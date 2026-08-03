@@ -1,0 +1,133 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ---- Database ----
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: medicheck-db
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medicheck}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medicheck_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-medicheck}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medicheck}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ---- Redis ----
+  redis:
+    image: redis:7-alpine
+    container_name: medicheck-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ---- FastAPI Backend (internal only - proxied through Nginx) ----
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medicheck-api
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+    expose:
+      - "8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ---- Celery Worker ----
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medicheck-worker
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=1000
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ---- Celery Beat ----
+  beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medicheck-beat
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - POSTGRES_HOST=db
+      - REDIS_HOST=redis
+    depends_on:
+      redis:
+        condition: service_healthy
+    command: celery -A workers.celery_app beat --loglevel=info
+    restart: unless-stopped
+    logging: *default-logging
+
+  # ---- Frontend + Nginx Reverse Proxy ----
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: medicheck-frontend
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - api
+    restart: unless-stopped
+    logging: *default-logging
+
+volumes:
+  postgres_data:
+  redis_data:
