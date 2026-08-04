@@ -24,6 +24,11 @@ export interface NavItem {
   section?: string
 }
 
+// NOTE: This file is kept for backwards compatibility.
+// Patient navigation is now defined in PatientLayout.tsx
+// Doctor/CMS navigation is defined in DoctorLayout.tsx
+// This ensures complete separation of patient and doctor portals.
+
 export const primaryNav: NavItem[] = [
   { label: 'Dashboard', to: '/app', icon: LayoutDashboard },
   { label: 'Health Profile', to: '/profile', icon: User },
@@ -36,17 +41,18 @@ export const primaryNav: NavItem[] = [
 export const secondaryNav: NavItem[] = [
   { label: 'Recommendations', to: '/recommendations', icon: HeartPulse },
   { label: 'Laboratory Results', to: '/body-systems', icon: FlaskConical },
-  { label: 'Knowledge Center', to: '/cms', icon: BookOpen },
+  // REMOVED: CMS link - Patients should NOT access CMS
+  // { label: 'Knowledge Center', to: '/cms', icon: BookOpen },
   { label: 'Body Systems', to: '/body-systems', icon: Layers },
 ]
 
 export const tertiaryNav: NavItem[] = [
   { label: 'Appointments', icon: Calendar, disabled: true },
-  { label: 'Settings', to: '/profile', icon: Settings },
+  { label: 'Settings', to: '/settings', icon: Settings },
 ]
 
 export const utilityItems: NavItem[] = [
-  { label: 'Settings', to: '/profile', icon: Settings },
+  { label: 'Settings', to: '/settings', icon: Settings },
   { label: 'Help & Support', icon: BookOpen },
   { label: 'Logout', icon: LogOut },
 ]

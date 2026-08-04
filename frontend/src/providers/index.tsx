@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react'
-import { AuthProvider } from './AuthProvider'
+import { AuthProvider } from '../contexts/AuthContext'
 import ThemeProvider from './ThemeProvider'
 
 const Providers: React.FC<{ children: React.ReactNode }> = ({ children }) => {

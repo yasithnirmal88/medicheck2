@@ -9,6 +9,7 @@ export type RegisterFormValues = {
   confirmPassword?: string
   displayName?: string
   acceptTerms?: boolean
+  role?: 'patient' | 'doctor'
 }
 
 export type AuthErrorType = 'invalid-credentials' | 'user-not-found' | 'network' | 'too-many-attempts' | 'unknown'
