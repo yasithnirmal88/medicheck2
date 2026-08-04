@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
 
     postgres_user: str = "medicheck"
-    postgres_password: str = "medicheck_secret"
+    postgres_password: str = "medicheck_secret"  # MUST be set via .env in production
     postgres_db: str = "medicheck"
     postgres_host: str = "localhost"
     postgres_port: int = 5432
@@ -150,5 +150,25 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         return self.environment == Environment.PRODUCTION
 
+    def validate_production_settings(self) -> list[str]:
+        """Validate production settings and return list of warnings."""
+        warnings = []
+        if self.environment == Environment.PRODUCTION:
+            if self.postgres_password == "medicheck_secret":
+                warnings.append("SECURITY: postgres_password is using default value. Set a strong password via POSTGRES_PASSWORD env var.")
+            if self.secret_key in ("", "change-me-to-a-random-secret-key"):
+                warnings.append("SECURITY: secret_key is not set. Authentication tokens are not secure!")
+            if self.redis_password == "":
+                warnings.append("SECURITY: redis_password is empty. Set a password via REDIS_PASSWORD env var.")
+        return warnings
+
 
 settings = Settings()
+
+# Validate production settings on startup
+_production_warnings = settings.validate_production_settings()
+if _production_warnings:
+    import logging
+    logging.basicConfig(level=logging.WARNING)
+    for warning in _production_warnings:
+        logging.warning(warning)
