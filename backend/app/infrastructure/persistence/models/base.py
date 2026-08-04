@@ -24,6 +24,7 @@ class TimestampMixin:
         server_default=func.now(),
         nullable=False,
         sort_order=100,
+        index=True,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -31,6 +32,7 @@ class TimestampMixin:
         onupdate=func.now(),
         nullable=False,
         sort_order=101,
+        index=True,
     )
 
 
@@ -40,6 +42,7 @@ class SoftDeleteMixin:
         nullable=True,
         default=None,
         sort_order=102,
+        index=True,
     )
 
     @property
