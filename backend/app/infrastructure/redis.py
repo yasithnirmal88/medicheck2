@@ -32,7 +32,7 @@ async def create_redis_pool() -> ConnectionPool:
 
 async def get_redis_client() -> AsyncRedis:
     global _redis_client
-    if _redis_client is not None and await _redis_client.ping():
+    if _redis_client is not None:
         return _redis_client
 
     pool = await create_redis_pool()
