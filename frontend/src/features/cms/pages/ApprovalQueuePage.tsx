@@ -96,8 +96,8 @@ export const ApprovalQueuePage: React.FC = () => {
                     <p className="text-xs text-slate-500">Reviewer: {r.reviewer_id}</p>
                   </div>
                   {r.status === 'pending' && (
-                    <button onClick={() => setCompleteReviewTarget(r.id)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition">
-                      Complete Review
+                    <button onClick={() => handleApprove(r.id)} className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition">
+                      Approve
                     </button>
                   )}
                 </div>

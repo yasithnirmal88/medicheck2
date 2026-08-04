@@ -239,7 +239,7 @@ const QuestionnaireListPage: React.FC = () => {
                   <AssessmentCard
                     key={template.id}
                     template={template}
-                    status={latest ? (latest.status as SessionStatus) : 'available'}
+                    status={latest ? (['submitted'].includes(latest.status) ? 'completed' : latest.status) as 'available' | 'in_progress' | 'paused' | 'completed' : 'available'}
                     progress={
                       latest && latest.status !== 'completed'
                         ? {
