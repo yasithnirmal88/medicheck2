@@ -219,7 +219,6 @@ class ClinicalDecisionService:
             .where(AssessmentSessionModel.id == session_id)
             .values(status="processed")
         )
-        await self.session.commit()
 
         # update result
         await self.session.execute(
@@ -227,7 +226,6 @@ class ClinicalDecisionService:
             .where(AssessmentResultModel.id == result.id)
             .values(summary=str(summary), confidence_score=float(overall_confidence))
         )
-        await self.session.commit()
 
         return {
             "result_id": result.id,

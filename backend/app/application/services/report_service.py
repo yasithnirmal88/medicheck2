@@ -192,7 +192,6 @@ class ReportService:
             .where(HealthAssessmentModel.id == assessment.id)
             .values(summary=str(summary))
         )
-        await self.session.commit()
 
         return {"report_id": assessment.id, "summary": summary}
 

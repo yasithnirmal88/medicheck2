@@ -30,7 +30,6 @@ class SQLAssessmentRepository:
             status="started",
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = (
             select(AssessmentSessionModel)
             .where(AssessmentSessionModel.user_id == user_id)
@@ -84,7 +83,6 @@ class SQLAssessmentRepository:
                 )
             )
             await self.session.execute(upd)
-            await self.session.commit()
             q2 = select(AssessmentAnswerModel).where(
                 AssessmentAnswerModel.id == existing.id
             )
@@ -99,7 +97,6 @@ class SQLAssessmentRepository:
             recorded_at=datetime.now(timezone.utc),
         )
         await self.session.execute(ins)
-        await self.session.commit()
         q3 = select(AssessmentAnswerModel).where(
             AssessmentAnswerModel.session_id == session_id,
             AssessmentAnswerModel.question_id == question_id,
@@ -125,4 +122,3 @@ class SQLAssessmentRepository:
             .values(**kwargs)
         )
         await self.session.execute(stmt)
-        await self.session.commit()
