@@ -27,17 +27,29 @@ export const AssessmentFilters = ({
 }) => {
   const toggleStatus = (s: AssessmentStatus) => {
     const set = new Set(filters.status)
-    set.has(s) ? set.delete(s) : set.add(s)
+    if (set.has(s)) {
+      set.delete(s)
+    } else {
+      set.add(s)
+    }
     onChange({ status: Array.from(set) })
   }
   const toggleDifficulty = (d: Difficulty) => {
     const set = new Set(filters.difficulty)
-    set.has(d) ? set.delete(d) : set.add(d)
+    if (set.has(d)) {
+      set.delete(d)
+    } else {
+      set.add(d)
+    }
     onChange({ difficulty: Array.from(set) })
   }
   const togglePriority = (p: AIPriority) => {
     const set = new Set(filters.priority)
-    set.has(p) ? set.delete(p) : set.add(p)
+    if (set.has(p)) {
+      set.delete(p)
+    } else {
+      set.add(p)
+    }
     onChange({ priority: Array.from(set) })
   }
 

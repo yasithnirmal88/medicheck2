@@ -21,10 +21,10 @@ const fieldSpecs: FieldSpec[] = [
 ]
 
 export function WomenHealthSection({ data, onChange }: WomenHealthSectionProps) {
-  const record = data as Record<string, unknown>
+  const record = data as unknown as Record<string, unknown>
 
   const update = (name: string, value: unknown) => {
-    onChange({ ...record, [name]: value } as WizardState['women_health'])
+    onChange({ ...record, [name]: value } as unknown as WizardState['women_health'])
   }
 
   return (
@@ -42,7 +42,7 @@ export function WomenHealthSection({ data, onChange }: WomenHealthSectionProps) 
             <Venus className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Women's Health</h3>
+            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Women&apos;s Health</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">Reproductive and hormonal health details</p>
           </div>
         </div>

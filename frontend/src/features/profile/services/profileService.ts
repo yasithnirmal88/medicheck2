@@ -13,7 +13,7 @@ export async function fetchProfileData(): Promise<WizardState> {
 }
 
 export async function saveProfileData(data: WizardState): Promise<WizardState> {
-  const payload = mapPersonalFromWizard(data)
+  const payload = mapPersonalFromWizard(data.personal)
   const response = await api.post(PROFILE_ENDPOINT, payload)
   return response.data
 }

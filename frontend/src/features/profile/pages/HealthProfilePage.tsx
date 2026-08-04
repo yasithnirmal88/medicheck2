@@ -505,7 +505,7 @@ export default function HealthProfilePage() {
               id="completion-panel"
               className="mb-4 overflow-hidden"
             >
-              <ProfileCompletion state={state} onSectionClick={(key) => {
+              <ProfileCompletion state={state as WizardState} onSectionClick={(key) => {
                 const idx = steps.findIndex((s) => s.key === key)
                 if (idx >= 0) setCurrentStep(idx)
               }} />

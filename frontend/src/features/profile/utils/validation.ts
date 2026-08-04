@@ -19,8 +19,8 @@ export function validateField(key: SectionKey, fieldName: string, value: unknown
   return fieldError ? [fieldError.message] : []
 }
 
-export function getMissingFields(state: WizardState): Record<SectionKey, string[]> {
-  const missing: Record<SectionKey, string[]> = {}
+export function getMissingFields(state: WizardState): Partial<Record<SectionKey, string[]>> {
+  const missing: Partial<Record<SectionKey, string[]>> = {}
   for (const key of Object.keys(sectionSchemas) as SectionKey[]) {
     const schema = sectionSchemas[key]
     if (!schema) continue
