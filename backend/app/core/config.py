@@ -94,6 +94,10 @@ class Settings(BaseSettings):
 
     firebase_credentials_path: str | None = None
     firebase_credentials_json: str | None = None
+    firebase_project_id: str | None = None
+    firebase_client_email: str | None = None
+    firebase_private_key: str | None = None
+    firebase_token_uri: str = "https://oauth2.googleapis.com/token"
 
     @property
     def firebase_credentials(self) -> dict | None:
@@ -103,6 +107,17 @@ class Settings(BaseSettings):
             path = Path(self.firebase_credentials_path)
             if path.exists():
                 return json.loads(path.read_text())
+        if self.firebase_project_id and self.firebase_client_email and self.firebase_private_key:
+            private_key = self.firebase_private_key.strip()
+            if private_key.startswith('"') and private_key.endswith('"'):
+                private_key = private_key[1:-1]
+            return {
+                "type": "service_account",
+                "project_id": self.firebase_project_id,
+                "private_key": private_key.replace("\\n", "\n"),
+                "client_email": self.firebase_client_email,
+                "token_uri": self.firebase_token_uri,
+            }
         return None
 
     allowed_hosts: str = "localhost,127.0.0.1,.medicheck.app"
