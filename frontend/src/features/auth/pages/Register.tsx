@@ -175,6 +175,24 @@ const RegisterPage: React.FC = () => {
             {...register('confirmPassword')}
           />
 
+          {/* Terms Checkbox */}
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              {...register('acceptTerms')}
+              className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-sm text-slate-600 dark:text-slate-400">
+              I agree to the{' '}
+              <a href="/terms" className="text-blue-600 hover:underline">Terms of Service</a>
+              {' '}and{' '}
+              <a href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</a>
+            </span>
+          </label>
+          {errors.acceptTerms && (
+            <p className="text-sm text-red-500">{errors.acceptTerms.message}</p>
+          )}
+
           <LoadingButton
             type="submit"
             fullWidth
@@ -233,18 +251,6 @@ const RegisterPage: React.FC = () => {
             </button>
           </p>
         </div>
-
-        {/* Terms Notice */}
-        <p className="text-center text-xs text-slate-400 dark:text-slate-500">
-          By creating an account, you agree to our{' '}
-          <a href="/terms" className="underline hover:text-slate-600">
-            Terms of Service
-          </a>{' '}
-          and{' '}
-          <a href="/privacy" className="underline hover:text-slate-600">
-            Privacy Policy
-          </a>
-        </p>
       </div>
     </AuthLayout>
   )
