@@ -3,7 +3,6 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { PageHeader, FormSection, FormField } from '../components/ContentLayout'
-import { cn } from '@/lib/utils'
 import { Save, X } from 'lucide-react'
 
 interface FieldDefinition {

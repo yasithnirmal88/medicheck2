@@ -4,6 +4,13 @@ import Card from '@/shared/ui/Card'
 import { useSessions } from '../hooks/usePatientDashboard'
 import { Link } from 'react-router-dom'
 
+interface Session {
+  id: string
+  started_at?: string
+  status: string
+  [key: string]: unknown
+}
+
 export default function AssessmentHistory() {
   const { data: sessions, isLoading } = useSessions()
 
@@ -16,7 +23,7 @@ export default function AssessmentHistory() {
             <div>Loading...</div>
           ) : sessions && sessions.length > 0 ? (
             <ul className="divide-y">
-              {sessions.map((s: any) => (
+              {sessions.map((s: Session) => (
                 <li key={s.id} className="py-3 flex items-center justify-between">
                   <div>
                     <div className="text-sm font-medium">Assessment</div>

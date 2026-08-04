@@ -21,7 +21,11 @@ const defaults = {
   food_allergies: '',
 }
 
-export default function NutritionForm({ initial }: { initial?: any }) {
+interface NutritionFormProps {
+  initial?: typeof defaults
+}
+
+export default function NutritionForm({ initial }: NutritionFormProps) {
   const form = useForm({ defaultValues: initial ?? defaults })
   const qc = useQueryClient()
   const mutation = useMutation({

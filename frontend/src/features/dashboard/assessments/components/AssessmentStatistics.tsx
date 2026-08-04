@@ -1,4 +1,4 @@
-import { Award, CalendarDays, CheckCircle, Clock, FileText } from 'lucide-react'
+import { Award, CalendarDays, CheckCircle, Clock } from 'lucide-react'
 import Card from '@/shared/ui/Card'
 import { cn } from '@/lib/utils'
 

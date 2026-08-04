@@ -4,7 +4,6 @@ import toast from 'react-hot-toast'
 import { ContentLayout, StatusBadge, EmptyState, TableSkeleton, Modal, FormField } from '../components/ContentLayout'
 import { useWorkflows } from '../hooks/useCmsQueries'
 import { cmsApi } from '../api/cmsApi'
-import type { Workflow } from '../types'
 
 export const PublishingWorkflowsPage: React.FC = () => {
   const [showCreate, setShowCreate] = useState(false)

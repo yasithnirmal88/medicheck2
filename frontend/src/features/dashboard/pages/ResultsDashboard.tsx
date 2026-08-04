@@ -1,11 +1,16 @@
 import React, { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Award, BarChart2, ClipboardList, FlaskConical, HeartPulse, LifeBuoy, NotebookText, Repeat, TrendingUp } from 'lucide-react'
+import { Award, BarChart2, FlaskConical, HeartPulse, LifeBuoy, NotebookText, Repeat, TrendingUp } from 'lucide-react'
 import AppLayout from '@/layouts/AppLayout'
 import Card from '@/shared/ui/Card'
 import Button from '@/shared/ui/Button'
 import { fetchReportBySession, generateReport } from '@/features/dashboard/api/patientService'
+
+interface Report {
+  summary?: string
+  [key: string]: unknown
+}
 
 interface RiskIndicator {
   id: string
@@ -120,7 +125,7 @@ function BarRow({ label, value, max = 100 }: { label: string; value: number; max
   )
 }
 
-function deriveScores(report: any): { overall: number; systems: BodySystemScore[] } {
+function deriveScores(report: Report): { overall: number; systems: BodySystemScore[] } {
   const raw = report?.summary ?? ''
   const seed = raw.length > 0 ? raw.length : 72
   const systems: BodySystemScore[] = [

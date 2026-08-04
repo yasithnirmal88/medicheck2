@@ -3,7 +3,7 @@ import { useSaveAnswer, useSession, useProgress } from './useQuestionnaire'
 import type { Question } from '../types'
 
 interface AnswerMap {
-  [questionId: string]: Record<string, any>
+  [questionId: string]: Record<string, unknown>
 }
 
 export function useQuestionnaireSession(sessionId: string | undefined) {
@@ -37,7 +37,7 @@ export function useQuestionnaireSession(sessionId: string | undefined) {
   }, [session?.status])
 
   const triggerAutoSave = useCallback(
-    (questionId: string, value: Record<string, any>) => {
+    (questionId: string, value: Record<string, unknown>) => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
       setSaveStatus('saving')
       debounceRef.current = setTimeout(() => {
@@ -57,7 +57,7 @@ export function useQuestionnaireSession(sessionId: string | undefined) {
   )
 
   const saveAnswer = useCallback(
-    (questionId: string, value: Record<string, any>) => {
+    (questionId: string, value: Record<string, unknown>) => {
       setAnswers((prev) => ({ ...prev, [questionId]: value }))
       triggerAutoSave(questionId, value)
     },

@@ -356,7 +356,7 @@ async def test_workflow_cms_content_lifecycle(db_session: AsyncSession):
         "id": bs_id, "code": "UAT_CMS", "name": "UAT CMS System",
         "description": "CMS UAT test", "icon": "test", "color_hex": "#000000",
         "display_order": 99, "is_core": False,
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC), "updated_at": datetime.now(UTC),
     })
     assert created_bs is not None
 
@@ -365,7 +365,7 @@ async def test_workflow_cms_content_lifecycle(db_session: AsyncSession):
         "id": uuid.uuid4().hex, "body_system_id": bs_id, "key": "UAT_CMS_IND",
         "name": "CMS Test Indicator", "severity": "mild",
         "evidence_strength": "C", "confidence": 0.5,
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC), "updated_at": datetime.now(UTC),
     })
     assert created_ind is not None
     assert created_ind.key == "UAT_CMS_IND"
@@ -380,7 +380,7 @@ async def test_workflow_cms_content_lifecycle(db_session: AsyncSession):
         "id": uuid.uuid4().hex, "title": "CMS UAT Evidence",
         "source": "Test Journal", "source_type": "journal",
         "evidence_level": "C",
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC), "updated_at": datetime.now(UTC),
     })
     assert created_ev is not None
 
@@ -390,7 +390,7 @@ async def test_workflow_cms_content_lifecycle(db_session: AsyncSession):
         "category": "lifestyle", "title": "CMS UAT Rec",
         "text": "Test recommendation.", "priority": 5,
         "key": "UAT_CMS_REC", "urgency": "routine", "evidence_level": "C",
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC), "updated_at": datetime.now(UTC),
     })
     assert created_rec is not None
 
@@ -549,7 +549,7 @@ async def test_workflow_admin_full_crud(db_session: AsyncSession):
         "id": bs_id, "code": "UAT_ADM", "name": "UAT Admin",
         "description": "Admin UAT", "icon": "admin", "color_hex": "#FFF",
         "display_order": 100, "is_core": False,
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC), "updated_at": datetime.now(UTC),
     })
     assert bs_created is not None
 
@@ -559,7 +559,7 @@ async def test_workflow_admin_full_crud(db_session: AsyncSession):
         "id": ind_id, "body_system_id": bs_id, "key": "UAT_ADM_IND",
         "name": "Admin Indicator", "severity": "moderate",
         "evidence_strength": "B", "confidence": 0.6,
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC), "updated_at": datetime.now(UTC),
     })
     assert ind_created is not None
 
@@ -568,7 +568,7 @@ async def test_workflow_admin_full_crud(db_session: AsyncSession):
         "id": uuid.uuid4().hex, "title": "Admin UAT Evidence",
         "source": "Admin Journal", "source_type": "journal",
         "evidence_level": "B",
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC), "updated_at": datetime.now(UTC),
     })
     assert ev_created is not None
 
@@ -578,7 +578,7 @@ async def test_workflow_admin_full_crud(db_session: AsyncSession):
         "category": "medication", "title": "Admin UAT Rec",
         "text": "Admin recommendation.", "priority": 8,
         "key": "UAT_ADM_REC", "urgency": "routine", "evidence_level": "B",
-        "created_at": datetime.utcnow(), "updated_at": datetime.utcnow(),
+        "created_at": datetime.now(UTC), "updated_at": datetime.now(UTC),
     })
     assert rec_created is not None
 

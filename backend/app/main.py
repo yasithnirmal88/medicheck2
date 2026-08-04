@@ -20,7 +20,6 @@ from app.api.errors import (
 )
 from app.api.middleware import (
     AuditLogMiddleware,
-    CSRFProtectMiddleware,
     RequestIDMiddleware,
     RequestLoggingMiddleware,
     RequestTimingMiddleware,
@@ -36,7 +35,7 @@ from app.core.exceptions import (
 )
 from app.core.logging import get_logger, setup_logging
 from app.core.security.firebase import get_firebase_app
-from app.infrastructure.database import close_db, init_db
+from app.infrastructure.database import close_db
 from app.infrastructure.redis import close_redis
 
 logger = get_logger(__name__)

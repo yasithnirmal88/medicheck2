@@ -3,6 +3,10 @@ import AppLayout from '@/layouts/AppLayout'
 import Card from '@/shared/ui/Card'
 import { useVersions } from '../hooks/useVersions'
 
+interface ProfileVersion {
+  [key: string]: unknown
+}
+
 export default function ProfileVersions() {
   const { data: versions, isLoading, restore } = useVersions()
 
@@ -19,7 +23,7 @@ export default function ProfileVersions() {
           {!isLoading && (!versions || versions.length === 0) && <div>No versions yet</div>}
           {!isLoading && versions && (
             <ul className="space-y-3">
-              {versions.map((v: any, idx: number) => (
+              {versions.map((v: ProfileVersion, idx: number) => (
                 <li key={idx} className="flex items-start justify-between">
                   <div>
                     <div className="text-sm font-medium">Version {versions.length - idx}</div>

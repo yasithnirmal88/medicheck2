@@ -12,12 +12,12 @@ export function useHealthTips(state: WizardState): HealthTip[] {
     const tips: HealthTip[] = []
     const l = state.lifestyle
     const n = state.nutrition
-    const mh = state.conditions
-    const fh = state.family_history
-    const lr = state.lifestyle_risks
-    const env = state.environment
-    const occ = state.occupation
-    const trav = state.travel
+    const _mh = state.conditions
+    const _fh = state.family_history
+    const _lr = state.lifestyle_risks
+    const _env = state.environment
+    const _occ = state.occupation
+    const _trav = state.travel
 
     if (l.smoking === 'current') {
       tips.push({ icon: 'alert', color: 'red', text: 'Current smoking significantly increases cardiovascular and respiratory risk. Consider a cessation plan.' })

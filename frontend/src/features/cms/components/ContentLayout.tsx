@@ -401,7 +401,6 @@ interface PaginationProps {
 }
 
 export const Pagination: React.FC<PaginationProps> = ({ skip, limit, total, onChange }) => {
-  const current = Math.floor(skip / limit) + 1
   const totalPages = Math.ceil(total / limit)
   if (totalPages <= 1) return null
 

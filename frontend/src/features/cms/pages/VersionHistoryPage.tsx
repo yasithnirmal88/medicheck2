@@ -1,9 +1,7 @@
 import React, { useState } from 'react'
-import { History, GitCompare, RotateCcw } from 'lucide-react'
-import toast from 'react-hot-toast'
+import { History, GitCompare } from 'lucide-react'
 import { ContentLayout, StatusBadge, EmptyState, TableSkeleton, FormField } from '../components/ContentLayout'
 import { useSnapshots } from '../hooks/useCmsQueries'
-import type { VersionSnapshot } from '../types'
 
 export const VersionHistoryPage: React.FC = () => {
   const [entityType, setEntityType] = useState('')

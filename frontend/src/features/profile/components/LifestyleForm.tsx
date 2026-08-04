@@ -23,7 +23,11 @@ const defaultValues = {
   physical_activity_level: '',
 }
 
-export default function LifestyleForm({ initial }: { initial?: any }) {
+interface LifestyleFormProps {
+  initial?: typeof defaultValues
+}
+
+export default function LifestyleForm({ initial }: LifestyleFormProps) {
   const form = useForm({ defaultValues: initial ?? defaultValues })
   const qc = useQueryClient()
 

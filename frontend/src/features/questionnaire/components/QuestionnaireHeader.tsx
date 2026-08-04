@@ -26,7 +26,7 @@ type QuestionnaireHeaderProps = {
 }
 
 const QuestionnaireHeader: React.FC<QuestionnaireHeaderProps> = ({
-  session,
+  session: _session,
   currentIndex,
   totalQuestions,
   answered,

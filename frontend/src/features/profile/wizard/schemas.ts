@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import type { MedicalHistoryEntry, SurgeryEntry, FamilyEntry, MedicationEntry, AllergyEntry, VaccinationEntry } from '../types/wizard'
 
 const stringField = z.string().trim()
 const optionalString = stringField.optional()

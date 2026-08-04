@@ -1,7 +1,6 @@
 import React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Mars, Shield, AlertTriangle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Mars } from 'lucide-react'
 import { Field } from './FieldControl'
 import type { FieldSpec } from './FieldControl'
 import type { WizardState } from '@/features/profile/types/wizard'

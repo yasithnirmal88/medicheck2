@@ -7,7 +7,7 @@ interface SwitchProps {
   description?: string
 }
 
-export const Switch: React.FC<SwitchProps> = ({ checked, onChange, label, description }) => (
+export const Switch: React.FC<SwitchProps> = ({ checked, onChange, label, description: _description }) => (
   <button
     type="button"
     role="switch"

@@ -4,10 +4,17 @@ import Card from '@/shared/ui/Card'
 import { useProfile, useCompletion, useSessions } from '../hooks/usePatientDashboard'
 import { Link } from 'react-router-dom'
 
+interface Session {
+  id: string
+  started_at?: string
+  status: string
+  [key: string]: unknown
+}
+
 export default function PatientDashboard() {
   const { data: profile } = useProfile()
   const { data: completion } = useCompletion()
-  const { data: sessions } = useSessions()
+  const { data: sessions } = useSessions() as { data?: Session[] }
 
   const latestSession = sessions && sessions.length > 0 ? sessions[0] : null
 
@@ -67,7 +74,7 @@ export default function PatientDashboard() {
             <div className="mt-2">
               {sessions && sessions.length > 0 ? (
                 <ul className="space-y-2">
-                  {sessions.slice(0, 5).map((s: any) => (
+                  {sessions.slice(0, 5).map((s: Session) => (
                     <li key={s.id} className="flex items-center justify-between">
                       <div>
                         <div className="text-sm font-medium">{s.id}</div>

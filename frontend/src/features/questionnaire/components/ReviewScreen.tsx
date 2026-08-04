@@ -25,7 +25,7 @@ function ProgressBar({ value, color = 'indigo' }: { value: number; color?: 'indi
 
 interface ReviewScreenProps {
   questions: Question[]
-  answers: Record<string, any>
+  answers: Record<string, unknown>
   onEdit: (index: number) => void
   onSubmit: () => void
 }

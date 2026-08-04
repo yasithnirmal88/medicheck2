@@ -1,11 +1,39 @@
 import React, { useEffect, useState } from 'react'
 import { listIndicators, listEvidence, listRecommendations, listAudit } from '../api/adminService'
 
+interface Indicator {
+  id: string
+  name: string
+  description?: string
+  [key: string]: unknown
+}
+
+interface Evidence {
+  id: string
+  title: string
+  source: string
+  [key: string]: unknown
+}
+
+interface Recommendation {
+  id: string
+  title: string
+  [key: string]: unknown
+}
+
+interface AuditLog {
+  id: string
+  changed_at: string
+  entity_type: string
+  action: string
+  [key: string]: unknown
+}
+
 export default function AdminDashboard() {
-  const [indicators, setIndicators] = useState<any[]>([])
-  const [evidence, setEvidence] = useState<any[]>([])
-  const [recommendations, setRecommendations] = useState<any[]>([])
-  const [audits, setAudits] = useState<any[]>([])
+  const [indicators, setIndicators] = useState<Indicator[]>([])
+  const [evidence, setEvidence] = useState<Evidence[]>([])
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([])
+  const [audits, setAudits] = useState<AuditLog[]>([])
 
   useEffect(() => {
     listIndicators().then(setIndicators).catch(() => setIndicators([]))

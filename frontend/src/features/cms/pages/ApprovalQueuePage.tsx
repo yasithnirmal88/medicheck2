@@ -1,10 +1,9 @@
 import React, { useState } from 'react'
 import { CheckCircle2, XCircle, Clock } from 'lucide-react'
 import toast from 'react-hot-toast'
-import { ContentLayout, Tabs, StatusBadge, EmptyState, TableSkeleton, ConfirmAction, FormField } from '../components/ContentLayout'
-import { useApprovals, useReviews, usePublishingJobs, useChangeRequests, useApproveJob } from '../hooks/useCmsQueries'
+import { ContentLayout, Tabs, StatusBadge, EmptyState, TableSkeleton, ConfirmAction } from '../components/ContentLayout'
+import { useApprovals, useReviews, usePublishingJobs, useChangeRequests } from '../hooks/useCmsQueries'
 import { cmsApi } from '../api/cmsApi'
-import type { Approval, Review, PublishingJob, ChangeRequest } from '../types'
 
 const approvalTabs = [
   { id: 'pending', label: 'Pending Approvals' },
@@ -17,13 +16,11 @@ export const ApprovalQueuePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('pending')
   const [rejectTarget, setRejectTarget] = useState<{ id: string; type: string } | null>(null)
   const [rejectReason, setRejectReason] = useState('')
-  const [completeReviewTarget, setCompleteReviewTarget] = useState<string | null>(null)
 
   const { data: approvals, isLoading: approvalsLoading } = useApprovals()
   const { data: reviews, isLoading: reviewsLoading } = useReviews()
   const { data: jobs, isLoading: jobsLoading } = usePublishingJobs()
   const { data: changeRequests, isLoading: changesLoading } = useChangeRequests()
-  const approveJob = useApproveJob()
 
   const handleApprove = async (id: string) => {
     try {
@@ -40,14 +37,6 @@ export const ApprovalQueuePage: React.FC = () => {
       setRejectTarget(null)
       setRejectReason('')
     } catch { toast.error('Failed to reject') }
-  }
-
-  const handleCompleteReview = async (id: string) => {
-    try {
-      await cmsApi.publishing.completeReview(id, 'completed')
-      toast.success('Review completed')
-      setCompleteReviewTarget(null)
-    } catch { toast.error('Failed to complete review') }
   }
 
   const handleExecutePublish = async (id: string) => {
