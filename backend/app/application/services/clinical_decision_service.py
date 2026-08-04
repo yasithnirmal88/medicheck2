@@ -38,6 +38,8 @@ class ClinicalDecisionService:
         sess = await self.session.get(AssessmentSessionModel, session_id)
         if sess is None:
             raise ValueError("Assessment session not found")
+        if user_id is not None and sess.user_id != user_id:
+            raise ValueError("Assessment session not found")
         answers = sess.answers  # loaded with selectin earlier
 
         # build answer map
