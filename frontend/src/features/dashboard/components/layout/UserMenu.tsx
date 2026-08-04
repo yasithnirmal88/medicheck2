@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getAuth, signOut } from 'firebase/auth'
 import { ChevronDown, HelpCircle, LogOut, Settings, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useAuth } from '@/hooks/useAuth'
+import { useAuth } from '@/providers/AuthProvider'
+import { getFirebaseAuth, signOut } from '@/lib/firebase'
 import { initials } from '../../utils/format'
 
 export interface UserMenuProps {
@@ -31,10 +31,11 @@ export const UserMenu: React.FC<UserMenuProps> = ({ name, email }) => {
 
   const onLogout = async () => {
     try {
-      await signOut(getAuth())
+      const auth = getFirebaseAuth()
+      await signOut(auth)
       window.location.href = '/login'
     } catch (err) {
-      console.error(err)
+      console.error('Logout error:', err)
     }
   }
 

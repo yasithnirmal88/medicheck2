@@ -1,40 +1,84 @@
+/**
+ * AuthProvider - React Context for Firebase Authentication
+ * 
+ * Wraps the app and provides authentication state to all components.
+ * Uses the centralized Firebase configuration from @/lib/firebase
+ */
+
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { initializeApp } from 'firebase/app'
-import { getAuth, onAuthStateChanged, User } from 'firebase/auth'
+import { User } from 'firebase/auth'
+import { getFirebaseAuth, onAuthStateChanged } from '@/lib/firebase'
 
-const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyAUjtplfYBgFUOo6C5Q5R0NmXzVPIiH9TQ",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "medicheck-19865.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "medicheck-19865",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "medicheck-19865.firebasestorage.app",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "873643749135",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "1:873643749135:web:763c4346a3aa00964f987a",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-RXCH3ECT4X"
-}
-
-const app = initializeApp(firebaseConfig)
-const auth = getAuth(app)
-
+// Auth context type
 type AuthContextType = {
   user: User | null
   loading: boolean
+  isAuthenticated: boolean
 }
 
-const AuthContext = createContext<AuthContextType>({ user: null, loading: true })
+// Default context value
+const defaultContext: AuthContextType = {
+  user: null,
+  loading: true,
+  isAuthenticated: false,
+}
 
+// Create context
+const AuthContext = createContext<AuthContextType>(defaultContext)
+
+// Provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u)
+    let unsubscribe: (() => void) | null = null
+
+    try {
+      const auth = getFirebaseAuth()
+      
+      unsubscribe = onAuthStateChanged(
+        auth,
+        (firebaseUser) => {
+          setUser(firebaseUser)
+          setLoading(false)
+        },
+        (error) => {
+          console.error('Auth state change error:', error)
+          setLoading(false)
+        }
+      )
+    } catch (error) {
+      console.error('Firebase auth initialization error:', error)
       setLoading(false)
-    })
-    return () => unsub()
+    }
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
   }, [])
 
-  return <AuthContext.Provider value={{ user, loading }}>{children}</AuthContext.Provider>
+  const value: AuthContextType = {
+    user,
+    loading,
+    isAuthenticated: !!user,
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
-export const useAuthContext = () => useContext(AuthContext)
+// Hook to access auth context
+export const useAuthContext = (): AuthContextType => {
+  const context = useContext(AuthContext)
+  
+  if (!context) {
+    throw new Error('useAuthContext must be used within an AuthProvider')
+  }
+  
+  return context
+}
+
+// Named export for backwards compatibility
+export { useAuthContext as useAuth }
