@@ -8,13 +8,6 @@ import { useTemplates, useStartSession } from '../hooks/useQuestionnaire'
 import type { QuestionnaireTemplate } from '../types'
 import Skeleton from '@/shared/ui/Skeleton'
 
-const SectionHeader: React.FC<{ title: string; subtitle?: string }> = ({ title, subtitle }) => (
-  <div className="mb-2">
-    <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">{title}</h2>
-    {subtitle ? <p className="text-sm text-gray-500 dark:text-gray-400">{subtitle}</p> : null}
-  </div>
-)
-
 const AssessmentSelectionPage: React.FC = () => {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')

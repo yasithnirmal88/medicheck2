@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ContentLayout, DataTable, StatusBadge, SearchInput, Pagination, ConfirmAction } from '../components/ContentLayout'
+import { ContentLayout, DataTable, SearchInput, Pagination, ConfirmAction } from '../components/ContentLayout'
 import { useContentList, useDeleteContent } from '../hooks/useCmsQueries'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
 import type { Column } from '../components/ContentLayout'

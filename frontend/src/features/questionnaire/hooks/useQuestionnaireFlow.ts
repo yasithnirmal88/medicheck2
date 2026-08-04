@@ -7,7 +7,7 @@ import {
   useCompleteSession,
   useSession,
 } from './useQuestionnaire'
-import type { AnswerResponse, AssessmentSession, Question } from '../types'
+import type { AnswerResponse, Question } from '../types'
 
 const DRAFT_STORAGE_KEY = (sessionId: string) => `medicheck:questionnaire:draft:${sessionId}`
 

@@ -2,7 +2,7 @@ import React from 'react'
 import { ContentLayout, FormSection, TableSkeleton } from '../components/ContentLayout'
 import { useContentList } from '../hooks/useCmsQueries'
 import { cn } from '@/lib/utils'
-import { Settings, Tag, Stethoscope, AlertTriangle } from 'lucide-react'
+import { Tag, Stethoscope, AlertTriangle } from 'lucide-react'
 import type { MedicalSpecialty, MedicalTag, RiskCategory } from '../types'
 
 export const SettingsPage: React.FC = () => {

@@ -5,9 +5,38 @@ import { useQuery } from '@tanstack/react-query'
 import { fetchReportBySession } from '../api/patientService'
 import { useParams } from 'react-router-dom'
 
+interface BodySystemAssessment {
+  id: string
+  body_system_id?: string
+  category?: string
+  notes?: string
+  [key: string]: unknown
+}
+
+interface Condition {
+  id: string
+  condition_id?: string
+  confidence?: number
+  notes?: string
+}
+
+interface Advice {
+  id: string
+  category?: string
+  text?: string
+}
+
+interface HealthReport {
+  summary?: string
+  body_systems?: BodySystemAssessment[]
+  conditions?: Condition[]
+  advices?: Advice[]
+  [key: string]: unknown
+}
+
 export default function ReportViewer() {
   const { id } = useParams<{ id: string }>()
-  const { data: report, isLoading } = useQuery({ queryKey: ['report', id], queryFn: () => fetchReportBySession(id || ''), enabled: !!id })
+  const { data: report, isLoading } = useQuery<HealthReport>({ queryKey: ['report', id], queryFn: () => fetchReportBySession(id || ''), enabled: !!id })
 
   return (
     <AppLayout>
@@ -29,7 +58,7 @@ export default function ReportViewer() {
                 <h2 className="text-lg font-medium mt-4">Body Systems</h2>
                 <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-3">
                   {report.body_systems && report.body_systems.length > 0 ? (
-                    report.body_systems.map((b: any) => (
+                    report.body_systems.map((b: BodySystemAssessment) => (
                       <div key={b.id} className="p-3 border rounded">
                         <div className="text-sm font-medium">Body system: {b.body_system_id ?? 'Unknown'}</div>
                         <div className="text-xs text-gray-500">Category: {b.category}</div>
@@ -46,7 +75,7 @@ export default function ReportViewer() {
                 <h2 className="text-lg font-medium mt-4">Condition Assessments</h2>
                 {report.conditions && report.conditions.length > 0 ? (
                   <ul className="mt-2 space-y-2">
-                    {report.conditions.map((c: any) => (
+                    {report.conditions.map((c: Condition) => (
                       <li key={c.id} className="p-3 border rounded">
                         <div className="text-sm font-medium">Condition: {c.condition_id}</div>
                         <div className="text-xs text-gray-500">Confidence: {c.confidence}</div>
@@ -63,7 +92,7 @@ export default function ReportViewer() {
                 <h2 className="text-lg font-medium mt-4">Recommendations & Advice</h2>
                 {report.advices && report.advices.length > 0 ? (
                   <ul className="mt-2 space-y-2">
-                    {report.advices.map((a: any) => (
+                    {report.advices.map((a: Advice) => (
                       <li key={a.id} className="p-3 border rounded">
                         <div className="text-sm font-medium">{a.category ?? 'Advice'}</div>
                         <div className="text-xs text-gray-500">{a.text}</div>

@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils'
-import { Bot, CheckCircle, ClipboardList, HeartPulse, TestTube, User, Lightbulb } from 'lucide-react'
+import { Bot, CheckCircle, ClipboardList, TestTube, User, Lightbulb } from 'lucide-react'
 import { motion } from 'framer-motion'
 
 type TimelineItem = {

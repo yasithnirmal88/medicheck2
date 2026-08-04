@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { SearchInput, TableSkeleton, EmptyState } from '../components/ContentLayout'
 import { cmsApi } from '../api/cmsApi'
-import { cn } from '@/lib/utils'
-import { Search, FileText, Loader2 } from 'lucide-react'
+import { Search, FileText } from 'lucide-react'
 import type { EntitySearchResult } from '../types'
 
 export const SearchPage: React.FC = () => {

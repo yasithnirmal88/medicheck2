@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { ContentLayout, Modal, StatusBadge, EmptyState, TableSkeleton, FormField } from '../components/ContentLayout'
 import { useRuleSets, useEvaluateRule } from '../hooks/useCmsQueries'
 import { cmsApi } from '../api/cmsApi'
-import type { RuleSet, RuleEvaluationResult } from '../types'
+import type { RuleEvaluationResult } from '../types'
 
 export const RuleBuilderPage: React.FC = () => {
   const [selectedRuleSetId, setSelectedRuleSetId] = useState<string | null>(null)

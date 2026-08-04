@@ -8,15 +8,12 @@ import {
   FileText,
   Grid2X2,
   History,
-  List,
   LogOut,
   Menu,
   Search,
   Settings,
   ShieldHalf,
   User,
-  Users,
-  X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Card from '@/shared/ui/Card'

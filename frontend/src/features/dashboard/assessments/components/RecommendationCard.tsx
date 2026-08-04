@@ -1,9 +1,8 @@
 import Card from '@/shared/ui/Card'
 import { cn } from '@/lib/utils'
-import { ArrowRight, Bot, FileText, Target } from 'lucide-react'
+import { ArrowRight, Bot, Target } from 'lucide-react'
 import { motion } from 'framer-motion'
 import type { AIPriority } from '../types'
-import { AssessmentBadge } from './AssessmentCard'
 import { recommendationInsight } from '../mockData'
 
 export const RecommendationCard = () => {

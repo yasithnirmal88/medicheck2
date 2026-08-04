@@ -5,7 +5,7 @@ import { DifficultyIndicator } from './DifficultyIndicator'
 import { Award, Bot, Clock, Edit3, PlayCircle, RefreshCw, Trash2 } from 'lucide-react'
 import { motion } from 'framer-motion'
 
-export const AssessmentBadge = ({ aiEnabled, priority }: { aiEnabled: boolean; priority: AssessmentDef['priority'] }) => (
+export const AssessmentBadge = ({ aiEnabled }: { aiEnabled: boolean }) => (
   <span
     className={cn(
       'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium',

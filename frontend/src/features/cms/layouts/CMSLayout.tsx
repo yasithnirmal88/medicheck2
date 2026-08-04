@@ -3,8 +3,8 @@ import { NavLink, Outlet } from 'react-router-dom'
 import {
   LayoutDashboard, Layers, GitBranch, Network, CheckCircle2,
   History, BookOpen, FileText, Activity, Stethoscope, Beaker,
-  ScanLine, Heart, Apple, Dumbbell, FlaskConical, Pill,
-  Shield, Users, Search, Settings, GitMerge, Clock,
+  ScanLine, Heart, Apple, Dumbbell, Pill,
+  Shield, Users, Search, Settings, GitMerge,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'

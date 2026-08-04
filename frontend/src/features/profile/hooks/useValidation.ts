@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { sectionSchemas } from '../wizard/schemas'
-import type { SectionKey, WizardState } from '../types/wizard'
+import type { SectionKey } from '../types/wizard'
 
 interface ValidationResult {
   isValid: boolean

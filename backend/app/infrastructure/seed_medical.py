@@ -16,7 +16,6 @@ from app.infrastructure.persistence.models.clinical_indicator import (
 from app.infrastructure.persistence.models.evidence_reference import (
     EvidenceReferenceModel,
 )
-from app.infrastructure.persistence.models.laboratory_test import LaboratoryTestModel
 from app.infrastructure.persistence.models.links import (
     ConditionLaboratoryTestLinkModel,
     ConditionRecommendationLinkModel,
@@ -28,7 +27,6 @@ from app.infrastructure.persistence.models.links import (
 from app.infrastructure.persistence.models.possible_condition import (
     PossibleConditionModel,
 )
-from app.infrastructure.persistence.models.recommendation import RecommendationModel
 from app.infrastructure.persistence.repositories.sql_clinical_indicator_repository import (
     SQLClinicalIndicatorRepository,
 )

@@ -58,7 +58,7 @@ export const useSaveAnswer = () => {
   return useMutation({
     mutationFn: ({ sessionId, data }: { sessionId: string; data: SaveAnswerRequest }) =>
       saveAnswer(sessionId, data),
-    onMutate: async ({ sessionId, data }) => {
+    onMutate: async ({ sessionId, data: _data }) => {
       await qc.cancelQueries({ queryKey: ['session', sessionId] })
       const previous = qc.getQueryData(['session', sessionId])
       return { previous }

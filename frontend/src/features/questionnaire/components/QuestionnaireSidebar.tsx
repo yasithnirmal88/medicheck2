@@ -8,7 +8,6 @@ import {
   Lightbulb,
   Send,
   ShieldCheck,
-  User,
   X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -64,7 +63,7 @@ type QuestionnaireSidebarProps = {
 }
 
 const QuestionnaireSidebar: React.FC<QuestionnaireSidebarProps> = ({
-  question,
+  question: _question,
   answered,
   totalQuestions,
   completionPercentage,

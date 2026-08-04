@@ -109,7 +109,7 @@ export interface AssessmentSession {
 
 export interface SaveAnswerRequest {
   question_id: string
-  response_value: Record<string, any>
+  response_value: Record<string, unknown>
   time_taken_seconds?: number
 }
 

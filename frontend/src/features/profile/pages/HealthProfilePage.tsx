@@ -1,6 +1,6 @@
-import React, { useMemo, useEffect, useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Info, AlertTriangle } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { useWizard } from '../state/WizardProvider'
 import { DashboardLayout } from '../../../layouts/DashboardLayout'
 import { Stepper } from '../components/wizard/Stepper'
@@ -10,14 +10,11 @@ import { PhotoUpload } from '../components/wizard/PhotoUpload'
 import { MedicationCard } from '../components/wizard/MedicationCard'
 import { AllergyCard } from '../components/wizard/AllergyCard'
 import { VaccinationSection } from '../components/wizard/VaccinationSection'
-import { WomenHealthSection } from '../components/wizard/WomenHealthSection'
-import { MenHealthSection } from '../components/wizard/MenHealthSection'
 import { DiseaseCardGrid } from '../components/wizard/DiseaseCardGrid'
 import { ExpandableFamilyCard } from '../components/wizard/ExpandableFamilyCard'
 import { ReviewSubmitPage } from '../components/wizard/ReviewSubmitPage'
 import { HealthTips } from '../components/wizard/HealthTips'
 import { ProfileErrorBoundary } from '../components/ProfileErrorBoundary'
-import { ProfileSkeleton } from '../components/ProfileSkeleton'
 import { AutoSaveIndicator } from '../components/AutoSaveIndicator'
 import { ProfileCompletion } from '../components/ProfileCompletion'
 import { AIReadinessScore } from '../components/AIReadinessScore'
@@ -29,8 +26,6 @@ import { useHealthTips } from '../hooks/useHealthTips'
 import { useToast } from '../hooks/useToast'
 import { useValidation } from '../hooks/useValidation'
 import type { WizardState, SectionKey } from '../types/wizard'
-import { fieldSpecs } from '../wizard/fieldSpecs'
-import { sectionSchemas } from '../wizard/schemas'
 
 const STEP_LABELS: { key: SectionKey; label: string; icon: string }[] = [
   { key: 'personal', label: 'Personal', icon: 'User' },
@@ -84,8 +79,6 @@ function renderSection(
     )
   }
 
-  const specs = fieldSpecs[key]
-
   if (key === 'personal') {
     return (
       <div className="space-y-6">
@@ -103,7 +96,7 @@ function renderSection(
     const itemMap = {
       conditions: {
         newItem: { id: crypto.randomUUID(), conditions: [], diagnosis_date: '', severity: '', status: '', notes: '', surgeries_count: '', hospital_admissions: '', previous_fractures: '', organ_transplants: '' },
-        renderItem: (item: unknown, index: number, onUpdate: (item: unknown) => void, onRemove: () => void) => {
+        renderItem: (item: unknown, _index: number, onUpdate: (item: unknown) => void, _onRemove: () => void) => {
           const entry = item as WizardState['conditions'][number]
           return (
             <div className="space-y-3">
@@ -134,7 +127,7 @@ function renderSection(
       },
       surgeries: {
         newItem: { id: crypto.randomUUID(), procedure: '', date: '', hospital: '', reason: '', outcome: '' },
-        renderItem: (item: unknown, index: number, onUpdate: (item: unknown) => void, onRemove: () => void) => {
+        renderItem: (item: unknown, _index: number, onUpdate: (item: unknown) => void, _onRemove: () => void) => {
           const entry = item as WizardState['surgeries'][number]
           return (
             <div className="space-y-3">
@@ -151,7 +144,7 @@ function renderSection(
       },
       family_history: {
         newItem: { id: crypto.randomUUID(), relative: '', diseases: [], age_at_diagnosis: '', current_status: '', notes: '' },
-        renderItem: (item: unknown, index: number, onUpdate: (item: unknown) => void, onRemove: () => void) => {
+        renderItem: (item: unknown, _index: number, onUpdate: (item: unknown) => void, _onRemove: () => void) => {
           const entry = item as WizardState['family_history'][number]
           return (
             <ExpandableFamilyCard
@@ -170,7 +163,7 @@ function renderSection(
       },
       medications: {
         newItem: { id: crypto.randomUUID(), medication: '', dosage: '', frequency: '', reason: '', start_date: '', prescribing_doctor: '', current_status: '' },
-        renderItem: (item: unknown, index: number, onUpdate: (item: unknown) => void, onRemove: () => void) => {
+        renderItem: (item: unknown, _index: number, onUpdate: (item: unknown) => void, onRemove: () => void) => {
           const entry = item as WizardState['medications'][number]
           return (
             <MedicationCard
@@ -189,7 +182,7 @@ function renderSection(
       },
       allergies: {
         newItem: { id: crypto.randomUUID(), type: '', substance: '', severity: '', reaction: '', emergency_medication: '' },
-        renderItem: (item: unknown, index: number, onUpdate: (item: unknown) => void, onRemove: () => void) => {
+        renderItem: (item: unknown, _index: number, onUpdate: (item: unknown) => void, onRemove: () => void) => {
           const entry = item as WizardState['allergies'][number]
           return (
             <AllergyCard
@@ -206,7 +199,7 @@ function renderSection(
       },
       vaccinations: {
         newItem: { id: crypto.randomUUID(), vaccine: '', dose: '', date: '', provider: '' },
-        renderItem: (item: unknown, index: number, onUpdate: (item: unknown) => void, onRemove: () => void) => {
+        renderItem: (item: unknown, _index: number, onUpdate: (item: unknown) => void, _onRemove: () => void) => {
           const entry = item as WizardState['vaccinations'][number]
           return (
             <div className="space-y-3">
@@ -418,10 +411,10 @@ export default function HealthProfilePage() {
   const [currentStep, setCurrentStep] = React.useState(0)
   const [showCompletion, setShowCompletion] = useState(false)
   const [showAIReadiness, setShowAIReadiness] = useState(false)
-  const { success, error, info } = useToast()
+  const { success, error } = useToast()
   const { validateSection } = useValidation()
-  const completion = useProfileCompletion(state)
-  const aiReadiness = useAIReadiness(state)
+  useProfileCompletion(state)
+  useAIReadiness(state)
   const healthTips = useHealthTips(state)
   useAutoSave(true)
   useUnsavedChanges(hasUnsavedChanges)

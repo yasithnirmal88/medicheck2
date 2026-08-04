@@ -17,14 +17,22 @@ import FileUploadInput from './question-types/FileUploadInput'
 
 interface QuestionRendererProps {
   question: Question
-  value: any
-  onChange: (value: any) => void
+  value: unknown
+  onChange: (value: unknown) => void
   error?: string
   disabled?: boolean
   onSearch?: (query: string) => Promise<{ id: string; text: string; value: string }[]>
 }
 
-const typeMap: Record<string, React.FC<any>> = {
+interface ComponentProps {
+  value: unknown
+  onChange: (value: unknown) => void
+  error?: string
+  disabled?: boolean
+  onSearch?: (query: string) => Promise<{ id: string; text: string; value: string }[]>
+}
+
+const typeMap: Record<string, React.FC<ComponentProps>> = {
   single_choice: SingleChoice,
   multiple_choice: MultipleChoice,
   yes_no: YesNo,

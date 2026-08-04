@@ -4,11 +4,28 @@ import Card from '@/shared/ui/Card'
 import { useReports } from '../hooks/useTimeline'
 import { Link } from 'react-router-dom'
 
+interface BodySystem {
+  id: string
+  body_system_id?: string
+  category?: string
+}
+
+interface TimelineReport {
+  id: string
+  session_id?: string
+  summary?: string
+  status?: string
+  created_at?: string
+  started_at?: string
+  body_systems?: BodySystem[]
+  [key: string]: unknown
+}
+
 export default function TimelinePage() {
   const [order, setOrder] = useState<'desc' | 'asc'>('desc')
   const { data: reports, isLoading } = useReports(50, 0)
 
-  const sorted = reports ? [...reports].sort((a: any, b: any) => {
+  const sorted = reports ? [...reports].sort((a: TimelineReport, b: TimelineReport) => {
     const da = new Date(a.created_at || a.started_at || 0).getTime()
     const db = new Date(b.created_at || b.started_at || 0).getTime()
     return order === 'desc' ? db - da : da - db
@@ -31,7 +48,7 @@ export default function TimelinePage() {
             <div className="text-sm text-gray-500">No assessments found.</div>
           ) : (
             <ul className="space-y-3">
-              {sorted.map((r: any) => (
+              {sorted.map((r: TimelineReport) => (
                 <li key={r.id} className="p-3 border rounded">
                   <div className="flex items-start justify-between">
                     <div>
@@ -51,7 +68,7 @@ export default function TimelinePage() {
                     <strong>Body Systems:</strong>
                     <div className="mt-1">
                       {r.body_systems && r.body_systems.length > 0 ? (
-                        r.body_systems.map((b: any) => (
+                        r.body_systems.map((b: BodySystem) => (
                           <div key={b.id} className="text-xs">{b.body_system_id ?? 'Unknown'} — {b.category}</div>
                         ))
                       ) : (

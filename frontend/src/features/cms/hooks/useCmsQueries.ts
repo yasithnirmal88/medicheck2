@@ -3,7 +3,7 @@ import toast from 'react-hot-toast'
 import { cmsApi } from '../api/cmsApi'
 import type {
   Approval, AuditDiff, AuditLogEntry, AuditStats, BodySystem,
-  ChangeRequest, ClinicalIndicator, CMSDashboardOverview, DecisionRule,
+  ChangeRequest, ClinicalIndicator, CMSDashboardOverview,
   Disease, EntityType, EvidenceReference, GraphValidationResult,
   ImagingTest, KnowledgeGraph, LaboratoryTest, PaginatedResponse,
   PublishingJob, Question, QuestionGroup, Recommendation,
