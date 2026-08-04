@@ -33,7 +33,7 @@ async def get_result_by_session(
     session: AsyncSession = Depends(get_db),
 ):
     svc = ClinicalDecisionService(session)
-    res = await svc.get_result_by_session(session_id)
+    res = await svc.get_result_by_session(session_id, user_id=current_user.id)
     if not res:
         raise HTTPException(status_code=404, detail="result not found")
     return res
@@ -46,7 +46,7 @@ async def get_result(
     session: AsyncSession = Depends(get_db),
 ):
     svc = ClinicalDecisionService(session)
-    res = await svc.get_result(result_id)
+    res = await svc.get_result(result_id, user_id=current_user.id)
     if not res:
         raise HTTPException(status_code=404, detail="result not found")
     return res
@@ -59,7 +59,7 @@ async def get_explanation(
     session: AsyncSession = Depends(get_db),
 ):
     svc = ClinicalDecisionService(session)
-    res = await svc.get_result_by_session(session_id)
+    res = await svc.get_result_by_session(session_id, user_id=current_user.id)
     if not res:
         raise HTTPException(status_code=404, detail="result not found")
     return res.explanations
@@ -72,7 +72,7 @@ async def get_recommendations(
     session: AsyncSession = Depends(get_db),
 ):
     svc = ClinicalDecisionService(session)
-    res = await svc.get_result_by_session(session_id)
+    res = await svc.get_result_by_session(session_id, user_id=current_user.id)
     if not res:
         raise HTTPException(status_code=404, detail="result not found")
     return res.generated_recommendations
@@ -85,7 +85,7 @@ async def get_laboratory_tests(
     session: AsyncSession = Depends(get_db),
 ):
     svc = ClinicalDecisionService(session)
-    res = await svc.get_result_by_session(session_id)
+    res = await svc.get_result_by_session(session_id, user_id=current_user.id)
     if not res:
         raise HTTPException(status_code=404, detail="result not found")
     return res.generated_laboratory_tests
@@ -98,7 +98,7 @@ async def get_screenings(
     session: AsyncSession = Depends(get_db),
 ):
     svc = ClinicalDecisionService(session)
-    res = await svc.get_result_by_session(session_id)
+    res = await svc.get_result_by_session(session_id, user_id=current_user.id)
     if not res:
         raise HTTPException(status_code=404, detail="result not found")
     return res.generated_screenings

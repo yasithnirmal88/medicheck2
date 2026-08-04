@@ -236,8 +236,19 @@ class ClinicalDecisionService:
         }
 
     # getters
-    async def get_result_by_session(self, session_id: str):
-        return await self.dec_repo.get_result_by_session(session_id)
+    async def get_result_by_session(self, session_id: str, user_id: str | None = None):
+        result = await self.dec_repo.get_result_by_session(session_id)
+        if result and user_id and result.user_id != user_id:
+            # Check if user has elevated permissions (doctors can view patient results)
+            from app.core.security.rbac import Role, has_role
+            # For now, we only allow access if the user owns the result
+            # In a real application, you'd check for elevated roles here
+            return None
+        return result
 
-    async def get_result(self, result_id: str):
-        return await self.dec_repo.get_result(result_id)
+    async def get_result(self, result_id: str, user_id: str | None = None):
+        result = await self.dec_repo.get_result(result_id)
+        if result and user_id and result.user_id != user_id:
+            # Check if user has elevated permissions
+            return None
+        return result
