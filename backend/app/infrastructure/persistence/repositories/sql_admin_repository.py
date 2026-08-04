@@ -25,7 +25,6 @@ class SQLAdminRepository:
         model = BodySystemModel(**filtered)
         self.session.add(model)
         await self.session.flush()
-        await self.session.commit()
         return model
 
     async def list_body_systems(self) -> list[BodySystemModel]:
@@ -41,13 +40,11 @@ class SQLAdminRepository:
     async def update_body_system(self, bs_id: str, data: dict) -> BodySystemModel:
         stmt = update(BodySystemModel).where(BodySystemModel.id == bs_id).values(**data)
         await self.session.execute(stmt)
-        await self.session.commit()
         return await self.get_body_system(bs_id)
 
     async def delete_body_system(self, bs_id: str) -> None:
         stmt = delete(BodySystemModel).where(BodySystemModel.id == bs_id)
         await self.session.execute(stmt)
-        await self.session.commit()
 
     # Indicators
     async def create_indicator(self, data: dict) -> ClinicalIndicatorModel:
@@ -56,7 +53,6 @@ class SQLAdminRepository:
         model = ClinicalIndicatorModel(**filtered)
         self.session.add(model)
         await self.session.flush()
-        await self.session.commit()
         return model
 
     async def update_indicator(self, ind_id: str, data: dict) -> ClinicalIndicatorModel:
@@ -66,7 +62,6 @@ class SQLAdminRepository:
             .values(**data)
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(ClinicalIndicatorModel).where(ClinicalIndicatorModel.id == ind_id)
         r = await self.session.execute(q)
         return r.scalars().first()
@@ -93,7 +88,6 @@ class SQLAdminRepository:
         model = EvidenceReferenceModel(**filtered)
         self.session.add(model)
         await self.session.flush()
-        await self.session.commit()
         return model
 
     async def list_evidence(self, limit: int = 50) -> list[EvidenceReferenceModel]:
@@ -117,13 +111,11 @@ class SQLAdminRepository:
             .values(**data)
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         return await self.get_evidence(ev_id)
 
     async def delete_evidence(self, ev_id: str) -> None:
         stmt = delete(EvidenceReferenceModel).where(EvidenceReferenceModel.id == ev_id)
         await self.session.execute(stmt)
-        await self.session.commit()
 
     # Recommendations
     async def create_recommendation(self, data: dict) -> RecommendationModel:
@@ -132,7 +124,6 @@ class SQLAdminRepository:
         model = RecommendationModel(**filtered)
         self.session.add(model)
         await self.session.flush()
-        await self.session.commit()
         return model
 
     async def list_recommendations(self, limit: int = 100) -> list[RecommendationModel]:
@@ -148,7 +139,6 @@ class SQLAdminRepository:
     async def update_recommendation(self, rec_id: str, data: dict) -> RecommendationModel:
         stmt = update(RecommendationModel).where(RecommendationModel.id == rec_id).values(**data)
         await self.session.execute(stmt)
-        await self.session.commit()
         return await self.get_recommendation(rec_id)
 
     # Audit
@@ -164,5 +154,4 @@ class SQLAdminRepository:
         model = AuditLogModel(**data)
         self.session.add(model)
         await self.session.flush()
-        await self.session.commit()
         return model

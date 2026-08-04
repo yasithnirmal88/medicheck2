@@ -38,7 +38,6 @@ class SQLProfileRepository:
     async def create_for_user(self, user_id: str) -> HealthProfileModel:
         stmt = insert(HealthProfileModel).values(user_id=user_id, draft=1)
         await self.session.execute(stmt)
-        await self.session.commit()
         return await self.get_by_user_id(user_id)
 
     async def get_or_create_for_user(self, user_id: str) -> HealthProfileModel:
@@ -58,11 +57,9 @@ class SQLProfileRepository:
                 .values(**data)
             )
             await self.session.execute(upd)
-            await self.session.commit()
             return
         ins = insert(PersonalInfoModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
 
     async def upsert_lifestyle(self, profile_id: str, data: dict) -> None:
         q = select(LifestyleModel).where(LifestyleModel.profile_id == profile_id)
@@ -75,11 +72,9 @@ class SQLProfileRepository:
                 .values(**data)
             )
             await self.session.execute(upd)
-            await self.session.commit()
             return
         ins = insert(LifestyleModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
 
     async def upsert_nutrition(self, profile_id: str, data: dict) -> None:
         q = select(NutritionModel).where(NutritionModel.profile_id == profile_id)
@@ -92,11 +87,9 @@ class SQLProfileRepository:
                 .values(**data)
             )
             await self.session.execute(upd)
-            await self.session.commit()
             return
         ins = insert(NutritionModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
 
     # CRUD for repeatable sections
     async def add_medical_history(
@@ -104,7 +97,6 @@ class SQLProfileRepository:
     ) -> MedicalHistoryModel:
         ins = insert(MedicalHistoryModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
         # return latest
         q = (
             select(MedicalHistoryModel)
@@ -128,7 +120,6 @@ class SQLProfileRepository:
     ) -> MedicationHistoryModel:
         ins = insert(MedicationHistoryModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
         q = (
             select(MedicationHistoryModel)
             .where(MedicationHistoryModel.profile_id == profile_id)
@@ -149,7 +140,6 @@ class SQLProfileRepository:
     async def add_surgery(self, profile_id: str, data: dict) -> SurgicalHistoryModel:
         ins = insert(SurgicalHistoryModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
         q = (
             select(SurgicalHistoryModel)
             .where(SurgicalHistoryModel.profile_id == profile_id)
@@ -172,7 +162,6 @@ class SQLProfileRepository:
     ) -> FamilyHistoryModel:
         ins = insert(FamilyHistoryModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
         q = (
             select(FamilyHistoryModel)
             .where(FamilyHistoryModel.profile_id == profile_id)
@@ -193,7 +182,6 @@ class SQLProfileRepository:
     async def add_allergy(self, profile_id: str, data: dict) -> AllergyModel:
         ins = insert(AllergyModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
         q = (
             select(AllergyModel)
             .where(AllergyModel.profile_id == profile_id)
@@ -214,7 +202,6 @@ class SQLProfileRepository:
     async def add_immunization(self, profile_id: str, data: dict) -> ImmunizationModel:
         ins = insert(ImmunizationModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
         q = (
             select(ImmunizationModel)
             .where(ImmunizationModel.profile_id == profile_id)
@@ -235,7 +222,6 @@ class SQLProfileRepository:
     async def add_measurement(self, profile_id: str, data: dict) -> MeasurementModel:
         ins = insert(MeasurementModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
         q = (
             select(MeasurementModel)
             .where(MeasurementModel.profile_id == profile_id)
@@ -256,7 +242,6 @@ class SQLProfileRepository:
     async def add_lab_report(self, profile_id: str, data: dict) -> LabReportModel:
         ins = insert(LabReportModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
-        await self.session.commit()
         q = (
             select(LabReportModel)
             .where(LabReportModel.profile_id == profile_id)
@@ -323,7 +308,6 @@ class SQLProfileRepository:
             created_by=created_by,
         )
         await self.session.execute(ins)
-        await self.session.commit()
         # return created
         q2 = (
             select(ProfileVersionModel)

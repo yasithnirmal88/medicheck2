@@ -21,7 +21,6 @@ class SQLDecisionRepository:
     async def create_result(self, data: dict) -> AssessmentResultModel:
         stmt = insert(AssessmentResultModel).values(**data)
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(AssessmentResultModel).where(
             AssessmentResultModel.session_id == data.get("session_id")
         )
@@ -44,7 +43,6 @@ class SQLDecisionRepository:
             notes=notes,
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(ActivatedIndicatorModel).where(
             ActivatedIndicatorModel.result_id == result_id
         )
@@ -69,7 +67,6 @@ class SQLDecisionRepository:
             notes=notes,
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(ActivatedConditionModel).where(
             ActivatedConditionModel.result_id == result_id
         )
@@ -91,7 +88,6 @@ class SQLDecisionRepository:
             notes=notes,
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(GeneratedRecommendationModel).where(
             GeneratedRecommendationModel.result_id == result_id
         )
@@ -106,7 +102,6 @@ class SQLDecisionRepository:
             result_id=result_id, laboratory_test_id=laboratory_test_id, reason=reason
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(GeneratedLaboratoryTestModel).where(
             GeneratedLaboratoryTestModel.result_id == result_id
         )
@@ -121,7 +116,6 @@ class SQLDecisionRepository:
             result_id=result_id, name=name, reason=reason
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(GeneratedScreeningModel).where(
             GeneratedScreeningModel.result_id == result_id
         )
@@ -136,7 +130,6 @@ class SQLDecisionRepository:
             result_id=result_id, source_type=source_type, source_id=source_id, text=text
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(ExplanationRecordModel).where(
             ExplanationRecordModel.result_id == result_id
         )

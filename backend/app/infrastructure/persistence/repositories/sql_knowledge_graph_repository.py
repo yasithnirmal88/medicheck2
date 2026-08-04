@@ -36,7 +36,6 @@ class SQLKnowledgeGraphRepository:
     async def create_condition(self, data: dict) -> PossibleConditionModel:
         stmt = insert(PossibleConditionModel).values(**data)
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(PossibleConditionModel).where(
             PossibleConditionModel.code == data.get("code")
         )
@@ -46,7 +45,6 @@ class SQLKnowledgeGraphRepository:
     async def create_laboratory_test(self, data: dict) -> LaboratoryTestModel:
         stmt = insert(LaboratoryTestModel).values(**data)
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(LaboratoryTestModel).where(
             LaboratoryTestModel.code == data.get("code")
         )
@@ -71,14 +69,12 @@ class SQLKnowledgeGraphRepository:
                     .values(active=True)
                 )
                 await self.session.execute(stmt)
-                await self.session.commit()
             return existing
 
         stmt = insert(QuestionIndicatorLinkModel).values(
             question_id=question_id, indicator_id=indicator_id
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         r = await self.session.execute(q)
         return r.scalars().first()
 
@@ -99,14 +95,12 @@ class SQLKnowledgeGraphRepository:
                     .values(active=True)
                 )
                 await self.session.execute(stmt)
-                await self.session.commit()
             return existing
 
         stmt = insert(QuestionOptionIndicatorLinkModel).values(
             question_option_id=question_option_id, indicator_id=indicator_id
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         r = await self.session.execute(q)
         return r.scalars().first()
 
@@ -127,13 +121,11 @@ class SQLKnowledgeGraphRepository:
                     .values(active=True)
                 )
                 await self.session.execute(stmt)
-                await self.session.commit()
             return existing
         stmt = insert(IndicatorConditionLinkModel).values(
             indicator_id=indicator_id, condition_id=condition_id
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         r = await self.session.execute(q)
         return r.scalars().first()
 
@@ -154,13 +146,11 @@ class SQLKnowledgeGraphRepository:
                     .values(active=True)
                 )
                 await self.session.execute(stmt)
-                await self.session.commit()
             return existing
         stmt = insert(IndicatorEvidenceLinkModel).values(
             indicator_id=indicator_id, evidence_id=evidence_id
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         r = await self.session.execute(q)
         return r.scalars().first()
 
@@ -181,13 +171,11 @@ class SQLKnowledgeGraphRepository:
                     .values(active=True)
                 )
                 await self.session.execute(stmt)
-                await self.session.commit()
             return existing
         stmt = insert(IndicatorRecommendationLinkModel).values(
             indicator_id=indicator_id, recommendation_id=recommendation_id
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         r = await self.session.execute(q)
         return r.scalars().first()
 
@@ -208,13 +196,11 @@ class SQLKnowledgeGraphRepository:
                     .values(active=True)
                 )
                 await self.session.execute(stmt)
-                await self.session.commit()
             return existing
         stmt = insert(ConditionRecommendationLinkModel).values(
             condition_id=condition_id, recommendation_id=recommendation_id
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         r = await self.session.execute(q)
         return r.scalars().first()
 
@@ -235,13 +221,11 @@ class SQLKnowledgeGraphRepository:
                     .values(active=True)
                 )
                 await self.session.execute(stmt)
-                await self.session.commit()
             return existing
         stmt = insert(ConditionLaboratoryTestLinkModel).values(
             condition_id=condition_id, laboratory_test_id=laboratory_test_id
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         r = await self.session.execute(q)
         return r.scalars().first()
 
@@ -262,13 +246,11 @@ class SQLKnowledgeGraphRepository:
                     .values(active=True)
                 )
                 await self.session.execute(stmt)
-                await self.session.commit()
             return existing
         stmt = insert(BodySystemConditionLinkModel).values(
             body_system_id=body_system_id, condition_id=condition_id
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         r = await self.session.execute(q)
         return r.scalars().first()
 

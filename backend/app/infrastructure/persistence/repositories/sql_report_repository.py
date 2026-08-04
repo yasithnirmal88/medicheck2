@@ -19,7 +19,6 @@ class SQLReportRepository:
     async def create_health_assessment(self, data: dict) -> HealthAssessmentModel:
         stmt = insert(HealthAssessmentModel).values(**data)
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(HealthAssessmentModel).where(
             HealthAssessmentModel.session_id == data.get("session_id")
         )
@@ -42,7 +41,6 @@ class SQLReportRepository:
             notes=notes,
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(BodySystemAssessmentModel).where(
             BodySystemAssessmentModel.assessment_id == assessment_id
         )
@@ -66,7 +64,6 @@ class SQLReportRepository:
             notes=notes,
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(ConditionAssessmentModel).where(
             ConditionAssessmentModel.assessment_id == assessment_id
         )
@@ -81,7 +78,6 @@ class SQLReportRepository:
             assessment_id=assessment_id, data=data
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(LifestyleAssessmentModel).where(
             LifestyleAssessmentModel.assessment_id == assessment_id
         )
@@ -103,7 +99,6 @@ class SQLReportRepository:
             text=text,
         )
         await self.session.execute(stmt)
-        await self.session.commit()
         q = select(GeneratedAdviceModel).where(
             GeneratedAdviceModel.assessment_id == assessment_id
         )
