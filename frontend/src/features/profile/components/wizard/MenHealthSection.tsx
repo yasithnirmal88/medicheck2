@@ -18,10 +18,10 @@ const fieldSpecs: FieldSpec[] = [
 ]
 
 export function MenHealthSection({ data, onChange }: MenHealthSectionProps) {
-  const record = data as Record<string, unknown>
+  const record = data as unknown as Record<string, unknown>
 
   const update = (name: string, value: unknown) => {
-    onChange({ ...record, [name]: value } as WizardState['men_health'])
+    onChange({ ...record, [name]: value } as unknown as WizardState['men_health'])
   }
 
   return (
@@ -39,7 +39,7 @@ export function MenHealthSection({ data, onChange }: MenHealthSectionProps) {
             <Mars className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Men's Health</h3>
+            <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100">Men&apos;s Health</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">Prostate and hormonal health details</p>
           </div>
         </div>

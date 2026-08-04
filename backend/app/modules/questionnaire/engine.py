@@ -5,8 +5,6 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from sqlalchemy import select
-
 from app.domain.entities.assessment_answer import AssessmentAnswer
 from app.domain.entities.assessment_progress import AssessmentProgress
 from app.domain.entities.assessment_session import AssessmentSession
