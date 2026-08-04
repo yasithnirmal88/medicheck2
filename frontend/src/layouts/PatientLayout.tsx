@@ -11,20 +11,16 @@ import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import {
   Activity,
   BookOpen,
-  ChevronLeft,
-  ChevronRight,
   ClipboardList,
-  FileText,
-  FlaskConical,
   HeartPulse,
   LayoutDashboard,
+  Layers,
   LogOut,
   Settings,
   ShieldPlus,
   Stethoscope,
   User,
   X,
-  Layers,
   Calendar,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -53,11 +49,6 @@ const patientNavItems = [
     path: '/assessments',
     icon: Stethoscope,
   },
-  {
-    label: 'Health Reports',
-    path: '/assessments',
-    icon: FileText,
-  },
 ]
 
 const patientSecondaryNavItems = [
@@ -70,11 +61,6 @@ const patientSecondaryNavItems = [
     label: 'Recommendations',
     path: '/recommendations',
     icon: HeartPulse,
-  },
-  {
-    label: 'Laboratory Results',
-    path: '/body-systems',
-    icon: FlaskConical,
   },
   {
     label: 'Body Systems',
