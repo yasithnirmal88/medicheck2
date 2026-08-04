@@ -61,6 +61,7 @@ interface RequireRoleProps {
  * 
  * Redirects to fallbackPath if user doesn't have required role.
  * Requires user to be authenticated first.
+ * Waits for role to load before blocking access.
  */
 export const RequireRole: React.FC<RequireRoleProps> = ({
   children,
@@ -68,13 +69,13 @@ export const RequireRole: React.FC<RequireRoleProps> = ({
   fallbackPath = '/unauthorized',
   showLoading = true,
 }) => {
-  const { user, loading, role, isAuthenticated } = useAuthContext()
+  const { user, loading, roleLoading, role, isAuthenticated } = useAuthContext()
   const location = useLocation()
 
   // Normalize roles to array
   const allowedRoles = Array.isArray(roles) ? roles : [roles]
 
-  if (loading && showLoading) {
+  if (loading || roleLoading) {
     return <LoadingPage />
   }
 
@@ -106,15 +107,17 @@ interface RequirePatientProps {
  * RequirePatient - Ensures user is a patient
  * 
  * Redirects to patient dashboard or fallback if user is not a patient.
+ * Waits for role to load before blocking access.
  */
 export const RequirePatient: React.FC<RequirePatientProps> = ({
   children,
   fallbackPath = '/cms/dashboard',
 }) => {
-  const { isAuthenticated, isPatient, loading, role } = useAuthContext()
+  const { isAuthenticated, isPatient, loading, roleLoading, role } = useAuthContext()
   const location = useLocation()
 
-  if (loading) {
+  // Wait for both auth and role to be loaded
+  if (loading || roleLoading) {
     return <LoadingPage />
   }
 
@@ -123,13 +126,15 @@ export const RequirePatient: React.FC<RequirePatientProps> = ({
   }
 
   // Redirect doctors/clinicians away from patient routes
-  if (!isPatient) {
+  // New users with null role default to patient access
+  if (role !== null && !isPatient) {
     console.warn(
       `Access denied: Non-patient role "${role}" tried to access patient route`
     )
     return <Navigate to={fallbackPath} replace />
   }
 
+  // New users (role is null) get patient access by default
   return children
 }
 
@@ -147,15 +152,17 @@ interface RequireDoctorProps {
  * 
  * Redirects to patient dashboard or fallback if user is a patient.
  * Required for accessing CMS features.
+ * Waits for role to load before blocking access.
  */
 export const RequireDoctor: React.FC<RequireDoctorProps> = ({
   children,
   fallbackPath = '/app',
 }) => {
-  const { isAuthenticated, isPatient, loading, role, canAccessCMS } = useAuthContext()
+  const { isAuthenticated, isPatient, loading, roleLoading, role, canAccessCMS } = useAuthContext()
   const location = useLocation()
 
-  if (loading) {
+  // Wait for both auth and role to be loaded
+  if (loading || roleLoading) {
     return <LoadingPage />
   }
 
@@ -164,7 +171,8 @@ export const RequireDoctor: React.FC<RequireDoctorProps> = ({
   }
 
   // Redirect patients away from doctor routes
-  if (isPatient || !canAccessCMS) {
+  // New users (role is null) cannot access CMS - they must be assigned a role
+  if (role === null || isPatient || !canAccessCMS) {
     console.warn(
       `Access denied: Patient or insufficient role "${role}" tried to access CMS`
     )
@@ -187,15 +195,16 @@ interface RequireAdminProps {
  * RequireAdmin - Ensures user is an admin
  * 
  * Redirects to fallback if user is not an admin.
+ * Waits for role to load before blocking access.
  */
 export const RequireAdmin: React.FC<RequireAdminProps> = ({
   children,
   fallbackPath = '/app',
 }) => {
-  const { isAuthenticated, loading, role } = useAuthContext()
+  const { isAuthenticated, loading, roleLoading, role } = useAuthContext()
   const location = useLocation()
 
-  if (loading) {
+  if (loading || roleLoading) {
     return <LoadingPage />
   }
 
