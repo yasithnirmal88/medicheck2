@@ -52,7 +52,7 @@ export default function TimelinePage() {
                 <li key={r.id} className="p-3 border rounded">
                   <div className="flex items-start justify-between">
                     <div>
-                      <div className="font-medium">{new Date(r.created_at || r.started_at || r.started_at).toLocaleString()}</div>
+                      <div className="font-medium">{new Date(r.created_at ?? r.started_at ?? Date.now()).toLocaleString()}</div>
                       <div className="text-xs text-gray-500">Session: {r.session_id ?? r.id}</div>
                       <div className="text-sm mt-2">Summary: {r.summary ?? '—'}</div>
                     </div>

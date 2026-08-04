@@ -112,7 +112,7 @@ export const AssessmentCard = ({
           </div>
 
           <div className="mt-3 flex items-center justify-between">
-            <AssessmentBadge aiEnabled={assessment.aiEnabled} priority={assessment.priority} />
+            <AssessmentBadge aiEnabled={assessment.aiEnabled} />
             {assessment.status === 'in_progress' && assessment.progressPct !== undefined && (
               <span className="text-xs font-medium text-indigo-600">{assessment.progressPct}% complete</span>
             )}

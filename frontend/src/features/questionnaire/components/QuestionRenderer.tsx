@@ -24,15 +24,10 @@ interface QuestionRendererProps {
   onSearch?: (query: string) => Promise<{ id: string; text: string; value: string }[]>
 }
 
-interface ComponentProps {
-  value: unknown
-  onChange: (value: unknown) => void
-  error?: string
-  disabled?: boolean
-  onSearch?: (query: string) => Promise<{ id: string; text: string; value: string }[]>
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ComponentType = React.ComponentType<any>
 
-const typeMap: Record<string, React.FC<ComponentProps>> = {
+const typeMap: Record<string, ComponentType> = {
   single_choice: SingleChoice,
   multiple_choice: MultipleChoice,
   yes_no: YesNo,
