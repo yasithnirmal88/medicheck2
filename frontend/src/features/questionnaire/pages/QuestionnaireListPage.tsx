@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, History, PauseCircle, Play, Search, TrendingUp, Loader2 } from 'lucide-react'
+import { ClipboardList, History, PauseCircle, Play, Search, TrendingUp } from 'lucide-react'
 import AppLayout from '@/layouts/AppLayout'
 import ProgressBar from '../components/ProgressBar'
 import AssessmentCard from '../components/AssessmentCard'
@@ -12,6 +12,8 @@ import Skeleton from '@/shared/ui/Skeleton'
 import Button from '@/shared/ui/Button'
 import { useTemplates, useStartSession, useSessions } from '../hooks/useQuestionnaire'
 import type { QuestionnaireTemplate, AssessmentSession } from '../types'
+
+type SessionStatus = 'available' | 'in_progress' | 'paused' | 'completed' | 'submitted'
 
 const HeroSection: React.FC<{
   templates: QuestionnaireTemplate[] | undefined
@@ -237,7 +239,7 @@ const QuestionnaireListPage: React.FC = () => {
                   <AssessmentCard
                     key={template.id}
                     template={template}
-                    status={latest ? (latest.status as any) : 'available'}
+                    status={latest ? (latest.status as SessionStatus) : 'available'}
                     progress={
                       latest && latest.status !== 'completed'
                         ? {

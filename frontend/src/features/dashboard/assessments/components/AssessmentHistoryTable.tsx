@@ -1,6 +1,4 @@
-import { cn } from '@/lib/utils'
 import {
-  CalendarDays,
   CheckCircle,
   ChevronRight,
   Download,
@@ -10,17 +8,6 @@ import {
 import { motion } from 'framer-motion'
 import type { AssessmentDef } from '../types'
 import { StatusChip } from './StatusChip'
-
-const STATUS_LABEL: Record<AssessmentDef['status'], string> = {
-  not_started: 'Not Started',
-  in_progress: 'In Progress',
-  completed: 'Completed',
-  recommended: 'Recommended',
-  locked: 'Locked',
-  requires_profile: 'Requires Profile',
-  expired: 'Expired',
-  needs_review: 'Needs Review',
-}
 
 export const AssessmentHistoryTable = ({
   assessments,

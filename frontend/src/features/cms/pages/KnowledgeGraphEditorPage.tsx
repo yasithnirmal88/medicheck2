@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { Network, Plus, Trash2, Search, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Network, Plus, Search, CheckCircle2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { ContentLayout, Modal, StatusBadge, EmptyState, TableSkeleton, FormField } from '../components/ContentLayout'
 import { useKnowledgeGraphs, useValidateGraph } from '../hooks/useCmsQueries'
 import { cmsApi } from '../api/cmsApi'
 import type { KnowledgeGraph, KnowledgeGraphNode, KnowledgeGraphEdge, GraphValidationResult, EntitySearchResult } from '../types'
+
+interface GraphDetail extends KnowledgeGraph {
+  nodes?: KnowledgeGraphNode[]
+  edges?: KnowledgeGraphEdge[]
+}
 
 export const KnowledgeGraphEditorPage: React.FC = () => {
   const [selectedGraphId, setSelectedGraphId] = useState<string | null>(null)
@@ -27,9 +32,9 @@ export const KnowledgeGraphEditorPage: React.FC = () => {
     if (selectedGraphId) {
       setDetailsLoading(true)
       Promise.all([
-        cmsApi.knowledgeGraph.getGraph(selectedGraphId) as Promise<KnowledgeGraph & { nodes?: KnowledgeGraphNode[]; edges?: KnowledgeGraphEdge[] }>,
+        cmsApi.knowledgeGraph.getGraph(selectedGraphId) as Promise<GraphDetail>,
       ]).then(([detail]) => {
-        setGraphDetails({ nodes: (detail as any).nodes ?? [], edges: (detail as any).edges ?? [] })
+        setGraphDetails({ nodes: detail.nodes ?? [], edges: detail.edges ?? [] })
       }).catch(() => toast.error('Failed to load graph details')).finally(() => setDetailsLoading(false))
     } else {
       setGraphDetails(null)

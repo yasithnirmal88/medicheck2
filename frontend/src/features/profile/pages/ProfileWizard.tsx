@@ -18,6 +18,8 @@ const PersonalInfoSchema = z.object({
   blood_group: z.string().optional().nullable(),
 })
 
+type PersonalInfoFormData = z.infer<typeof PersonalInfoSchema>
+
 export default function ProfileWizard() {
   const { data: profile } = useProfile()
   const { savePersonal } = useProfile()
@@ -35,12 +37,12 @@ export default function ProfileWizard() {
 
   // autosave on changes (debounced)
   useEffect(() => {
-    const handler = debounce((values: any) => {
+    const handler = debounce((values: Partial<PersonalInfoFormData>) => {
       savePersonal.mutate(values)
     }, 800)
 
     const subscription = form.watch((value) => {
-      handler(value as any)
+      handler(value as Partial<PersonalInfoFormData>)
     })
 
     return () => subscription.unsubscribe()

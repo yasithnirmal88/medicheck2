@@ -5,7 +5,6 @@ import LoadingPage from '../shared/loading/LoadingPage'
 import { useAuth } from '../hooks/useAuth'
 
 const LoginPage = React.lazy(() => import('../features/auth/pages/Login'))
-const ProfilePage = React.lazy(() => import('../features/profile/pages/Profile'))
 const Dashboard = React.lazy(() => import('../features/dashboard/pages/Dashboard'))
 const QuestionnaireListPage = React.lazy(() => import('../features/questionnaire/pages/QuestionnaireListPage'))
 const QuestionnaireSessionPage = React.lazy(() => import('../features/questionnaire/pages/QuestionnaireSessionPage'))
@@ -60,10 +59,6 @@ const RequireAuth: React.FC<{ children: React.ReactElement }> = ({ children }) =
   if (loading) return <LoadingPage />
   if (!user) return <Navigate to="/login" replace />
   return children
-}
-
-function LazyPage({ Component }: { Component: React.LazyExoticComponent<React.ComponentType<any>> }) {
-  return <Component />
 }
 
 export default function Router() {

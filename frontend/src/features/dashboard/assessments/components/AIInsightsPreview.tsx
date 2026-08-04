@@ -1,7 +1,6 @@
 import Card from '@/shared/ui/Card'
 import { cn } from '@/lib/utils'
-import { AlertTriangle, Bot, ChevronUp, Smile, Target, TrendingUp, TrendingDown } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { AlertTriangle, Bot, ChevronUp, TrendingUp, TrendingDown } from 'lucide-react'
 import type { AIInsight } from '../types'
 import { aiInsight } from '../mockData'
 

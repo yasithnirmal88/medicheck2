@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Shield, Clock, BarChart3, Search } from 'lucide-react'
+import { Clock, Search } from 'lucide-react'
 import { ContentLayout, Tabs, StatusBadge, EmptyState, TableSkeleton, Pagination, DataTable } from '../components/ContentLayout'
 import { useAuditLogs, useAuditStats } from '../hooks/useCmsQueries'
 import type { AuditLogEntry, AuditStats } from '../types'
@@ -178,7 +178,7 @@ const AuditStatsSection: React.FC<{ stats: AuditStats }> = ({ stats }) => (
         <EmptyState title="No actor data" />
       ) : (
         <div className="space-y-2">
-          {stats.top_actors.map((actor, i) => (
+          {stats.top_actors.map((actor, _i) => (
             <div key={actor.actor_id} className="flex items-center justify-between text-sm">
               <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{actor.actor_id}</span>
               <span className="font-semibold text-slate-900 dark:text-white">{actor.actions} actions</span>

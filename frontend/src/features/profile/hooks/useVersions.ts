@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { previewVersion, restoreVersion } from '../api/extendedService'
+import { restoreVersion } from '../api/extendedService'
 import api from '@/lib/api'
 
 const fetchVersions = async () => {

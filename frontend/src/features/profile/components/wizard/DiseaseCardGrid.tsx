@@ -21,15 +21,6 @@ const DISEASES = [
   { id: 'mental_illness', label: 'Mental Illness', icon: '🧠', color: 'blue' },
 ]
 
-const colorMap: Record<string, string> = {
-  red: 'border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200',
-  amber: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200',
-  teal: 'border-teal-200 bg-teal-50 text-teal-800 dark:border-teal-800 dark:bg-teal-900/20 dark:text-teal-200',
-  blue: 'border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-900/20 dark:text-blue-200',
-  purple: 'border-purple-200 bg-purple-50 text-purple-800 dark:border-purple-800 dark:bg-purple-900/20 dark:text-purple-200',
-  slate: 'border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200',
-}
-
 export function DiseaseCardGrid({ selected, onChange }: DiseaseCardGridProps) {
   const [search, setSearch] = useState('')
 

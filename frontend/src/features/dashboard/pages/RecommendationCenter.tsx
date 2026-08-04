@@ -2,9 +2,16 @@ import React from 'react'
 import AppLayout from '@/layouts/AppLayout'
 import Card from '@/shared/ui/Card'
 
+interface Recommendation {
+  id: string
+  text: string
+  priority?: string
+  [key: string]: unknown
+}
+
 export default function RecommendationCenter() {
   // placeholder — recommendations are fetched from the report/decision endpoints in real usage
-  const recs: any[] = []
+  const recs: Recommendation[] = []
 
   return (
     <AppLayout>

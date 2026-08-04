@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React from 'react'
 import AppLayout from '@/layouts/AppLayout'
 import Card from '@/shared/ui/Card'
-import { useCompareReports, useReports } from '../hooks/useTimeline'
+import { useCompareReports } from '../hooks/useTimeline'
 import { useSearchParams } from 'react-router-dom'
 
 export default function ComparePage() {
@@ -25,7 +25,7 @@ export default function ComparePage() {
                 <h2 className="text-lg font-medium">Added Conditions</h2>
                 <ul className="mt-2 list-disc list-inside text-sm">
                   {compare.added_conditions && compare.added_conditions.length > 0 ? (
-                    compare.added_conditions.map((c: any) => <li key={c}>{c}</li>)
+                    compare.added_conditions.map((c: string) => <li key={c}>{c}</li>)
                   ) : (
                     <li className="text-gray-500">None</li>
                   )}
@@ -36,7 +36,7 @@ export default function ComparePage() {
                 <h2 className="text-lg font-medium">Removed Conditions</h2>
                 <ul className="mt-2 list-disc list-inside text-sm">
                   {compare.removed_conditions && compare.removed_conditions.length > 0 ? (
-                    compare.removed_conditions.map((c: any) => <li key={c}>{c}</li>)
+                    compare.removed_conditions.map((c: string) => <li key={c}>{c}</li>)
                   ) : (
                     <li className="text-gray-500">None</li>
                   )}
@@ -47,7 +47,7 @@ export default function ComparePage() {
                 <h2 className="text-lg font-medium">Added Advices</h2>
                 <ul className="mt-2 list-disc list-inside text-sm">
                   {compare.added_advices && compare.added_advices.length > 0 ? (
-                    compare.added_advices.map((c: any) => <li key={c}>{c}</li>)
+                    compare.added_advices.map((c: string) => <li key={c}>{c}</li>)
                   ) : (
                     <li className="text-gray-500">None</li>
                   )}

@@ -1,7 +1,6 @@
 import React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Baby, Calendar, Venus, Pill, Heart } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { Venus } from 'lucide-react'
 import { Field } from './FieldControl'
 import type { FieldSpec } from './FieldControl'
 import type { WizardState } from '@/features/profile/types/wizard'

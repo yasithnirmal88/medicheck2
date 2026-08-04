@@ -4,7 +4,7 @@ import toast from 'react-hot-toast'
 import { ContentLayout, Tabs, Modal, StatusBadge, EmptyState, TableSkeleton, FormField } from '../components/ContentLayout'
 import { useBuilderGroups, useQuestions, useReorderGroups } from '../hooks/useCmsQueries'
 import { cmsApi } from '../api/cmsApi'
-import type { QuestionGroupWithQuestions, Question, DependencyRule, BranchRule } from '../types'
+import type { DependencyRule, BranchRule } from '../types'
 
 const builderTabs = [
   { id: 'groups', label: 'Groups' },
@@ -96,7 +96,7 @@ export const QuestionnaireBuilderPage: React.FC = () => {
               <EmptyState title="No groups" description="No question groups found" />
             ) : (
               <div className="space-y-2">
-                {groups.map((group, idx) => (
+                {groups.map((group, _idx) => (
                   <div
                     key={group.id}
                     onClick={() => setSelectedGroupId(group.id)}

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react'
+import React, { useRef } from 'react'
 import type { Question } from '../../types'
 import { cn } from '@/lib/utils'
 
@@ -13,7 +13,6 @@ interface DateInputProps {
 const DateInput: React.FC<DateInputProps> = ({ question, value, onChange, error, disabled }) => {
   const inputRef = useRef<HTMLInputElement>(null)
   const rules = question.validation_rules
-  const [open, setOpen] = useState(false)
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     onChange(e.target.value)
@@ -33,8 +32,6 @@ const DateInput: React.FC<DateInputProps> = ({ question, value, onChange, error,
           min={rules?.past_only ? undefined : undefined}
           max={rules?.future_only ? today : undefined}
           aria-label={question.text}
-          onFocus={() => setOpen(true)}
-          onBlur={() => setOpen(false)}
           className={cn(
             'w-full px-4 py-3 border rounded-lg text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50',
             !value && 'text-gray-400'

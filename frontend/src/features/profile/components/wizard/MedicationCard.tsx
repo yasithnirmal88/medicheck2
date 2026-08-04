@@ -1,6 +1,5 @@
 import React from 'react'
 import { X, Pill } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 interface MedicationCardProps {
   medication: string
