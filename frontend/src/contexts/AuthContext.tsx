@@ -93,6 +93,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         headers: {
           Authorization: `Bearer ${token}`,
         },
+        timeout: 5000, // 5 second timeout
       })
       
       // Backend returns role in the response
@@ -106,7 +107,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setError(null)
     } catch (err: unknown) {
-      console.error('Failed to fetch user role:', err)
+      // Don't log network errors - they're expected when backend isn't running
+      const isNetworkError = 
+        err instanceof Error && 
+        (err.message.includes('Network Error') || 
+         err.message.includes('ERR_CONNECTION_REFUSED') ||
+         err.message.includes('timeout'))
+      
+      if (!isNetworkError) {
+        console.warn('Failed to fetch user role from backend:', err)
+      }
+      
       // Fall back to stored role or default
       const storedRole = localStorage.getItem('medicheck_role') as UserRole | null
       if (storedRole) {
