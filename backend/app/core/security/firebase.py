@@ -44,9 +44,13 @@ def get_firebase_app() -> firebase_admin.App | None:
 async def verify_firebase_token(id_token: str) -> dict[str, Any]:
     app = get_firebase_app()
     if app is None:
-        if settings.environment in (Environment.STAGING, Environment.PRODUCTION):
-            raise AuthenticationError(detail="Firebase is not configured")
-        logger.debug("Firebase not initialized, returning mock claims")
+        if not settings.allow_mock_auth:
+            if settings.environment in (Environment.STAGING, Environment.PRODUCTION):
+                raise AuthenticationError(detail="Firebase is not configured - authentication is required")
+            raise AuthenticationError(
+                detail="Firebase is not configured. Set allow_mock_auth=True for development only."
+            )
+        logger.warning("SECURITY: Using mock authentication. DO NOT use in production!")
         return _mock_verify(id_token)
 
     try:

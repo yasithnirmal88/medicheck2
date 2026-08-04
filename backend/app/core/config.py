@@ -117,6 +117,7 @@ class Settings(BaseSettings):
     enable_security_headers: bool = True
     hsts_max_age: int = 31536000
     csp_report_only: bool = False
+    allow_mock_auth: bool = False  # Set to True only for local development
 
     celery_broker_url: str = ""
     celery_result_backend: str = ""
