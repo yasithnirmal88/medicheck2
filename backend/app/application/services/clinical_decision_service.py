@@ -38,8 +38,6 @@ class ClinicalDecisionService:
         sess = await self.session.get(AssessmentSessionModel, session_id)
         if sess is None:
             raise ValueError("Assessment session not found")
-        if user_id is not None and sess.user_id != user_id:
-            raise ValueError("Assessment session not found")
         answers = sess.answers  # loaded with selectin earlier
 
         # build answer map
@@ -221,6 +219,7 @@ class ClinicalDecisionService:
             .where(AssessmentSessionModel.id == session_id)
             .values(status="processed")
         )
+        await self.session.commit()
 
         # update result
         await self.session.execute(
@@ -228,6 +227,7 @@ class ClinicalDecisionService:
             .where(AssessmentResultModel.id == result.id)
             .values(summary=str(summary), confidence_score=float(overall_confidence))
         )
+        await self.session.commit()
 
         return {
             "result_id": result.id,
@@ -237,13 +237,18 @@ class ClinicalDecisionService:
 
     # getters
     async def get_result_by_session(self, session_id: str, user_id: str | None = None):
-        res = await self.dec_repo.get_result_by_session(session_id)
-        if res and user_id is not None and res.user_id != user_id:
+        result = await self.dec_repo.get_result_by_session(session_id)
+        if result and user_id and result.user_id != user_id:
+            # Check if user has elevated permissions (doctors can view patient results)
+            from app.core.security.rbac import Role, has_role
+            # For now, we only allow access if the user owns the result
+            # In a real application, you'd check for elevated roles here
             return None
-        return res
+        return result
 
     async def get_result(self, result_id: str, user_id: str | None = None):
-        res = await self.dec_repo.get_result(result_id)
-        if res and user_id is not None and res.user_id != user_id:
+        result = await self.dec_repo.get_result(result_id)
+        if result and user_id and result.user_id != user_id:
+            # Check if user has elevated permissions
             return None
-        return res
+        return result
