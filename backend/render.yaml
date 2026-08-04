@@ -1,0 +1,96 @@
+# Render Blueprint - Medicheck Backend
+# Deploy to: https://dashboard.render.com/blueprints
+
+services:
+  - type: web
+    name: medicheck-api
+    runtime: python
+    region: oregon
+    plan: starter
+    pythonVersion: "3.12"
+    
+    # Build settings
+    buildCommand: pip install -r requirements.txt && alembic upgrade head
+    preDeployCommand: ""
+    
+    # Health check
+    healthCheckPath: /api/v1/health
+    
+    # Auto deploy from main branch
+    autoDeploy: true
+    
+    # Environment variables (set in Render dashboard for production)
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+        sync: false
+      
+      - key: PYTHON_VERSION
+        value: "3.12"
+      
+      # Database - use Render PostgreSQL internal URL
+      - key: DATABASE_URL
+        fromDatabase:
+          name: medicheck-db
+          property: internalConnectionString
+      
+      # Redis - use Render Redis internal URL
+      - key: REDIS_URL
+        fromService:
+          name: medicheck-redis
+          type: redis
+          property: connectionString
+      
+      # Security
+      - key: SECRET_KEY
+        sync: false  # Set in dashboard
+        generateValue: true
+      
+      # Firebase (set in dashboard)
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_CLIENT_EMAIL
+        sync: false
+      - key: FIREBASE_PRIVATE_KEY
+        sync: false
+        multiline: true
+      
+      # CORS - Update with your Vercel domain
+      - key: CORS_ORIGINS
+        value: "https://your-frontend.vercel.app,https://*.vercel.app,http://localhost:3000,http://localhost:5173"
+      
+      # Allowed hosts - Update with your domain
+      - key: ALLOWED_HOSTS
+        value: "your-backend.onrender.com,.onrender.com"
+      
+      # Rate limiting
+      - key: RATE_LIMIT_MAX_REQUESTS
+        value: "100"
+      - key: RATE_LIMIT_WINDOW_SECONDS
+        value: "60"
+      
+      # Security headers
+      - key: ENABLE_SECURITY_HEADERS
+        value: "true"
+      
+      # Disable mock auth in production
+      - key: ALLOW_MOCK_AUTH
+        value: "false"
+      
+      # Logging
+      - key: LOG_LEVEL
+        value: "INFO"
+
+# PostgreSQL Database
+databases:
+  - name: medicheck-db
+    plan: starter
+    databaseName: medicheck
+    ipAllowList: []
+
+# Redis Cache
+redis:
+  - name: medicheck-redis
+    plan: starter
+    ipAllowList: []
+    maxmemoryPolicy: allkeys-lru

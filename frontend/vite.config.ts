@@ -11,15 +11,20 @@ export default defineConfig({
     }
   },
   build: {
+    target: 'esnext',
+    minify: 'terser',
+    sourcemap: false,
     rollupOptions: {
       output: {
         manualChunks: {
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-vendor': ['lucide-react', 'recharts', 'framer-motion'],
-          'query-vendor': ['@tanstack/react-query']
-        }
-      }
-    }
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-router': ['react-router-dom'],
+          'vendor-query': ['@tanstack/react-query'],
+          'vendor-ui': ['lucide-react', 'recharts', 'framer-motion'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000,
   },
   test: {
     globals: true,
