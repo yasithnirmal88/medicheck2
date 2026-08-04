@@ -36,7 +36,7 @@ async def get_report_by_session(
     redis: Redis = Depends(get_redis),
 ):
     svc = ReportService(session, CacheService(redis))
-    rpt = await svc.get_report_by_session(session_id)
+    rpt = await svc.get_report_by_session(session_id, user_id=current_user.id)
     if not rpt:
         raise HTTPException(status_code=404, detail="report not found")
     return rpt
@@ -50,7 +50,7 @@ async def get_report(
     redis: Redis = Depends(get_redis),
 ):
     svc = ReportService(session, CacheService(redis))
-    rpt = await svc.get_report(report_id)
+    rpt = await svc.get_report(report_id, user_id=current_user.id)
     if not rpt:
         raise HTTPException(status_code=404, detail="report not found")
     return rpt
@@ -78,7 +78,7 @@ async def compare_reports(
 ):
     svc = ReportService(session, CacheService(redis))
     try:
-        res = await svc.compare_reports(id1, id2)
+        res = await svc.compare_reports(id1, id2, user_id=current_user.id)
         return res
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))

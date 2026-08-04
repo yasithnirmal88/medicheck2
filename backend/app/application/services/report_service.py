@@ -49,6 +49,8 @@ class ReportService:
         result = await self.dec_repo.get_result_by_session(session_id)
         if not result:
             raise ValueError("No decision result for session; run CDSE first")
+        if user_id is not None and result.user_id != user_id:
+            raise ValueError("No decision result for session; run CDSE first")
 
         # Batch-load indicators for all activated indicators
         indicator_ids = [act.indicator_id for act in result.activated_indicators]
@@ -195,28 +197,28 @@ class ReportService:
 
         return {"report_id": assessment.id, "summary": summary}
 
-    async def get_report_by_session(self, session_id: str):
-        if self.cache:
-            return await self.cache.remember(
-                f"report:session:{session_id}", 300,
-                lambda: self.report_repo.get_report_by_session(session_id),
-            )
-        return await self.report_repo.get_report_by_session(session_id)
+    async def get_report_by_session(
+        self, session_id: str, user_id: str | None = None
+    ):
+        rpt = await self.report_repo.get_report_by_session(session_id)
+        if rpt and user_id is not None and rpt.user_id != user_id:
+            return None
+        return rpt
 
-    async def get_report(self, report_id: str):
-        if self.cache:
-            return await self.cache.remember(
-                f"report:id:{report_id}", 300,
-                lambda: self.report_repo.get_report(report_id),
-            )
-        return await self.report_repo.get_report(report_id)
+    async def get_report(self, report_id: str, user_id: str | None = None):
+        rpt = await self.report_repo.get_report(report_id)
+        if rpt and user_id is not None and rpt.user_id != user_id:
+            return None
+        return rpt
 
     async def list_reports(self, user_id: str, limit: int = 100, offset: int = 0):
         return await self.report_repo.list_reports_by_user(user_id, limit=limit, offset=offset)
 
-    async def compare_reports(self, id1: str, id2: str) -> dict[str, Any]:
-        r1 = await self.get_report(id1)
-        r2 = await self.get_report(id2)
+    async def compare_reports(
+        self, id1: str, id2: str, user_id: str | None = None
+    ) -> dict[str, Any]:
+        r1 = await self.get_report(id1, user_id=user_id)
+        r2 = await self.get_report(id2, user_id=user_id)
         if not r1 or not r2:
             raise ValueError('One or both reports not found')
 
