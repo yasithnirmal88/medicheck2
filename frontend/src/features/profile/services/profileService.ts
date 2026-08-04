@@ -1,6 +1,6 @@
-import { api } from '@/lib/api'
+import api from '@/lib/api'
 import type { WizardState } from '../types/wizard'
-import { mapMainPersonalFromWizard } from '../api/profileApi'
+import { mapPersonalFromWizard } from '../api/profileApi'
 
 const PROFILE_ENDPOINT = '/profiles/me'
 const LIFESTYLE_ENDPOINT = '/profiles/me/lifestyle'
@@ -13,7 +13,7 @@ export async function fetchProfileData(): Promise<WizardState> {
 }
 
 export async function saveProfileData(data: WizardState): Promise<WizardState> {
-  const payload = mapMainPersonalFromWizard(data)
+  const payload = mapPersonalFromWizard(data)
   const response = await api.post(PROFILE_ENDPOINT, payload)
   return response.data
 }
