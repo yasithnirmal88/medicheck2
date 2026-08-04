@@ -17,6 +17,7 @@ import {
   updateProfile,
   type User 
 } from '@/lib/firebase'
+import api from '@/lib/api'
 import type { LoginFormValues, RegisterFormValues } from '../types/auth'
 import { toFriendlyAuthError } from '../utils/authErrors'
 
@@ -59,19 +60,42 @@ export function useGoogleLogin() {
   })
 }
 
-// Registration
+// Registration with role
 export function useRegister() {
   return useMutation({
-    mutationFn: async ({ email, password, displayName }: RegisterFormValues) => {
+    mutationFn: async ({ email, password, displayName, role = 'patient' }: RegisterFormValues) => {
       // Ensure Firebase is initialized
       initializeFirebase()
       
       const auth = getFirebaseAuth()
+      
+      // Create Firebase user
       const result = await createUserWithEmailAndPassword(auth, email, password)
       
       // Update display name if provided
       if (displayName && result.user) {
         await updateProfile(result.user, { displayName })
+      }
+      
+      // Register with backend to store role
+      try {
+        const token = await result.user.getIdToken()
+        await api.post('/auth/register', {
+          email,
+          display_name: displayName,
+          role, // 'patient' or 'doctor'
+          firebase_uid: result.user.uid,
+        }, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+      } catch (apiError) {
+        // Log but don't fail - Firebase user was created successfully
+        console.warn('Failed to register with backend API:', apiError)
+        // Store role in localStorage as fallback
+        localStorage.setItem('medicheck_role', role)
+        localStorage.setItem('medicheck_account_type', role)
       }
       
       return result.user
@@ -85,6 +109,9 @@ export function useSignOut() {
     mutationFn: async () => {
       const auth = getFirebaseAuth()
       await firebaseSignOut(auth)
+      // Clear local role storage
+      localStorage.removeItem('medicheck_role')
+      localStorage.removeItem('medicheck_account_type')
     },
   })
 }
