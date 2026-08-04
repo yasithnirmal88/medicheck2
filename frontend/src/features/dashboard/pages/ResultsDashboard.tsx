@@ -85,7 +85,7 @@ function useHealthReport(sessionId?: string) {
   }
 }
 
-function ScoreGauge({ score }: { score: number }) {
+const ScoreGauge = React.memo(function ScoreGauge({ score }: { score: number }) {
   let color = 'text-indigo-600'
   let label = 'Fair'
   if (score >= 85) {
@@ -107,9 +107,9 @@ function ScoreGauge({ score }: { score: number }) {
       <span className={`text-2xl font-bold ${color}`}>{score}/100 — {label}</span>
     </div>
   )
-}
+})
 
-function BarRow({ label, value, max = 100 }: { label: string; value: number; max?: number }) {
+const BarRow = React.memo(function BarRow({ label, value, max = 100 }: { label: string; value: number; max?: number }) {
   const pct = (value / max) * 100
   let barColor = 'bg-amber-500'
   if (pct >= 85) barColor = 'bg-emerald-500'
@@ -123,7 +123,7 @@ function BarRow({ label, value, max = 100 }: { label: string; value: number; max
       <span className="text-right text-gray-700 dark:text-gray-200">{value}</span>
     </div>
   )
-}
+})
 
 function deriveScores(report: Report): { overall: number; systems: BodySystemScore[] } {
   const raw = report?.summary ?? ''
