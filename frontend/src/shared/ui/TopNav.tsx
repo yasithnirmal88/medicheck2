@@ -1,7 +1,7 @@
 import React from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTheme } from '../../providers/ThemeProvider'
-import { getAuth, signOut } from 'firebase/auth'
+import { getFirebaseAuth, signOut } from '@/lib/firebase'
 import { cn } from '@/lib/utils'
 
 const TopNav: React.FC = () => {
@@ -10,12 +10,12 @@ const TopNav: React.FC = () => {
   const { theme, toggle } = useTheme()
 
   const onSignOut = async () => {
-    const auth = getAuth()
     try {
+      const auth = getFirebaseAuth()
       await signOut(auth)
       window.location.href = '/login'
     } catch (err) {
-      console.error(err)
+      console.error('Sign out error:', err)
     }
   }
 
