@@ -38,6 +38,8 @@ class ClinicalDecisionService:
         sess = await self.session.get(AssessmentSessionModel, session_id)
         if sess is None:
             raise ValueError("Assessment session not found")
+        if user_id is not None and sess.user_id != user_id:
+            raise ValueError("Assessment session not found")
         answers = sess.answers  # loaded with selectin earlier
 
         # build answer map
@@ -234,8 +236,14 @@ class ClinicalDecisionService:
         }
 
     # getters
-    async def get_result_by_session(self, session_id: str):
-        return await self.dec_repo.get_result_by_session(session_id)
+    async def get_result_by_session(self, session_id: str, user_id: str | None = None):
+        res = await self.dec_repo.get_result_by_session(session_id)
+        if res and user_id is not None and res.user_id != user_id:
+            return None
+        return res
 
-    async def get_result(self, result_id: str):
-        return await self.dec_repo.get_result(result_id)
+    async def get_result(self, result_id: str, user_id: str | None = None):
+        res = await self.dec_repo.get_result(result_id)
+        if res and user_id is not None and res.user_id != user_id:
+            return None
+        return res

@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     @classmethod
     def validate_database_url(cls, v: str | None, info: dict) -> str:
         if v:
+            # Render and many PaaS providers inject a sync "postgres://" URL.
+            # The app uses an async engine and requires the asyncpg dialect, so
+            # normalize common plain-postgres schemes (skip sqlite/test URLs).
+            if v.startswith("postgres://"):
+                return v.replace("postgres://", "postgresql+asyncpg://", 1)
+            if v.startswith("postgresql://"):
+                return v.replace("postgresql://", "postgresql+asyncpg://", 1)
             return v
         values = info.data
         return (
