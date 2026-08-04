@@ -106,7 +106,7 @@ const SearchFilters: React.FC<SearchFiltersProps> = ({
 
       {(activeCount || value.query) && (
         <div className="flex flex-wrap items-center gap-1.5 py-1 text-xs text-gray-500 dark:text-gray-400">
-          {value.query && <span>Search: "{value.query}"</span>}
+          {value.query && <span>Search: &quot;{value.query}&quot;</span>}
           {availableStatuses
             .filter((s) => value.status === s)
             .map((s) => (

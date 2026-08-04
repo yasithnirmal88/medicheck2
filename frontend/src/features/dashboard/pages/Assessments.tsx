@@ -380,9 +380,9 @@ const Assessments: React.FC = () => {
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
                   <FileText className="h-6 w-6 text-slate-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Let's begin your health journey.</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Let&apos;s begin your health journey.</h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                  You haven't completed any assessments yet. Start your first one to generate a personalized report.
+                  You haven&apos;t completed any assessments yet. Start your first one to generate a personalized report.
                 </p>
                 <button
                   type="button"

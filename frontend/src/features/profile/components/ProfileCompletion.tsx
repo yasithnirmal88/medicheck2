@@ -1,11 +1,11 @@
 import React from 'react'
 import { CheckCircle2, AlertCircle, TrendingUp } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { SectionKey } from '@/features/profile/types/wizard'
+import type { SectionKey, WizardState } from '@/features/profile/types/wizard'
 import { fieldSpecs } from '@/features/profile/wizard/fieldSpecs'
 
 interface ProfileCompletionProps {
-  state: Record<string, unknown>
+  state: WizardState
   onSectionClick?: (key: SectionKey) => void
 }
 
@@ -17,7 +17,7 @@ export function ProfileCompletion({ state, onSectionClick }: ProfileCompletionPr
 
     for (const [key, specs] of Object.entries(fieldSpecs)) {
       if (specs.length === 0) continue
-      const record = (state[key] as Record<string, unknown>) ?? {}
+      const record = (state[key as keyof WizardState] as unknown as Record<string, unknown>) ?? {}
       let filled = 0
       let total = 0
       for (const spec of specs) {

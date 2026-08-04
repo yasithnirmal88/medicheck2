@@ -90,7 +90,7 @@ export default function Router() {
         <Route path="/questionnaires/:id" element={<RequireAuth><QuestionnaireSessionPage /></RequireAuth>} />
         <Route path="/admin" element={<RequireAuth><AdminDashboard /></RequireAuth>} />
         <Route path="/dashboard" element={<RequireAuth><PatientDashboard /></RequireAuth>} />
-        <Route path="/assessments" element={<RequireAuth><AssessmentHistory /></RequireAuth>} />
+        <Route path="/assessments/history" element={<RequireAuth><AssessmentHistory /></RequireAuth>} />
         <Route path="/assessments/dashboard" element={<RequireAuth><AssessmentsPage /></RequireAuth>} />
         <Route path="/assessments/:id/results" element={<RequireAuth><ResultsDashboard /></RequireAuth>} />
         <Route path="/assessments/:id" element={<RequireAuth><ReportViewer /></RequireAuth>} />

@@ -4,7 +4,6 @@ from datetime import datetime
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel
 
 T = TypeVar("T")
 
@@ -24,7 +23,7 @@ class ErrorResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class SuccessResponse(GenericModel, Generic[T]):
+class SuccessResponse(BaseModel, Generic[T]):
     success: bool = Field(True)
     data: T
 
@@ -44,7 +43,7 @@ class TimestampedResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class PaginationResponse(GenericModel, Generic[T]):
+class PaginationResponse(BaseModel, Generic[T]):
     items: list[T]
     total: int = 0
     page: int = 1
