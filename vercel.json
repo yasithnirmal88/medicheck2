@@ -5,7 +5,7 @@
   "framework": "vite",
   "regions": ["iad1"],
   "env": {
-    "VITE_API_URL": "https://medicheck-api.onrender.com/api/v1"
+    "VITE_API_URL": "https://medicheck-api.onrender.com"
   },
   "rewrites": [
     { "source": "/((?!assets/).*)", "destination": "/index.html" }
