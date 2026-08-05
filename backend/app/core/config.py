@@ -120,13 +120,13 @@ class Settings(BaseSettings):
             }
         return None
 
-    allowed_hosts: str = "localhost,127.0.0.1,.medicheck.app"
+    allowed_hosts: str = "localhost,127.0.0.1,.medicheck.app,.onrender.com,.vercel.app"
 
     @property
     def allowed_hosts_list(self) -> list[str]:
         return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
 
-    cors_origins: str = "http://localhost:3000,http://localhost:5173"
+    cors_origins: str = "http://localhost:3000,http://localhost:5173,https://medicheck2-6nfzv4r1v-yasithnirmal88s-projects.vercel.app,https://*.vercel.app"
 
     @property
     def cors_origin_list(self) -> list[str]:
