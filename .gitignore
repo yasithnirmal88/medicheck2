@@ -34,6 +34,11 @@ Thumbs.db
 # Docker
 docker-data/
 
+# SQLite databases
+*.db
+*.sqlite
+*.sqlite3
+
 # Celery
 celerybeat-schedule
 celerybeat.pid
