@@ -107,15 +107,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       setError(null)
     } catch (err: unknown) {
-      // Don't log network errors - they're expected when backend isn't running
-      const isNetworkError = 
-        err instanceof Error && 
-        (err.message.includes('Network Error') || 
-         err.message.includes('ERR_CONNECTION_REFUSED') ||
-         err.message.includes('timeout'))
+      // Handle different error types
+      let errorMessage = 'Unknown error'
       
-      if (!isNetworkError) {
-        console.warn('Failed to fetch user role from backend:', err)
+      if (err && typeof err === 'object') {
+        // Axios error structure
+        const axiosError = err as { message?: string; response?: { status?: number } }
+        errorMessage = axiosError.message || errorMessage
+        
+        // Don't log network errors - they're expected when backend isn't running
+        const isNetworkError = 
+          errorMessage.includes('Network Error') || 
+          errorMessage.includes('ERR_CONNECTION_REFUSED') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('401') ||
+          axiosError.response?.status === 401
+        
+        if (!isNetworkError) {
+          console.warn('Failed to fetch user role from backend:', err)
+        }
+      } else if (err instanceof Error) {
+        errorMessage = err.message
       }
       
       // Fall back to stored role or default

@@ -126,11 +126,27 @@ class Settings(BaseSettings):
     def allowed_hosts_list(self) -> list[str]:
         return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
 
-    cors_origins: str = "http://localhost:3000,http://localhost:5173,https://medicheck2-6nfzv4r1v-yasithnirmal88s-projects.vercel.app,https://*.vercel.app"
+    cors_origins: str = ""
 
     @property
     def cors_origin_list(self) -> list[str]:
-        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        # If CORS_ORIGINS is set in environment, use it
+        if self.cors_origins:
+            return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        # Default allowed origins for development and production
+        return [
+            "http://localhost:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:5173",
+            # Allow all Vercel preview deployments
+            "https://*.vercel.app",
+            # Allow all Render deployments
+            "https://*.onrender.com",
+            # Allow Medicheck domains
+            "https://medicheck.app",
+            "https://www.medicheck.app",
+        ]
 
     # Security
     csrf_protection_enabled: bool = True

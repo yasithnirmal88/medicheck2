@@ -24,6 +24,7 @@ class RegisterRequest(BaseModel):
     firebase_token: constr(min_length=10) = Field(..., description="Firebase ID token")
     full_name: constr(min_length=1, max_length=200) = Field(..., description="Full name")
     email: EmailStr | None = Field(None, description="Email address")
+    role: Literal["patient", "doctor"] = Field("patient", description="User role: patient or doctor")
 
     model_config = ConfigDict(extra="forbid")
 
@@ -106,6 +107,7 @@ class UserResponse(BaseModel):
     avatar_url: str | None = None
     email_verified: bool = False
     is_active: bool = True
+    roles: list[Literal["patient", "doctor", "researcher", "administrator"]] = []
     last_login_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
