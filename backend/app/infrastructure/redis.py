@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncGenerator
 
 from redis.asyncio import Redis as AsyncRedis
@@ -21,11 +22,24 @@ async def create_redis_pool() -> ConnectionPool:
     if _pool is not None:
         return _pool
 
-    _pool = ConnectionPool.from_url(
-        settings.redis_url,
-        max_connections=20,
-        decode_responses=True,
-    )
+    # Check if using Upstash Redis
+    upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
+    upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
+    
+    if upstash_url and upstash_token:
+        # Use Upstash - create connection pool with REST API
+        _pool = ConnectionPool.from_url(
+            f"rediss://default:{upstash_token}@{upstash_url.replace('https://', '')}:6379",
+            max_connections=20,
+            decode_responses=True,
+        )
+    else:
+        _pool = ConnectionPool.from_url(
+            settings.redis_url,
+            max_connections=20,
+            decode_responses=True,
+        )
+    
     logger.info("Redis connection pool created")
     return _pool
 
