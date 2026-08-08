@@ -1,10 +1,15 @@
-import React, { useState } from 'react'
+import React, { useSyncExternalStore, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Sidebar from '@/features/dashboard/components/layout/Sidebar'
 import TopBar from '@/features/dashboard/components/layout/TopBar'
 import MobileBottomNav from '@/features/dashboard/components/layout/MobileBottomNav'
+import {
+  getSidebarCollapsed,
+  subscribeSidebarCollapsed,
+  toggleSidebarCollapsed,
+} from '@/features/dashboard/components/layout/sidebarCollapseStore'
 import type { DashboardNotification } from '@/features/dashboard/components/layout/NotificationPanel'
 
 interface DashboardLayoutProps {
@@ -20,7 +25,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
   userName,
   userEmail,
 }) => {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  // Collapse state is shared + persisted across navigations (see store).
+  const sidebarCollapsed = useSyncExternalStore(
+    subscribeSidebarCollapsed,
+    getSidebarCollapsed,
+    () => false, // server snapshot (SSR-safe)
+  )
   const [mobileOpen, setMobileOpen] = useState(false)
 
   return (
@@ -33,8 +43,9 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
       >
         <Sidebar collapsed={sidebarCollapsed} />
         <button
-          onClick={() => setSidebarCollapsed((c) => !c)}
+          onClick={() => toggleSidebarCollapsed()}
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!sidebarCollapsed}
           className="flex h-11 items-center justify-center gap-2 border-t border-slate-200 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800"
         >
           {sidebarCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}

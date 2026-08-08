@@ -105,9 +105,17 @@ interface RequirePatientProps {
 
 /**
  * RequirePatient - Ensures user is a patient
- * 
+ *
  * Redirects to patient dashboard or fallback if user is not a patient.
- * Waits for role to load before blocking access.
+ *
+ * Loading semantics (P1-2): only the true Firebase auth check (`loading`)
+ * blocks the whole route with a full-screen loader. Once the user is known to
+ * be authenticated, the route renders immediately even while the role is still
+ * being fetched (`roleLoading`) — the dashboard shell + its own skeletons show
+ * instead of a blank "Loading..." screen. RBAC is still enforced: if a
+ * non-patient role is later confirmed, the user is redirected. No protected
+ * data is shown until the authenticated user is ready (dashboard queries are
+ * gated on the user in useDashboard).
  */
 export const RequirePatient: React.FC<RequirePatientProps> = ({
   children,
@@ -116,8 +124,9 @@ export const RequirePatient: React.FC<RequirePatientProps> = ({
   const { isAuthenticated, isPatient, loading, roleLoading, role } = useAuthContext()
   const location = useLocation()
 
-  // Wait for both auth and role to be loaded
-  if (loading || roleLoading) {
+  // Only the true auth check blocks the whole route. We cannot render any
+  // patient shell before we know whether the user is authenticated at all.
+  if (loading) {
     return <LoadingPage />
   }
 
@@ -125,8 +134,12 @@ export const RequirePatient: React.FC<RequirePatientProps> = ({
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  // Redirect doctors/clinicians away from patient routes
-  // New users with null role default to patient access
+  // Redirect doctors/clinicians away from patient routes. New users with a
+  // null role default to patient access. While roleLoading is true (role still
+  // unknown) we optimistically render the patient shell; the redirect below
+  // fires once a non-patient role is confirmed. roleLoading is intentionally
+  // not used to block here (see doc above) but is kept for future signaling.
+  void roleLoading
   if (role !== null && !isPatient) {
     console.warn(
       `Access denied: Non-patient role "${role}" tried to access patient route`
@@ -134,7 +147,8 @@ export const RequirePatient: React.FC<RequirePatientProps> = ({
     return <Navigate to={fallbackPath} replace />
   }
 
-  // New users (role is null) get patient access by default
+  // New users (role is null, incl. while roleLoading) get patient access by
+  // default. Protected data is gated downstream on the authenticated user.
   return children
 }
 

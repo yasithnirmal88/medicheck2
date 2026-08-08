@@ -18,17 +18,17 @@ class ProfileService:
         profile = await self.repo.get_by_user_id(user.id)
         if profile is None:
             profile = await self.repo.create_for_user(user.id)
-        return HealthProfileDTO.from_orm(profile)
+        return HealthProfileDTO.model_validate(profile)
 
     async def update_personal_info(
         self, user: User, data: PersonalInfoDTO
     ) -> HealthProfileDTO:
         profile = await self.repo.get_or_create_for_user(user.id)
-        await self.repo.upsert_personal_info(profile.id, data.dict())
+        await self.repo.upsert_personal_info(profile.id, data.model_dump())
         snapshot = await self.repo.snapshot_profile(profile.id)
         await self.repo.create_version(profile.id, snapshot, created_by=user.id)
         updated = await self.repo.get_by_id(profile.id)
-        return HealthProfileDTO.from_orm(updated)
+        return HealthProfileDTO.model_validate(updated)
 
     # Lifestyle & Nutrition
     async def update_lifestyle(self, user: User, data: dict) -> HealthProfileDTO:
@@ -37,7 +37,7 @@ class ProfileService:
         snapshot = await self.repo.snapshot_profile(profile.id)
         await self.repo.create_version(profile.id, snapshot, created_by=user.id)
         updated = await self.repo.get_by_id(profile.id)
-        return HealthProfileDTO.from_orm(updated)
+        return HealthProfileDTO.model_validate(updated)
 
     async def update_nutrition(self, user: User, data: dict) -> HealthProfileDTO:
         profile = await self.repo.get_or_create_for_user(user.id)
@@ -45,7 +45,7 @@ class ProfileService:
         snapshot = await self.repo.snapshot_profile(profile.id)
         await self.repo.create_version(profile.id, snapshot, created_by=user.id)
         updated = await self.repo.get_by_id(profile.id)
-        return HealthProfileDTO.from_orm(updated)
+        return HealthProfileDTO.model_validate(updated)
 
     # Repeatable sections add/list
     async def add_medical_history(self, user: User, data: dict):
@@ -138,7 +138,7 @@ class ProfileService:
 
     async def get_profile(self, user: User) -> HealthProfileDTO:
         profile = await self.repo.get_or_create_for_user(user.id)
-        return HealthProfileDTO.from_orm(profile)
+        return HealthProfileDTO.model_validate(profile)
 
     # Completion calculation
     async def compute_completion(self, user: User) -> dict:
@@ -213,4 +213,4 @@ class ProfileService:
         new_snapshot = await self.repo.snapshot_profile(profile.id)
         await self.repo.create_version(profile.id, new_snapshot, created_by=user.id)
         updated = await self.repo.get_by_id(profile.id)
-        return HealthProfileDTO.from_orm(updated)
+        return HealthProfileDTO.model_validate(updated)

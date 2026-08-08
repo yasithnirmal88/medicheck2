@@ -98,7 +98,13 @@ async def get_current_user(
     if not user.is_active:
         raise AuthenticationError(detail="Account is deactivated")
 
-    await _populate_user_roles(user, session)
+    # Roles are already eagerly loaded by SQLUserRepository.find_by_firebase_uid
+    # (via _base_query's selectinload(UserModel.roles)) and mapped in _to_entity.
+    # The previous _populate_user_roles call here issued a redundant second query
+    # fetching the same role codes; it is only needed as a fallback if a caller
+    # ever produces a User whose roles were not loaded.
+    if getattr(user, "roles", None) is None:
+        await _populate_user_roles(user, session)
     return user
 
 

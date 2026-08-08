@@ -90,9 +90,11 @@ api.interceptors.response.use(
   (response: AxiosResponse): AxiosResponse => {
     return response
   },
-  async (error: AxiosError): Promise<never> => {
-    // Handle 401 Unauthorized - token may have expired
-    if (error.response?.status === 401) {
+  async (error: AxiosError): Promise<unknown> => {
+    // Handle 401 Unauthorized - token may have expired. Refresh once and retry
+    // the original request. A _refreshed flag on the config prevents infinite
+    // re-entry: if the retried request still 401s, reject instead of looping.
+    if (error.response?.status === 401 && error.config && !(error.config as InternalAxiosRequestConfig & { _refreshed?: boolean })._refreshed) {
       try {
         const auth = getFirebaseAuth()
         const user = auth?.currentUser
@@ -100,9 +102,10 @@ api.interceptors.response.use(
         if (user) {
           // Force refresh token and retry once
           const token = await user.getIdToken(true)
-          
+
           if (token && error.config) {
             error.config.headers.Authorization = `Bearer ${token}`
+            ;(error.config as InternalAxiosRequestConfig & { _refreshed?: boolean })._refreshed = true
             return axios(error.config)
           }
         }

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
-import { PatientLayout } from '../PatientLayout'
 import { DoctorLayout } from '../DoctorLayout'
 import { DashboardLayout } from '../DashboardLayout'
+import AppLayout from '../AppLayout'
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuthContext: () => ({
@@ -49,22 +49,6 @@ beforeEach(() => {
       } as unknown as MediaQueryList))
 })
 
-describe('PatientLayout renders nested route content', () => {
-  it('shows the dashboard page via <Outlet/> when used as a layout element', () => {
-    render(
-      <MemoryRouter initialEntries={['/app']}>
-        <Routes>
-          <Route path="/app" element={<PatientLayout />}>
-            <Route index element={<div>Patient Dashboard Content</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    )
-
-    expect(screen.getByText('Patient Dashboard Content')).toBeInTheDocument()
-  })
-})
-
 describe('DoctorLayout renders nested route content', () => {
   it('shows the CMS dashboard page via <Outlet/> when used as a layout element', () => {
     render(
@@ -82,24 +66,6 @@ describe('DoctorLayout renders nested route content', () => {
 })
 
 describe('Sidebar collapse toggle', () => {
-  it('PatientLayout renders a collapse button that shrinks the sidebar', () => {
-    render(
-      <MemoryRouter initialEntries={['/app']}>
-        <Routes>
-          <Route path="/app" element={<PatientLayout />}>
-            <Route index element={<div>Patient Dashboard Content</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>,
-    )
-
-    const collapseBtn = screen.getByRole('button', { name: 'Collapse sidebar' })
-    expect(collapseBtn).toBeInTheDocument()
-
-    fireEvent.click(collapseBtn)
-    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
-  })
-
   it('DoctorLayout renders a collapse button that shrinks the sidebar', () => {
     render(
       <MemoryRouter initialEntries={['/cms/dashboard']}>
@@ -133,5 +99,52 @@ describe('DashboardLayout single sidebar', () => {
     // and only renders when opened).
     expect(container.querySelectorAll('aside').length).toBe(1)
     expect(screen.getByText('Patient Page Content')).toBeInTheDocument()
+  })
+})
+
+describe('DashboardLayout collapse persistence (P3-6)', () => {
+  it('keeps the sidebar collapsed across remounts (navigation)', () => {
+    // First mount: collapse the sidebar.
+    const { unmount } = render(
+      <MemoryRouter>
+        <DashboardLayout>
+          <div>Page A</div>
+        </DashboardLayout>
+      </MemoryRouter>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }))
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
+    unmount()
+
+    // Second mount (simulates navigating to another patient page which
+    // remounts DashboardLayout): the sidebar must stay collapsed.
+    render(
+      <MemoryRouter>
+        <DashboardLayout>
+          <div>Page B</div>
+        </DashboardLayout>
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
+
+    // Clean up the shared store so other tests start expanded.
+    fireEvent.click(screen.getByRole('button', { name: 'Expand sidebar' }))
+  })
+})
+
+describe('AppLayout passthrough (P3-6 — no double layout)', () => {
+  it('renders only its children (no extra TopNav/footer) so DashboardLayout is the sole chrome', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <AppLayout>
+          <div data-testid="child">Inner Content</div>
+        </AppLayout>
+      </MemoryRouter>,
+    )
+
+    // No nav bar / footer from AppLayout — just the child.
+    expect(container.querySelector('header')).toBeNull()
+    expect(container.querySelector('footer')).toBeNull()
+    expect(screen.getByTestId('child')).toBeInTheDocument()
   })
 })

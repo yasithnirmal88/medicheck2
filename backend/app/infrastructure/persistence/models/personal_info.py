@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import Date, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Date, Float, ForeignKey, Integer, JSON, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.infrastructure.persistence.models.base import BaseModel
@@ -25,7 +25,7 @@ class PersonalInfoModel(BaseModel):
     state: Mapped[str | None] = mapped_column(String(100), nullable=True)
     city: Mapped[str | None] = mapped_column(String(100), nullable=True)
     preferred_language: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    emergency_contact: Mapped[dict | None] = mapped_column(Text, nullable=True)
+    emergency_contact: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     occupation: Mapped[str | None] = mapped_column(String(150), nullable=True)
     industry: Mapped[str | None] = mapped_column(String(150), nullable=True)
     education_level: Mapped[str | None] = mapped_column(String(100), nullable=True)

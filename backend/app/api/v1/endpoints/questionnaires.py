@@ -32,34 +32,9 @@ async def list_templates(
     return [QuestionnaireTemplateResponse.from_attributes(t) for t in templates]
 
 
-@router.get("/{id}", summary="Get questionnaire template detail", response_model=QuestionnaireTemplateResponse)
-async def get_template_detail(
-    id: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[AsyncSession, Depends(get_db)],
-):
-    from app.infrastructure.persistence.repositories.sql_questionnaire_repository import (
-        SQLQuestionnaireRepository,
-    )
-    repo = SQLQuestionnaireRepository(session)
-    template = await repo.find_by_id(id)
-    if not template:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Template not found")
-    return QuestionnaireTemplateResponse.from_attributes(template)
-
-@router.post("/{id}/start", response_model=StartSessionResponse, summary="Start a questionnaire session", description="Start a questionnaire session for the authenticated user using the given template id.")
-async def start_session(
-    id: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[AsyncSession, Depends(get_db)],
-):
-    svc = QuestionnaireService(session)
-    result = await svc.start_session(current_user, template_id=id)
-    # return mapped DTO
-    return StartSessionResponse(**result)
-
-
+# Static /sessions routes MUST be declared before the /{id} parametric route,
+# otherwise FastAPI matches "/sessions" against "/{id}" (id="sessions") and
+# returns a 404 "Template not found".
 @router.get("/sessions", response_model=list[AssessmentSessionResponse], summary="List user questionnaire sessions", description="List past assessment sessions for the authenticated user.")
 async def list_sessions(
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -135,3 +110,33 @@ async def get_session_progress(
 ):
     svc = QuestionnaireService(session)
     return await svc.get_session_progress(current_user, id)
+
+
+# Parametric /{id} routes declared LAST so they cannot shadow the static
+# /sessions routes above.
+@router.get("/{id}", summary="Get questionnaire template detail", response_model=QuestionnaireTemplateResponse)
+async def get_template_detail(
+    id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    from app.infrastructure.persistence.repositories.sql_questionnaire_repository import (
+        SQLQuestionnaireRepository,
+    )
+    repo = SQLQuestionnaireRepository(session)
+    template = await repo.find_by_id(id)
+    if not template:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Template not found")
+    return QuestionnaireTemplateResponse.from_attributes(template)
+
+
+@router.post("/{id}/start", response_model=StartSessionResponse, summary="Start a questionnaire session", description="Start a questionnaire session for the authenticated user using the given template id.")
+async def start_session(
+    id: str,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+):
+    svc = QuestionnaireService(session)
+    result = await svc.start_session(current_user, template_id=id)
+    return StartSessionResponse(**result)

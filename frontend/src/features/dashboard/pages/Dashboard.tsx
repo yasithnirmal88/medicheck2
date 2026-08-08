@@ -75,13 +75,17 @@ interface DashboardViewModel {
 }
 
 export default function Dashboard() {
-  const derived = useDashboardDerived()
-  const profile = useDashboardProfile()
-  const reports = useDashboardReports()
-  const sessionsState = useDashboardSessions()
-  const measurements = useDashboardMeasurements()
-  const labReports = useDashboardLabReports()
   const { user } = useAuth()
+  // Queries only fire once a Firebase user is available (P1-3). This prevents
+  // tokenless 401s + retry storms now that the auth gate renders the shell
+  // during role resolution (P1-2).
+  const ready = !!user
+  const derived = useDashboardDerived({ enabled: ready })
+  const profile = useDashboardProfile({ enabled: ready })
+  const reports = useDashboardReports({ enabled: ready })
+  const sessionsState = useDashboardSessions({ enabled: ready })
+  const measurements = useDashboardMeasurements({ enabled: ready })
+  const labReports = useDashboardLabReports({ enabled: ready })
 
   const loading =
     reports.isLoading || sessionsState.isLoading || measurements.isLoading || labReports.isLoading

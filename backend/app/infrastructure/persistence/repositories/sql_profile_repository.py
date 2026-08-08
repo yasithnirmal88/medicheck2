@@ -26,12 +26,28 @@ class SQLProfileRepository:
         self.session = session
 
     async def get_by_user_id(self, user_id: str) -> HealthProfileModel | None:
-        q = select(HealthProfileModel).where(HealthProfileModel.user_id == user_id)
+        q = (
+            select(HealthProfileModel)
+            .where(HealthProfileModel.user_id == user_id)
+            .options(
+                selectinload(HealthProfileModel.personal_info),
+                selectinload(HealthProfileModel.lifestyle),
+                selectinload(HealthProfileModel.nutrition),
+            )
+        )
         r = await self.session.execute(q)
         return r.scalars().first()
 
     async def get_by_id(self, profile_id: str) -> HealthProfileModel | None:
-        q = select(HealthProfileModel).where(HealthProfileModel.id == profile_id)
+        q = (
+            select(HealthProfileModel)
+            .where(HealthProfileModel.id == profile_id)
+            .options(
+                selectinload(HealthProfileModel.personal_info),
+                selectinload(HealthProfileModel.lifestyle),
+                selectinload(HealthProfileModel.nutrition),
+            )
+        )
         r = await self.session.execute(q)
         return r.scalars().first()
 
@@ -277,7 +293,7 @@ class SQLProfileRepository:
                 "id": profile.id,
                 "user_id": profile.user_id,
                 "draft": bool(profile.draft),
-                "metadata": profile.extra_metadata,
+                "metadata": profile.profile_metadata,
             }
         }
         # personal info
