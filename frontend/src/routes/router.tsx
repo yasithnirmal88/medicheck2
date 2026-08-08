@@ -10,8 +10,8 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import NotFound from '../shared/ui/NotFound'
 import LoadingPage from '../shared/loading/LoadingPage'
 import { RequireAuth, RequirePatient, RequireDoctor, GuestRoute } from '../guards'
-import PatientLayout from '../layouts/PatientLayout'
 import DoctorLayout from '../layouts/DoctorLayout'
+import { DashboardLayout } from '../layouts/DashboardLayout'
 import { WizardProvider } from '../features/profile/state/WizardProvider'
 
 // ============================================================================
@@ -103,24 +103,27 @@ export default function Router() {
         {/* ============================================================ */}
         
         {/* Dashboard with nested routes */}
+        {/* Dashboard.tsx renders its own DashboardLayout shell, so no route-level layout wrapper */}
         <Route
           path="/app"
           element={
             <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayout />
+              <PatientDashboard />
             </RequirePatient>
           }
         >
-          <Route index element={<PatientDashboard />} />
           <Route path="dashboard" element={<Navigate to="/app" replace />} />
         </Route>
 
-        {/* Patient-specific routes - each wrapped in PatientLayout */}
+        {/* Patient-specific routes - each wrapped in DashboardLayout */}
+        {/* HealthProfilePage renders its own DashboardLayout shell */}
         <Route
           path="/profile"
           element={
             <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<WizardProvider><HealthProfilePage /></WizardProvider>} />
+              <WizardProvider>
+                <HealthProfilePage />
+              </WizardProvider>
             </RequirePatient>
           }
         />
@@ -343,7 +346,9 @@ export default function Router() {
 // Layout Wrapper Components
 // ============================================================================
 
-// Wrapper for PatientLayout with content
+// Wrapper that provides the DashboardLayout shell (sidebar + topbar) to patient
+// pages that don't render their own layout. Pages like Dashboard and HealthProfile
+// render DashboardLayout themselves and bypass this wrapper to avoid double sidebars.
 const PatientLayoutWithContent: React.FC<{ content: React.ReactNode }> = ({ content }) => (
-  <PatientLayout>{content}</PatientLayout>
+  <DashboardLayout>{content}</DashboardLayout>
 )
