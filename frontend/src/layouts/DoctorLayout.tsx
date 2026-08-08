@@ -302,6 +302,25 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
         ))}
       </nav>
 
+      {/* Collapse toggle */}
+      <button
+        onClick={onToggle}
+        aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        className={cn(
+          'flex items-center gap-2 border-t border-slate-200 px-3 py-3 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700 dark:border-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white',
+          collapsed ? 'justify-center' : 'justify-end',
+          mobile && 'hidden',
+        )}
+      >
+        {collapsed ? <ChevronRight className="h-4 w-4" /> : (
+          <>
+            <span>Collapse</span>
+            <ChevronLeft className="h-4 w-4" />
+          </>
+        )}
+      </button>
+
       {/* Footer */}
       <div className="border-t border-slate-200 p-3 dark:border-slate-800">
         {!collapsed ? (
