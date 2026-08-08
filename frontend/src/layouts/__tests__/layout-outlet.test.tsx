@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { PatientLayout } from '../PatientLayout'
 import { DoctorLayout } from '../DoctorLayout'
@@ -64,5 +64,43 @@ describe('DoctorLayout renders nested route content', () => {
     )
 
     expect(screen.getByText('CMS Dashboard Content')).toBeInTheDocument()
+  })
+})
+
+describe('Sidebar collapse toggle', () => {
+  it('PatientLayout renders a collapse button that shrinks the sidebar', () => {
+    render(
+      <MemoryRouter initialEntries={['/app']}>
+        <Routes>
+          <Route path="/app" element={<PatientLayout />}>
+            <Route index element={<div>Patient Dashboard Content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const collapseBtn = screen.getByRole('button', { name: 'Collapse sidebar' })
+    expect(collapseBtn).toBeInTheDocument()
+
+    fireEvent.click(collapseBtn)
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
+  })
+
+  it('DoctorLayout renders a collapse button that shrinks the sidebar', () => {
+    render(
+      <MemoryRouter initialEntries={['/cms/dashboard']}>
+        <Routes>
+          <Route path="/cms" element={<DoctorLayout />}>
+            <Route path="dashboard" element={<div>CMS Dashboard Content</div>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    )
+
+    const collapseBtn = screen.getByRole('button', { name: 'Collapse sidebar' })
+    expect(collapseBtn).toBeInTheDocument()
+
+    fireEvent.click(collapseBtn)
+    expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
   })
 })
