@@ -137,6 +137,7 @@ def _setup_middleware(app: FastAPI) -> None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
+        allow_origin_regex=r"^https://(?:[a-zA-Z0-9-]+\.)*(?:vercel\.app|onrender\.com|medicheck\.app)$",
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=[
