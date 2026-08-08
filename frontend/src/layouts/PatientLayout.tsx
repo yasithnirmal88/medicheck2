@@ -7,7 +7,7 @@
 
 import React, { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { NavLink, useNavigate, useLocation, Outlet } from 'react-router-dom'
 import {
   Activity,
   BookOpen,
@@ -188,7 +188,7 @@ export const PatientLayout: React.FC<PatientLayoutProps> = ({ children }) => {
 
         {/* Page Content */}
         <main className="p-4 lg:p-6">
-          {children}
+          {children ?? <Outlet />}
         </main>
 
         {/* Footer */}

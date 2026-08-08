@@ -6,7 +6,7 @@
  */
 
 import React, { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import { NavLink, useNavigate, Outlet } from 'react-router-dom'
 import {
   Activity,
   Beaker,
@@ -202,7 +202,7 @@ export const DoctorLayout: React.FC<DoctorLayoutProps> = ({ children }) => {
 
         {/* Page Content */}
         <main className="p-4 lg:p-6">
-          {children}
+          {children ?? <Outlet />}
         </main>
 
         {/* Footer */}
