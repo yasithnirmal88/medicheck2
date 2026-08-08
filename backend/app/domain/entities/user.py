@@ -28,6 +28,7 @@ class User:
         email: str,
         full_name: str,
         avatar_url: str | None = None,
+        role: str = "patient",
     ) -> User:
         now = datetime.now(UTC)
         return cls(
@@ -38,7 +39,7 @@ class User:
             avatar_url=avatar_url,
             email_verified=False,
             is_active=True,
-            roles=set(),
+            roles={role} if role else set(),
             last_login_at=None,
             created_at=now,
             updated_at=now,

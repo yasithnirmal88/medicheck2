@@ -18,6 +18,7 @@ class AuthService:
         firebase_token: str,
         full_name: str,
         email: str | None = None,
+        role: str = "patient",
     ) -> User:
         claims = await verify_firebase_token(firebase_token)
         firebase_uid = claims["uid"]
@@ -45,11 +46,12 @@ class AuthService:
             email=user_email,
             full_name=user_name,
             avatar_url=avatar_url,
+            role=role,
         )
         user.email_verified = claims.get("email_verified", False)
 
         created = await self._user_repo.create(user)
-        logger.info("User registered: %s (%s)", created.id, created.email)
+        logger.info("User registered: %s (%s) with role: %s", created.id, created.email, role)
         return created
 
     async def get_or_create_user(self, firebase_token: str) -> User:

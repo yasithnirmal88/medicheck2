@@ -13,16 +13,30 @@ const getApiBaseUrl = (): string => {
   const envUrl = import.meta.env.VITE_API_URL
   const envBaseUrl = import.meta.env.VITE_API_BASE_URL
   
+  let baseUrl = ''
+  
   if (envUrl) {
-    return envUrl
+    baseUrl = envUrl
+  } else if (envBaseUrl) {
+    baseUrl = envBaseUrl
+  } else if (import.meta.env.PROD) {
+    // In production (Vercel), use relative path to the same origin
+    baseUrl = '/api/v1'
+  } else {
+    // Default to local development server
+    return 'http://localhost:8000/api/v1'
   }
   
-  if (envBaseUrl) {
-    return envBaseUrl
+  // Ensure base URL ends with /api/v1
+  if (!baseUrl.endsWith('/api/v1')) {
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl + 'api/v1'
+    } else {
+      baseUrl = baseUrl + '/api/v1'
+    }
   }
   
-  // Default to local development server
-  return 'http://localhost:8000/api/v1'
+  return baseUrl
 }
 
 // Create axios instance

@@ -81,10 +81,10 @@ export function useRegister() {
       try {
         const token = await result.user.getIdToken()
         await api.post('/auth/register', {
+          firebase_token: token,
           email,
-          display_name: displayName,
+          full_name: displayName,
           role, // 'patient' or 'doctor'
-          firebase_uid: result.user.uid,
         }, {
           headers: {
             Authorization: `Bearer ${token}`,
