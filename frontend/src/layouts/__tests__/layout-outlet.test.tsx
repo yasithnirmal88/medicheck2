@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import { PatientLayout } from '../PatientLayout'
 import { DoctorLayout } from '../DoctorLayout'
+import { DashboardLayout } from '../DashboardLayout'
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuthContext: () => ({
@@ -23,6 +24,19 @@ vi.mock('react-dom', async () => {
   const actual = await vi.importActual<typeof import('react-dom')>('react-dom')
   return { ...actual, createPortal: (node: React.ReactNode) => node }
 })
+
+vi.mock('@/lib/firebase', () => ({
+  getFirebaseAuth: () => ({}),
+  signOut: vi.fn(),
+}))
+
+vi.mock('@/providers/AuthProvider', () => ({
+  useAuth: () => ({ user: { displayName: 'Jane Doe', email: 'jane@example.com' } }),
+}))
+
+vi.mock('@/providers/ThemeProvider', () => ({
+  useTheme: () => ({ theme: 'light', toggle: vi.fn() }),
+}))
 
 beforeEach(() => {
   window.matchMedia =
@@ -102,5 +116,22 @@ describe('Sidebar collapse toggle', () => {
 
     fireEvent.click(collapseBtn)
     expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeInTheDocument()
+  })
+})
+
+describe('DashboardLayout single sidebar', () => {
+  it('renders exactly one sidebar aside for patient content', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DashboardLayout>
+          <div>Patient Page Content</div>
+        </DashboardLayout>
+      </MemoryRouter>,
+    )
+
+    // The desktop sidebar is the only <aside> rendered (mobile drawer is portaled
+    // and only renders when opened).
+    expect(container.querySelectorAll('aside').length).toBe(1)
+    expect(screen.getByText('Patient Page Content')).toBeInTheDocument()
   })
 })
