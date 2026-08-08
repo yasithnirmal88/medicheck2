@@ -12,6 +12,7 @@ import LoadingPage from '../shared/loading/LoadingPage'
 import { RequireAuth, RequirePatient, RequireDoctor, GuestRoute } from '../guards'
 import PatientLayout from '../layouts/PatientLayout'
 import DoctorLayout from '../layouts/DoctorLayout'
+import { WizardProvider } from '../features/profile/state/WizardProvider'
 
 // ============================================================================
 // Lazy-loaded Patient Components
@@ -119,7 +120,7 @@ export default function Router() {
           path="/profile"
           element={
             <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<HealthProfilePage />} />
+              <PatientLayoutWithContent content={<WizardProvider><HealthProfilePage /></WizardProvider>} />
             </RequirePatient>
           }
         />
