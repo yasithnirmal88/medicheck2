@@ -50,7 +50,7 @@ const LandingPage: React.FC = () => {
               Choose your account type
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Select how you'll be using Medicheck
+              Select how you&rsquo;ll be using Medicheck
             </p>
           </div>
 

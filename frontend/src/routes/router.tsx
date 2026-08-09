@@ -51,10 +51,26 @@ const PublishingWorkflowsPage = React.lazy(() => import('../features/cms/pages/P
 const SearchPage = React.lazy(() => import('../features/cms/pages/SearchPage').then(m => ({ default: m.SearchPage })))
 const SettingsPage = React.lazy(() => import('../features/cms/pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
 
-// Content list pages - dynamically loaded based on entity type
-const ContentListPageWrapper = React.lazy(() => 
-  import('../features/cms/pages/ContentListPages').then(m => ({ default: m.QuestionsListPage }))
-)
+// Content list pages - one lazy component per entity type, wired to its
+// dedicated page. Previously a single ContentListPageWrapper (hardcoded to
+// QuestionsListPage) was used for every content route, so diseases, symptoms,
+// indicators, etc. all rendered the Questions list.
+const QuestionsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.QuestionsListPage })))
+const DiseasesListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.DiseasesListPage })))
+const BodySystemsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.BodySystemsListPage })))
+const SymptomsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.SymptomsListPage })))
+const IndicatorsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.IndicatorsListPage })))
+const LabTestsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.LabTestsListPage })))
+const ImagingTestsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.ImagingTestsListPage })))
+const RecommendationsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.RecommendationsListPage })))
+const LifestyleAdviceListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.LifestyleAdviceListPage })))
+const ExerciseProgramsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.ExerciseProgramsListPage })))
+const NutritionAdviceListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.NutritionAdviceListPage })))
+const TemplatesListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.TemplatesListPage })))
+const MedicationsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.MedicationsListPage })))
+const ClinicalGuidelinesListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.ClinicalGuidelinesListPage })))
+const DecisionRulesListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.DecisionRulesListPage })))
+const SeverityThresholdsListPage = React.lazy(() => import('../features/cms/pages/ContentListPages').then(m => ({ default: m.SeverityThresholdsListPage })))
 
 // ============================================================================
 // Auth Components (lazy-loaded)
@@ -279,24 +295,24 @@ export default function Router() {
           <Route path="dashboard" element={<CMSDashboardPage />} />
 
           {/* Content Management */}
-          <Route path="questions" element={<ContentListPageWrapper />} />
+          <Route path="questions" element={<QuestionsListPage />} />
           <Route path="question-groups" element={<Navigate to="/cms/questions" replace />} />
-          <Route path="diseases" element={<ContentListPageWrapper />} />
-          <Route path="body-systems" element={<ContentListPageWrapper />} />
-          <Route path="symptoms" element={<ContentListPageWrapper />} />
-          <Route path="indicators" element={<ContentListPageWrapper />} />
-          <Route path="lab-tests" element={<ContentListPageWrapper />} />
-          <Route path="imaging" element={<ContentListPageWrapper />} />
-          <Route path="recommendations" element={<ContentListPageWrapper />} />
-          <Route path="lifestyle" element={<ContentListPageWrapper />} />
-          <Route path="exercise" element={<ContentListPageWrapper />} />
-          <Route path="nutrition" element={<ContentListPageWrapper />} />
+          <Route path="diseases" element={<DiseasesListPage />} />
+          <Route path="body-systems" element={<BodySystemsListPage />} />
+          <Route path="symptoms" element={<SymptomsListPage />} />
+          <Route path="indicators" element={<IndicatorsListPage />} />
+          <Route path="lab-tests" element={<LabTestsListPage />} />
+          <Route path="imaging" element={<ImagingTestsListPage />} />
+          <Route path="recommendations" element={<RecommendationsListPage />} />
+          <Route path="lifestyle" element={<LifestyleAdviceListPage />} />
+          <Route path="exercise" element={<ExerciseProgramsListPage />} />
+          <Route path="nutrition" element={<NutritionAdviceListPage />} />
           <Route path="evidence" element={<ClinicalEvidencePage />} />
-          <Route path="templates" element={<ContentListPageWrapper />} />
-          <Route path="medications" element={<ContentListPageWrapper />} />
-          <Route path="guidelines" element={<ContentListPageWrapper />} />
-          <Route path="rules" element={<ContentListPageWrapper />} />
-          <Route path="thresholds" element={<ContentListPageWrapper />} />
+          <Route path="templates" element={<TemplatesListPage />} />
+          <Route path="medications" element={<MedicationsListPage />} />
+          <Route path="guidelines" element={<ClinicalGuidelinesListPage />} />
+          <Route path="rules" element={<DecisionRulesListPage />} />
+          <Route path="thresholds" element={<SeverityThresholdsListPage />} />
 
           {/* Builders */}
           <Route path="builder" element={<QuestionnaireBuilderPage />} />

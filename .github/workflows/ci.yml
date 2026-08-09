@@ -73,6 +73,7 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           ENVIRONMENT: development
           SECRET_KEY: test-secret-key
+          ALLOW_MOCK_AUTH: "true"
 
   test-frontend:
     runs-on: ubuntu-latest

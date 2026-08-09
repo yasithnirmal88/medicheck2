@@ -16,10 +16,12 @@ export const CMSDashboardPage: React.FC = () => {
   const { data: overview, isLoading: overviewLoading } = useDashboardOverview()
   const { data: recentActivity, isLoading: activityLoading } = useRecentActivity()
 
-  const totalQuestions = overview?.by_type?.question ?? 0
-  const activeDiseases = overview?.by_type?.disease ?? 0
+  // Backend dashboard_service returns plural keys (questions, diseases, ...)
+  // and statuses (draft/active/archived/pending). Align to those keys.
+  const totalQuestions = overview?.by_type?.questions ?? 0
+  const activeDiseases = overview?.by_type?.diseases ?? 0
   const pendingApprovals = overview?.workflow_pending?.approvals ?? 0
-  const publishedVersions = overview?.by_status?.question?.published ?? 0
+  const publishedVersions = overview?.workflow_pending?.approved_jobs ?? 0
 
   const activityColumns = [
     { key: 'actor_id', header: 'Actor', render: (item: RecentActivity) => <span className="font-mono text-xs">{item.actor_id}</span> },

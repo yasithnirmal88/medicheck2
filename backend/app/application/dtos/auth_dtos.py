@@ -73,7 +73,12 @@ class AuthenticatedUserResponse(BaseModel):
     avatar_url: str | None = None
     email_verified: bool = False
     is_active: bool = True
-    roles: list[Literal["patient", "doctor", "researcher", "administrator"]] = []
+    # Aligned with app.core.security.rbac.Role (str, Enum). The previous
+    # Literal rejected every real CMS role (medical_director, specialist_doctor,
+    # general_physician, research_reviewer, content_editor, read_only_reviewer,
+    # super_admin), which made /auth/me 500 for CMS users and prevented the
+    # frontend from ever resolving a CMS role.
+    roles: list[str] = []
     last_login_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
@@ -107,7 +112,12 @@ class UserResponse(BaseModel):
     avatar_url: str | None = None
     email_verified: bool = False
     is_active: bool = True
-    roles: list[Literal["patient", "doctor", "researcher", "administrator"]] = []
+    # Aligned with app.core.security.rbac.Role (str, Enum). The previous
+    # Literal rejected every real CMS role (medical_director, specialist_doctor,
+    # general_physician, research_reviewer, content_editor, read_only_reviewer,
+    # super_admin), which made /auth/me 500 for CMS users and prevented the
+    # frontend from ever resolving a CMS role.
+    roles: list[str] = []
     last_login_at: datetime | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None

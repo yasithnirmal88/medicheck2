@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { cmsApi } from '../api/cmsApi'
+import { cmsApi, contentApi } from '../api/cmsApi'
 import type {
   Approval, AuditDiff, AuditLogEntry, AuditStats, BodySystem,
   ChangeRequest, ClinicalIndicator, CMSDashboardOverview,
@@ -39,27 +39,24 @@ function contentQueryKey(entityType: string, ...rest: unknown[]) {
 }
 
 export function useContentList<T>(entityType: EntityType, params?: Record<string, unknown>) {
-  const api = cmsApi[entityType as keyof typeof cmsApi] as unknown as { list: (p?: Record<string, unknown>) => Promise<PaginatedResponse<T>> }
   return useQuery<PaginatedResponse<T>>({
     queryKey: contentQueryKey(entityType, 'list', params),
-    queryFn: () => api.list(params),
+    queryFn: () => contentApi.list<T>(entityType, params),
   })
 }
 
 export function useContentItem<T>(entityType: EntityType, id: string | undefined) {
-  const api = cmsApi[entityType as keyof typeof cmsApi] as unknown as { getById: (id: string) => Promise<T> }
   return useQuery<T | null>({
     queryKey: contentQueryKey(entityType, id),
-    queryFn: () => (id ? api.getById(id) : null),
+    queryFn: () => (id ? contentApi.getById<T>(entityType, id) : null),
     enabled: !!id,
   })
 }
 
 export function useCreateContent<T>(entityType: EntityType) {
   const qc = useQueryClient()
-  const api = cmsApi[entityType as keyof typeof cmsApi] as unknown as { create: (d: Partial<T>) => Promise<T> }
   return useMutation({
-    mutationFn: (data: Partial<T>) => api.create(data),
+    mutationFn: (data: Partial<T>) => contentApi.create<T>(entityType, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: contentQueryKey(entityType) })
       toast.success(`${entityType} created`)
@@ -72,9 +69,8 @@ export function useCreateContent<T>(entityType: EntityType) {
 
 export function useUpdateContent<T>(entityType: EntityType) {
   const qc = useQueryClient()
-  const api = cmsApi[entityType as keyof typeof cmsApi] as unknown as { update: (id: string, d: Partial<T>) => Promise<T> }
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<T> }) => api.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Partial<T> }) => contentApi.update<T>(entityType, id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: contentQueryKey(entityType) })
       toast.success(`${entityType} updated`)
@@ -87,9 +83,8 @@ export function useUpdateContent<T>(entityType: EntityType) {
 
 export function useDeleteContent(entityType: EntityType) {
   const qc = useQueryClient()
-  const api = cmsApi[entityType as keyof typeof cmsApi] as unknown as { delete: (id: string) => Promise<void> }
   return useMutation({
-    mutationFn: (id: string) => api.delete(id),
+    mutationFn: (id: string) => contentApi.delete(entityType, id),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: contentQueryKey(entityType) })
       toast.success(`${entityType} deleted`)

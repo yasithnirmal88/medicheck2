@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Body, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_admin, get_db
+from app.api.deps import get_current_admin, get_cms_user, get_db
 from app.application.dtos.questionnaire_dtos import QuestionResponse
 from app.domain.entities.question import (
     Question,
@@ -39,7 +39,7 @@ router = APIRouter(prefix="/cms", tags=["CMS"])
 
 @router.get("/questions")
 async def cms_list_questions(
-    admin: Annotated[User, Depends(get_current_admin)],
+    user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLQuestionRepository(session)
@@ -356,7 +356,7 @@ async def cms_remove_dependency(
 
 @router.get("/body-systems")
 async def cms_list_body_systems(
-    admin: Annotated[User, Depends(get_current_admin)],
+    user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLBodySystemRepository(session)
@@ -402,7 +402,7 @@ async def cms_update_body_system(
 
 @router.get("/question-groups")
 async def cms_list_question_groups(
-    admin: Annotated[User, Depends(get_current_admin)],
+    user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     body_system_id: str | None = None,
 ):
@@ -477,7 +477,7 @@ async def cms_update_question_group(
 
 @router.get("/templates")
 async def cms_list_templates(
-    admin: Annotated[User, Depends(get_current_admin)],
+    user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLQuestionnaireRepository(session)

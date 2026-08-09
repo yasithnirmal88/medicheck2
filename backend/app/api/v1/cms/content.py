@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_cms_user, get_db
 from app.api.schemas.cms import (
     CMSEntityCreate,
-    CMSEntityResponse,
     CMSEntityUpdate,
     CMSStatusUpdate,
 )
@@ -32,6 +31,33 @@ from app.infrastructure.persistence.models.user_role import user_role_table
 router = APIRouter(prefix="/cms/content", tags=["CMS Content"])
 
 ALL_ENTITY_TYPES = list(ENTITY_REGISTRY.keys())
+
+# Frontend sends abbreviated entity names (e.g. "indicator") while the
+# ENTITY_REGISTRY and permission maps use canonical names (e.g.
+# "clinical_indicator"). This alias map reconciles them so the existing
+# registry/permission layer does not need to be duplicated. Aliasing is a
+# request-path concern only; no database tables are renamed.
+ENTITY_ALIASES: dict[str, str] = {
+    "indicator": "clinical_indicator",
+    "lab_test": "laboratory_test",
+    "imaging": "imaging_test",
+    "evidence": "medical_evidence",
+    "lifestyle": "lifestyle_advice",
+    "exercise": "exercise_program",
+    "nutrition": "nutrition_advice",
+    "guideline": "clinical_guideline",
+    "medication": "medication_recommendation",
+    "rule": "decision_rule",
+    "tag": "medical_tag",
+    "specialty": "medical_specialty",
+    "template": "template_library",
+    "risk_threshold": "severity_threshold",
+}
+
+
+def _resolve(entity_type: str) -> str:
+    """Return the canonical entity_type for a (possibly abbreviated) name."""
+    return ENTITY_ALIASES.get(entity_type, entity_type)
 
 _READ_PERM_MAP: dict[str, Permission] = {
     "disease": Permission.CMS_READ_DISEASE,
@@ -134,20 +160,6 @@ async def _get_user_permissions(
     return perms
 
 
-def _to_response(entity_type: str, data: dict) -> CMSEntityResponse:
-    return CMSEntityResponse(
-        id=data["id"],
-        entity_type=entity_type,
-        data=data,
-        version=data.get("version", 1),
-        status=data.get("status", "draft"),
-        created_by=data.get("created_by"),
-        updated_by=data.get("updated_by"),
-        created_at=data.get("created_at", data.get("created_at")),
-        updated_at=data.get("updated_at", data.get("updated_at")),
-    )
-
-
 @router.get("/{entity_type}")
 async def list_content(
     entity_type: str,
@@ -159,19 +171,21 @@ async def list_content(
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
 ):
-    if entity_type not in ALL_ENTITY_TYPES:
+    canonical = _resolve(entity_type)
+    if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
     perms = await _get_user_permissions(session, user.id)
-    req_perm = _READ_PERM_MAP.get(entity_type, Permission.CMS_READ_DASHBOARD)
+    req_perm = _READ_PERM_MAP.get(canonical, Permission.CMS_READ_DASHBOARD)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
 
     svc = CMSContentService(session)
     items = await svc.list_entities(
-        entity_type, body_system_id=body_system_id,
+        canonical, body_system_id=body_system_id,
         status=status, search=search, skip=skip, limit=limit
     )
-    return [_to_response(entity_type, item) for item in items]
+    total = await svc.count_entities(canonical, status=status)
+    return {"items": items, "total": total, "skip": skip, "limit": limit}
 
 
 @router.get("/{entity_type}/{entity_id}")
@@ -181,18 +195,19 @@ async def get_content(
     user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
-    if entity_type not in ALL_ENTITY_TYPES:
+    canonical = _resolve(entity_type)
+    if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
     perms = await _get_user_permissions(session, user.id)
-    req_perm = _READ_PERM_MAP.get(entity_type, Permission.CMS_READ_DASHBOARD)
+    req_perm = _READ_PERM_MAP.get(canonical, Permission.CMS_READ_DASHBOARD)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
 
     svc = CMSContentService(session)
-    item = await svc.get_entity(entity_type, entity_id)
+    item = await svc.get_entity(canonical, entity_id)
     if item is None:
         raise HTTPException(404, f"{entity_type} not found")
-    return _to_response(entity_type, item)
+    return item
 
 
 @router.post("/{entity_type}")
@@ -202,18 +217,19 @@ async def create_content(
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: CMSEntityCreate = Body(...),
 ):
-    if entity_type not in ALL_ENTITY_TYPES:
+    canonical = _resolve(entity_type)
+    if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
     perms = await _get_user_permissions(session, user.id)
-    req_perm = _WRITE_PERM_MAP.get(entity_type, Permission.CMS_WRITE_PUBLISH)
+    req_perm = _WRITE_PERM_MAP.get(canonical, Permission.CMS_WRITE_PUBLISH)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
 
     svc = CMSContentService(session)
     data = payload.model_dump(exclude_none=True, exclude={"extra"})
     try:
-        item = await svc.create_entity(entity_type, data, user.id)
-        return _to_response(entity_type, item)
+        item = await svc.create_entity(canonical, data, user.id)
+        return item
     except ValueError as e:
         raise HTTPException(400, str(e))
     except TypeError as e:
@@ -228,18 +244,19 @@ async def update_content(
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: CMSEntityUpdate = Body(...),
 ):
-    if entity_type not in ALL_ENTITY_TYPES:
+    canonical = _resolve(entity_type)
+    if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
     perms = await _get_user_permissions(session, user.id)
-    req_perm = _WRITE_PERM_MAP.get(entity_type, Permission.CMS_WRITE_PUBLISH)
+    req_perm = _WRITE_PERM_MAP.get(canonical, Permission.CMS_WRITE_PUBLISH)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
 
     svc = CMSContentService(session)
     data = payload.model_dump(exclude_none=True, exclude={"extra"})
     try:
-        item = await svc.update_entity(entity_type, entity_id, data, user.id)
-        return _to_response(entity_type, item)
+        item = await svc.update_entity(canonical, entity_id, data, user.id)
+        return item
     except ValueError as e:
         raise HTTPException(404 if "not found" in str(e) else 400, str(e))
 
@@ -251,15 +268,16 @@ async def delete_content(
     user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
-    if entity_type not in ALL_ENTITY_TYPES:
+    canonical = _resolve(entity_type)
+    if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
     perms = await _get_user_permissions(session, user.id)
-    req_perm = _WRITE_PERM_MAP.get(entity_type, Permission.CMS_WRITE_PUBLISH)
+    req_perm = _WRITE_PERM_MAP.get(canonical, Permission.CMS_WRITE_PUBLISH)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
 
     svc = CMSContentService(session)
-    await svc.delete_entity(entity_type, entity_id, user.id)
+    await svc.delete_entity(canonical, entity_id, user.id)
     return {"message": f"{entity_type} deleted"}
 
 
@@ -271,7 +289,8 @@ async def update_content_status(
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: CMSStatusUpdate = Body(...),
 ):
-    if entity_type not in ALL_ENTITY_TYPES:
+    canonical = _resolve(entity_type)
+    if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
     perms = await _get_user_permissions(session, user.id)
     if not check_permission(perms, Permission.CMS_WRITE_PUBLISH):
@@ -280,9 +299,9 @@ async def update_content_status(
     svc = CMSContentService(session)
     try:
         item = await svc.update_status(
-            entity_type, entity_id, payload.status, user.id
+            canonical, entity_id, payload.status, user.id
         )
-        return _to_response(entity_type, item)
+        return item
     except ValueError as e:
         raise HTTPException(400, str(e))
 
@@ -294,11 +313,12 @@ async def count_content(
     session: Annotated[AsyncSession, Depends(get_db)],
     status: str | None = Query(None),
 ):
-    if entity_type not in ALL_ENTITY_TYPES:
+    canonical = _resolve(entity_type)
+    if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
 
     svc = CMSContentService(session)
-    count = await svc.count_entities(entity_type, status=status)
+    count = await svc.count_entities(canonical, status=status)
     return {"entity_type": entity_type, "count": count}
 
 
@@ -309,7 +329,8 @@ async def bulk_update_content_status(
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
-    if entity_type not in ALL_ENTITY_TYPES:
+    canonical = _resolve(entity_type)
+    if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
     perms = await _get_user_permissions(session, user.id)
     if not check_permission(perms, Permission.CMS_WRITE_PUBLISH):
@@ -318,7 +339,7 @@ async def bulk_update_content_status(
     ids = payload.get("ids", [])
     status = payload.get("status", "archived")
     svc = CMSContentService(session)
-    count = await svc.bulk_update_status(entity_type, ids, status)
+    count = await svc.bulk_update_status(canonical, ids, status)
     return {"updated": count}
 
 
@@ -329,14 +350,15 @@ async def bulk_delete_content(
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
-    if entity_type not in ALL_ENTITY_TYPES:
+    canonical = _resolve(entity_type)
+    if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
     perms = await _get_user_permissions(session, user.id)
-    req_perm = _WRITE_PERM_MAP.get(entity_type, Permission.CMS_WRITE_PUBLISH)
+    req_perm = _WRITE_PERM_MAP.get(canonical, Permission.CMS_WRITE_PUBLISH)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
 
     ids = payload.get("ids", [])
     svc = CMSContentService(session)
-    count = await svc.bulk_delete(entity_type, ids)
+    count = await svc.bulk_delete(canonical, ids)
     return {"deleted": count}
