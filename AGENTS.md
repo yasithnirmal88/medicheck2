@@ -73,3 +73,21 @@ THREE sidebar layouts existed; after P3-4 only two remain and both are routed:
 - Do NOT commit/stage until the whole P0‚ÜíP3 series is done + final audit clean.
 - Preserve RBAC; don't expose user data during loading. Preserve UI/functionality.
 - Backend deps NOT preinstalled in sandbox ‚Äî must `pip install` before running tests.
+
+## Assessments pages (two distinct routes ‚Äî keep straight)
+- `/assessments` ‚Üí `features/questionnaire/pages/AssessmentSelectionPage.tsx`. The REAL
+  working flow: uses `useNavigate` + `useStartSession` (TanStack mutation) to call the
+  backend `startSession(templateId)` and navigate to `/questionnaires/:sessionId`.
+  Backed by `features/questionnaire/data/assessments.ts` catalog + `useTemplates()`.
+- `/assessments/dashboard` ‚Üí `features/dashboard/pages/Assessments.tsx`. A mock-data
+  dashboard view (uses `features/dashboard/assessments/mockData.ts`, NOT backend). Was
+  shipped with stub handlers that only `console.log` (handlePrimary/handleEdit/
+  handleDiscard + AssessmentHistoryTable onView/onRetake/onDownload/onCompare), so every
+  "Start Assessment"/"Resume"/"Review Report" button did nothing. Fixed by wiring
+  `useNavigate`: completed ‚Üí `/assessments/:slug` (ReportViewer), requires_profile ‚Üí
+  `/profile`, locked ‚Üí no-op, everything else (not_started/recommended/in_progress/
+  expired/needs_review) ‚Üí `/assessments` (the real selection page). When adding new
+  buttons on this page, route via navigate ‚Äî do NOT reintroduce console.log stubs.
+- Routes that matter for navigation: `/assessments/:id`=ReportViewer,
+  `/assessments/:id/results`=ResultsDashboard, `/questionnaires/:id`=session,
+  `/timeline/compare`=ComparePage, `/profile`=HealthProfilePage.
