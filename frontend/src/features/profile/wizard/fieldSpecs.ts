@@ -23,10 +23,6 @@ export const fieldSpecs: Record<SectionKey, Spec[]> = {
     { name: 'preferred_language', label: 'Preferred Language', kind: 'text', placeholder: 'Enter preferred language', cols: 2 },
     { name: 'email', label: 'Email Address', kind: 'text', type: 'email', placeholder: 'Enter email address', cols: 2 },
     { name: 'phone', label: 'Phone Number', kind: 'text', type: 'tel', placeholder: 'Enter phone number', cols: 2 },
-    { name: 'emergency_contact', label: 'Emergency Contact Name', kind: 'text', placeholder: 'Enter emergency contact name', cols: 2, optional: true },
-    { name: 'emergency_phone', label: 'Emergency Contact Phone', kind: 'text', type: 'tel', placeholder: 'Enter emergency phone', cols: 2, optional: true },
-    { name: 'relationship', label: 'Relationship to Contact', kind: 'text', placeholder: 'e.g. Spouse, Parent', cols: 2, optional: true },
-    { name: 'photo', label: 'Profile Photo', kind: 'photo', optional: true },
   ],
   body: [
     { name: 'height_cm', label: 'Height (cm)', kind: 'number', placeholder: 'e.g. 170', min: 50, max: 250, cols: 2 },
@@ -159,17 +155,6 @@ export const fieldSpecs: Record<SectionKey, Spec[]> = {
     { name: 'tropical_regions', label: 'Tropical Regions Visited', kind: 'textarea', placeholder: 'List tropical regions visited', cols: 2, optional: true, rows: 2 },
     { name: 'vaccinations_required', label: 'Vaccinations Required for Travel', kind: 'textarea', placeholder: 'List required vaccinations', cols: 2, optional: true, rows: 2 },
     { name: 'recent_travel', label: 'Recent Travel (last 6 months)', kind: 'textarea', placeholder: 'Describe recent travel', cols: 2, optional: true, rows: 2 },
-  ],
-  emergency: [
-    { name: 'primary_name', label: 'Primary Contact Name', kind: 'text', placeholder: 'Enter full name', cols: 2 },
-    { name: 'primary_phone', label: 'Primary Contact Phone', kind: 'text', type: 'tel', placeholder: 'Enter phone number', cols: 2 },
-    { name: 'primary_relationship', label: 'Relationship', kind: 'card', options: [{ value: 'spouse', label: '💑 Spouse' }, { value: 'parent', label: '👨 Parent' }, { value: 'child', label: '👧 Child' }, { value: 'sibling', label: '👥 Sibling' }, { value: 'friend', label: '🤝 Friend' }, { value: 'other', label: '📌 Other' }], cols: 3 },
-    { name: 'secondary_name', label: 'Secondary Contact Name', kind: 'text', placeholder: 'Enter full name', cols: 2, optional: true },
-    { name: 'secondary_phone', label: 'Secondary Contact Phone', kind: 'text', type: 'tel', placeholder: 'Enter phone number', cols: 2, optional: true },
-    { name: 'secondary_relationship', label: 'Relationship', kind: 'card', options: [{ value: 'spouse', label: '💑 Spouse' }, { value: 'parent', label: '👨 Parent' }, { value: 'child', label: '👧 Child' }, { value: 'sibling', label: '👥 Sibling' }, { value: 'friend', label: '🤝 Friend' }, { value: 'other', label: '📌 Other' }], cols: 3, optional: true },
-    { name: 'hospital_preference', label: 'Hospital Preference', kind: 'text', placeholder: 'Enter preferred hospital', cols: 2, optional: true },
-    { name: 'insurance_provider', label: 'Insurance Provider', kind: 'text', placeholder: 'Enter insurance provider', cols: 2, optional: true },
-    { name: 'organ_donor', label: 'Organ Donor', kind: 'card', options: [{ value: 'yes', label: '✅ Yes' }, { value: 'no', label: '❌ No' }, { value: 'unknown', label: '❓ Unknown' }], cols: 3 },
   ],
   consents: [
     { name: 'terms_accepted', label: 'I accept the terms and conditions', kind: 'checkbox' },

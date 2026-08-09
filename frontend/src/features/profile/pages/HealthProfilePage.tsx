@@ -6,7 +6,6 @@ import { DashboardLayout } from '../../../layouts/DashboardLayout'
 import { Stepper } from '../components/wizard/Stepper'
 import { SectionForm } from '../components/wizard/SectionForm'
 import { RepeatableSection } from '../components/wizard/RepeatableSection'
-import { PhotoUpload } from '../components/wizard/PhotoUpload'
 import { MedicationCard } from '../components/wizard/MedicationCard'
 import { AllergyCard } from '../components/wizard/AllergyCard'
 import { VaccinationSection } from '../components/wizard/VaccinationSection'
@@ -25,6 +24,7 @@ import { useAIReadiness } from '../hooks/useAIReadiness'
 import { useHealthTips } from '../hooks/useHealthTips'
 import { useToast } from '../hooks/useToast'
 import { useValidation } from '../hooks/useValidation'
+import { normalizeUnanswered } from '../state/defaults'
 import type { WizardState, SectionKey } from '../types/wizard'
 
 const STEP_LABELS: { key: SectionKey; label: string; icon: string }[] = [
@@ -47,7 +47,6 @@ const STEP_LABELS: { key: SectionKey; label: string; icon: string }[] = [
   { key: 'environment', label: 'Environment', icon: 'Globe' },
   { key: 'occupation', label: 'Work', icon: 'Briefcase' },
   { key: 'travel', label: 'Travel', icon: 'Plane' },
-  { key: 'emergency', label: 'Emergency', icon: 'Phone' },
   { key: 'consents', label: 'Review', icon: 'CheckCircle' },
 ]
 
@@ -83,10 +82,6 @@ function renderSection(
     return (
       <div className="space-y-6">
         <SectionForm sectionKey={key} data={state.personal} onChange={(v) => setSection('personal', v)} />
-        <div className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800">
-          <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Profile Photo</h3>
-          <PhotoUpload value={state.personal.photo ?? ''} onChange={(v) => setSection('personal', { ...state.personal, photo: v })} />
-        </div>
       </div>
     )
   }
@@ -438,7 +433,7 @@ export default function HealthProfilePage() {
       const response = await fetch('/api/profiles/me', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(state),
+        body: JSON.stringify(normalizeUnanswered(state)),
       })
       if (!response.ok) throw new Error('Failed to submit')
       success('Profile submitted successfully!')

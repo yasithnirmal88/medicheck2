@@ -65,11 +65,6 @@ export function useAIReadiness(state: WizardState) {
     maxPoints += 1
     points += allergies.length > 0 ? 1 : 0
 
-    const emergency = state.emergency
-    const emergencyFields = [emergency.primary_name, emergency.primary_phone, emergency.primary_relationship]
-    maxPoints += emergencyFields.length
-    points += emergencyFields.filter((v) => v && v.trim() !== '').length
-
     const consents = state.consents
     maxPoints += 3
     points += consents.terms_accepted ? 1 : 0
@@ -93,9 +88,6 @@ export function useAIReadiness(state: WizardState) {
     }
     if (conditions.length > 0 && familyHistory.length === 0) {
       insights.push('Add family history for better risk assessment')
-    }
-    if (emergency.primary_name && !emergency.insurance_provider) {
-      insights.push('Add insurance provider for complete emergency profile')
     }
     if (!consents.ai_consent) {
       insights.push('Enable AI consent for personalized health analysis')
