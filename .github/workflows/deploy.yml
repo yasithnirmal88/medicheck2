@@ -25,6 +25,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # ─── Set up Buildx (required for gha cache export) ──
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       # ─── Build & Push Backend ───────────────────────────
       - name: Build & Push Backend
         uses: docker/build-push-action@v5
@@ -34,8 +38,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository }}/api:latest
             ${{ env.REGISTRY }}/${{ github.repository }}/api:${{ env.IMAGE_TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
 
       # ─── Build & Push Frontend ──────────────────────────
       - name: Build & Push Frontend
@@ -47,8 +51,8 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ github.repository }}/frontend:latest
             ${{ env.REGISTRY }}/${{ github.repository }}/frontend:${{ env.IMAGE_TAG }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=frontend
+          cache-to: type=gha,mode=max,scope=frontend
 
       # ─── Deploy to Production Server ────────────────────
       - name: Deploy to Production
