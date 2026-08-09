@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   BarChart3,
@@ -43,6 +44,7 @@ const DEFAULT_FILTERS: Filters = {
 }
 
 const Assessments: React.FC = () => {
+  const navigate = useNavigate()
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { theme, toggle } = useTheme()
@@ -79,13 +81,26 @@ const Assessments: React.FC = () => {
 
   const handleReset = () => setFilters(DEFAULT_FILTERS)
   const handleFilterChange = (f: Partial<Filters>) => setFilters((prev) => ({ ...prev, ...f }))
+
+  // Route the user based on the assessment's status. Completed assessments
+  // open their report; everything else routes to the assessment selection
+  // page, which owns the real session-starting flow against the backend.
   const handlePrimary = (a: AssessmentDef) => {
-    if (a.status === 'in_progress' || a.status === 'recommended') {
-      console.log('resume/start', a.slug)
+    if (a.status === 'locked') return
+    if (a.status === 'completed') {
+      navigate(`/assessments/${a.slug}`)
+    } else if (a.status === 'requires_profile') {
+      navigate('/profile')
+    } else {
+      navigate('/assessments')
     }
   }
-  const handleEdit = (a: AssessmentDef) => console.log('edit', a.slug)
-  const handleDiscard = (a: AssessmentDef) => console.log('discard', a.slug)
+  const handleEdit = (a: AssessmentDef) => navigate(`/assessments/${a.slug}`)
+  const handleDiscard = (_a: AssessmentDef) => navigate('/assessments')
+
+  const handleViewReport = (a: AssessmentDef) => navigate(`/assessments/${a.slug}`)
+  const handleRetake = () => navigate('/assessments')
+  const handleCompare = () => navigate('/timeline/compare')
 
   return (
     <div className="flex h-screen flex-col bg-gray-50 dark:bg-slate-950">
@@ -359,10 +374,10 @@ const Assessments: React.FC = () => {
               <div className="mt-3 overflow-x-auto">
                 <AssessmentHistoryTable
                   assessments={completed}
-                  onView={() => console.log('view')}
-                  onRetake={() => console.log('retake')}
-                  onDownload={() => console.log('download')}
-                  onCompare={() => console.log('compare')}
+                  onView={handleViewReport}
+                  onRetake={handleRetake}
+                  onDownload={() => undefined}
+                  onCompare={handleCompare}
                 />
               </div>
             </section>
