@@ -12,9 +12,57 @@ MEDICHECK_AI_PHASE1_REPORT.md.
 
 from __future__ import annotations
 
+from enum import Enum
 from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 — Health literacy levels + AI quality status
+# ---------------------------------------------------------------------------
+
+
+class LiteracyLevel(str, Enum):
+    """Patient-facing explanation complexity. The deterministic result is
+    identical at every level; only communication changes."""
+
+    SIMPLE = "simple"
+    STANDARD = "standard"
+    DETAILED = "detailed"
+
+
+class AIQualityStatus(str, Enum):
+    """Internal classification of an AI response lifecycle outcome.
+
+    ``valid`` — provider returned parseable, allow-list-valid output.
+    ``fallback`` — provider unavailable or timed out; safe fallback used.
+    ``validation_failed`` — provider output rejected by allow-list validation.
+    ``provider_unavailable`` — no provider configured / network error.
+    ``evidence_unavailable`` — explanation succeeded but no evidence was found.
+    """
+
+    VALID = "valid"
+    FALLBACK = "fallback"
+    VALIDATION_FAILED = "validation_failed"
+    PROVIDER_UNAVAILABLE = "provider_unavailable"
+    EVIDENCE_UNAVAILABLE = "evidence_unavailable"
+
+
+# ---------------------------------------------------------------------------
+# Phase 7 — Source breakdown for "Show the source" transparency
+# ---------------------------------------------------------------------------
+
+
+class SourceBreakdownItem(BaseModel):
+    """A single traceable link in the evidence chain shown to the patient."""
+
+    clinical_finding: str
+    contributing_answer_refs: list[str] = Field(default_factory=list)
+    knowledge_graph_relationship: str = ""
+    evidence_ids: list[str] = Field(default_factory=list)
+    deterministic_score: float | None = None
+    trace_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -116,6 +164,10 @@ class ReportExplanationContext(BaseModel):
     # than fabricating any.
     evidence_available: bool = False
     prompt_version: str = ""
+    # Phase 7: language + literacy level for personalized communication.
+    # Language resolves to the SAME canonical indicator IDs (Phase 5 principle).
+    language: str = "en"
+    literacy_level: LiteracyLevel = LiteracyLevel.STANDARD
 
     model_config = {"from_attributes": True}
 
@@ -192,6 +244,18 @@ class AIExplanationResponse(BaseModel):
     # supplied to the AI, returned to the patient so citations are verifiable.
     retrieved_evidence: list[RetrievedEvidenceContext] = Field(default_factory=list)
     evidence_available: bool = True
+    # Phase 7: language + literacy level of this explanation.
+    language: str = "en"
+    literacy_level: LiteracyLevel = LiteracyLevel.STANDARD
+    # Phase 7: AI quality status (valid/fallback/validation_failed/...).
+    quality_status: AIQualityStatus = AIQualityStatus.VALID
+    # Phase 7: "Show the source" — traceable chain per finding.
+    source_breakdown: list[SourceBreakdownItem] = Field(default_factory=list)
+    # Phase 7: AI transparency notice (patient-facing).
+    transparency_notice: str = ""
+    # Phase 7: audit metadata (provider/model/prompt_version for governance).
+    provider: str = ""
+    model: str = ""
 
     model_config = {"from_attributes": True}
 
@@ -302,6 +366,16 @@ UNAVAILABLE_FALLBACK = AIExplanationResponse(
     ),
     available=False,
     evidence_available=False,
+    quality_status=AIQualityStatus.PROVIDER_UNAVAILABLE,
+    transparency_notice=(
+        "Your clinical assessment was calculated by MediCheck's "
+        "deterministic clinical decision engine. AI was used only to "
+        "explain and communicate the results. AI did not diagnose a "
+        "disease, calculate your clinical score, determine severity, "
+        "create your recommendations, or modify your assessment."
+    ),
+    provider="stub",
+    model="",
 )
 
 # Standard message the AI/stub must use when retrieval found no eligible

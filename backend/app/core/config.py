@@ -204,6 +204,15 @@ class Settings(BaseSettings):
     # expensive full-history scans.
     analytics_max_date_range_days: int = 365
 
+    # ── Phase 7: AI Governance + Personalized Communication ───────────
+    # When true, AI interaction audit records are persisted (hashes only, no PHI).
+    ai_audit_enabled: bool = True
+    # Default explanation language (en/si/ta). The language layer is INTERFACE
+    # only — same canonical indicator IDs across all languages.
+    ai_default_language: str = "en"
+    # Default health-literacy level for patient explanations.
+    ai_default_literacy_level: str = "standard"
+
     @field_validator("celery_broker_url", mode="before")
     @classmethod
     def validate_celery_broker_url(cls, v: str | None, info: dict) -> str:

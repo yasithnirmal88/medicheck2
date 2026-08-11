@@ -167,3 +167,21 @@ async def get_analytics_user(
     if not has_role(current_user.roles, Role.RESEARCH_REVIEWER):
         raise AuthorizationError(detail="Analytics access required")
     return current_user
+
+
+async def get_ai_governance_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """AI governance access (Phase 7).
+
+    Requires a role with AI_VIEW_GOVERNANCE permission. Granted to
+    RESEARCH_REVIEWER, MEDICAL_DIRECTOR, and SUPER_ADMIN (level >=25).
+    Returns aggregate AI quality metrics only — never individual patient PHI
+    or individual AI audit records.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="AI governance access required")
+    if not has_role(current_user.roles, Role.RESEARCH_REVIEWER):
+        raise AuthorizationError(detail="AI governance access required")
+    return current_user

@@ -35,22 +35,32 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.ai.phase7_prompts import (
+    AI_TRANSPARENCY_NOTICE,
+    PHASE7_PROMPT_VERSION,
+)
 from app.application.ai.prompts import PROMPT_VERSION
 from app.application.ai.provider import (
     AIProviderError,
+    AIValidationFailure,
     AIExplanationProvider,
     get_explanation_provider,
 )
+from app.application.ai.language import normalize_language
 from app.application.dtos.ai_dtos import (
     AIExplanationResponse,
+    AIQualityStatus,
     BodySystemContext,
     ConditionContext,
     IndicatorContext,
     LaboratoryTestContext,
+    LiteracyLevel,
     RecommendationContext,
     ReportExplanationContext,
+    SourceBreakdownItem,
     UNAVAILABLE_FALLBACK,
 )
+from app.application.services.ai_audit_service import AIAuditService
 from app.application.services.evidence_retrieval_service import (
     EvidenceRetrievalService,
 )
@@ -151,9 +161,15 @@ class AIExplanationService:
         self.dec_repo = SQLDecisionRepository(session)
         self.retrieval = retrieval_service or EvidenceRetrievalService(session)
         self.provider = provider or get_explanation_provider()
+        self.audit = AIAuditService(session)
 
     async def explain_report(
-        self, session_id: str, user_id: str
+        self,
+        session_id: str,
+        user_id: str,
+        *,
+        language: str = "en",
+        literacy_level: str = "standard",
     ) -> AIExplanationResponse:
         """Return a validated, evidence-grounded AI explanation for the
         caller's report.
@@ -163,6 +179,10 @@ class AIExplanationService:
         the AI provider fails or returns invalid output, returns the safe
         ``UNAVAILABLE_FALLBACK`` — never raises for an AI failure. Retrieval
         failure is treated the same way (the report still works).
+
+        Phase 7: ``language`` and ``literacy_level`` personalize the
+        communication. The deterministic result is identical at every level;
+        only communication changes.
         """
         report = await self.report_repo.get_report_by_session(session_id)
         if not report or report.user_id != user_id:
@@ -172,32 +192,139 @@ class AIExplanationService:
         result = await self.dec_repo.get_result_by_session(session_id)
         trace_id = _extract_trace_id(result)
 
-        cache_key = f"{trace_id or session_id}:{PROMPT_VERSION}"
+        # Phase 7: normalize language + literacy level.
+        lang = normalize_language(language) or "en"
+        try:
+            lit = LiteracyLevel(literacy_level)
+        except ValueError:
+            lit = LiteracyLevel.STANDARD
+
+        cache_key = f"{trace_id or session_id}:{PROMPT_VERSION}:{lang}:{lit.value}"
         cached = _explanation_cache.get(cache_key)
         if cached is not None:
             return cached
 
-        context = await self._build_context(report, result, trace_id)
+        context = await self._build_context(
+            report, result, trace_id, language=lang, literacy_level=lit
+        )
+
+        provider_name = getattr(self.provider, "name", "stub")
+        provider_model = getattr(self.provider, "model", "") or ""
+        prompt_ver = getattr(self.provider, "prompt_version", PROMPT_VERSION)
+
+        # Build the input-context hash source (ids only, no PHI).
+        input_context = self._context_hash_source(context)
 
         try:
             raw = await self.provider.explain(context)
             response = self._parse_and_validate(raw, context)
             response.trace_id = trace_id
-            response.prompt_version = PROMPT_VERSION
+            response.prompt_version = prompt_ver
             response.retrieved_evidence = context.evidence
             response.evidence_available = context.evidence_available
+            response.language = lang
+            response.literacy_level = lit
+            response.provider = provider_name
+            response.model = provider_model
+            response.transparency_notice = AI_TRANSPARENCY_NOTICE
+            response.source_breakdown = self._build_source_breakdown(
+                context, trace_id
+            )
+            if context.evidence_available and context.evidence:
+                response.quality_status = AIQualityStatus.VALID
+            elif context.activated_indicators:
+                response.quality_status = AIQualityStatus.EVIDENCE_UNAVAILABLE
+            else:
+                response.quality_status = AIQualityStatus.VALID
+
+            await self.audit.record(
+                trace_id=trace_id,
+                session_id=session_id,
+                request_type="report_explanation",
+                provider=provider_name,
+                model=provider_model,
+                prompt_version=prompt_ver,
+                language=lang,
+                literacy_level=lit.value,
+                input_context=input_context,
+                output_str=raw,
+                status=response.quality_status.value,
+            )
         except AIProviderError as exc:
             logger.warning("AI provider unavailable for session %s: %s", session_id, exc)
             response = UNAVAILABLE_FALLBACK.model_copy(deep=True)
             response.trace_id = trace_id
             response.retrieved_evidence = context.evidence
             response.evidence_available = context.evidence_available
+            response.language = lang
+            response.literacy_level = lit
+            response.provider = provider_name
+            response.model = provider_model
+            response.transparency_notice = AI_TRANSPARENCY_NOTICE
+            response.quality_status = AIQualityStatus.PROVIDER_UNAVAILABLE
+            await self.audit.record(
+                trace_id=trace_id,
+                session_id=session_id,
+                request_type="report_explanation",
+                provider=provider_name,
+                model=provider_model,
+                prompt_version=prompt_ver,
+                language=lang,
+                literacy_level=lit.value,
+                input_context=input_context,
+                status="provider_unavailable",
+                status_reason=str(exc)[:200],
+            )
+        except AIValidationFailure as exc:
+            logger.warning("AI output invalid for session %s: %s", session_id, exc)
+            response = UNAVAILABLE_FALLBACK.model_copy(deep=True)
+            response.trace_id = trace_id
+            response.retrieved_evidence = context.evidence
+            response.evidence_available = context.evidence_available
+            response.language = lang
+            response.literacy_level = lit
+            response.provider = provider_name
+            response.model = provider_model
+            response.transparency_notice = AI_TRANSPARENCY_NOTICE
+            response.quality_status = AIQualityStatus.VALIDATION_FAILED
+            await self.audit.record(
+                trace_id=trace_id,
+                session_id=session_id,
+                request_type="report_explanation",
+                provider=provider_name,
+                model=provider_model,
+                prompt_version=prompt_ver,
+                language=lang,
+                literacy_level=lit.value,
+                input_context=input_context,
+                status="validation_failed",
+                status_reason=str(exc)[:200],
+            )
         except Exception as exc:  # malformed/invalid AI output
             logger.warning("AI explanation invalid for session %s: %s", session_id, exc)
             response = UNAVAILABLE_FALLBACK.model_copy(deep=True)
             response.trace_id = trace_id
             response.retrieved_evidence = context.evidence
             response.evidence_available = context.evidence_available
+            response.language = lang
+            response.literacy_level = lit
+            response.provider = provider_name
+            response.model = provider_model
+            response.transparency_notice = AI_TRANSPARENCY_NOTICE
+            response.quality_status = AIQualityStatus.VALIDATION_FAILED
+            await self.audit.record(
+                trace_id=trace_id,
+                session_id=session_id,
+                request_type="report_explanation",
+                provider=provider_name,
+                model=provider_model,
+                prompt_version=prompt_ver,
+                language=lang,
+                literacy_level=lit.value,
+                input_context=input_context,
+                status="validation_failed",
+                status_reason=str(exc)[:200],
+            )
 
         _explanation_cache.put(cache_key, response)
         return response
@@ -207,6 +334,9 @@ class AIExplanationService:
         report: HealthAssessmentModel,
         result: AssessmentResultModel | None,
         trace_id: str | None,
+        *,
+        language: str = "en",
+        literacy_level: LiteracyLevel = LiteracyLevel.STANDARD,
     ) -> ReportExplanationContext:
         # Body systems from the report rows (already bucketed by ReportService).
         body_systems: list[BodySystemContext] = []
@@ -341,6 +471,8 @@ class AIExplanationService:
             evidence=retrieved_evidence,
             evidence_available=bool(retrieved_evidence),
             prompt_version=PROMPT_VERSION,
+            language=language,
+            literacy_level=literacy_level,
         )
 
     @staticmethod
@@ -380,12 +512,12 @@ class AIExplanationService:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise AIProviderError("non-JSON AI output") from exc
+            raise AIValidationFailure("non-JSON AI output") from exc
         if not isinstance(data, dict):
-            raise AIProviderError("AI output is not a JSON object")
+            raise AIValidationFailure("AI output is not a JSON object")
         # Bounded copy to avoid huge payloads.
         if len(json.dumps(data)) > 50000:
-            raise AIProviderError("AI output too large")
+            raise AIValidationFailure("AI output too large")
         response = AIExplanationResponse(
             summary=str(data.get("summary", "")).strip(),
             key_findings=data.get("key_findings", []) or [],
@@ -456,6 +588,54 @@ class AIExplanationService:
             select(LaboratoryTestModel).where(LaboratoryTestModel.id.in_(ids))
         )
         return {l.id: l for l in rows.scalars().all()}
+
+
+    @staticmethod
+    def _context_hash_source(context: ReportExplanationContext) -> dict[str, Any]:
+        """Build a minimal dict of entity ids + scores for the audit hash.
+        Contains NO free-text PHI — only structural reference ids."""
+        return {
+            "trace_id": context.trace_id,
+            "severity": context.severity,
+            "indicator_ids": sorted(context.allowed_indicator_ids),
+            "condition_ids": sorted(context.allowed_condition_ids),
+            "recommendation_ids": sorted(context.allowed_recommendation_ids),
+            "evidence_ids": sorted(context.allowed_evidence_ids),
+            "language": context.language,
+            "literacy_level": context.literacy_level.value,
+            "prompt_version": context.prompt_version,
+        }
+
+    @staticmethod
+    def _build_source_breakdown(
+        context: ReportExplanationContext,
+        trace_id: str | None,
+    ) -> list[SourceBreakdownItem]:
+        """Build the 'Show the source' transparency chain for each finding."""
+        ev_by_indicator: dict[str, list[Any]] = {}
+        for ev in context.evidence:
+            if ev.linked_entity_type == "indicator":
+                ev_by_indicator.setdefault(ev.linked_entity_id, []).append(ev)
+
+        items: list[SourceBreakdownItem] = []
+        for ind in context.activated_indicators:
+            linked = ev_by_indicator.get(ind.id, [])
+            has_conditions = bool(context.possible_conditions)
+            items.append(
+                SourceBreakdownItem(
+                    clinical_finding=ind.name or ind.id,
+                    contributing_answer_refs=[],
+                    knowledge_graph_relationship=(
+                        "Indicator → Possible Condition"
+                        if has_conditions
+                        else "Indicator (activated by CDSE)"
+                    ),
+                    evidence_ids=[ev.id for ev in linked],
+                    deterministic_score=ind.score,
+                    trace_id=trace_id,
+                )
+            )
+        return items
 
 
 def _safe_float(v: Any) -> float | None:
