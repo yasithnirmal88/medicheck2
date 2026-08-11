@@ -9,6 +9,7 @@ import React, { useState } from 'react'
 import { NavLink, useNavigate, Outlet } from 'react-router-dom'
 import {
   Activity,
+  BarChart3,
   Beaker,
   BookOpen,
   CheckCircle2,
@@ -43,6 +44,7 @@ const cmsNavGroups = [
     label: 'Overview',
     items: [
       { label: 'Dashboard', path: '/cms/dashboard', icon: LayoutDashboard },
+      { label: 'Population Analytics', path: '/cms/analytics', icon: BarChart3 },
     ],
   },
   {

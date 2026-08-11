@@ -194,6 +194,16 @@ class Settings(BaseSettings):
     # as a voice failure, never an assessment failure (patient can type instead).
     stt_request_timeout_seconds: float = 20.0
 
+    # ── Phase 6: Population Health + SDG Analytics ────────────────────
+    # Small-cell suppression threshold (k-anonymity). Population segments
+    # smaller than this are reported as "Suppressed" to prevent re-identification.
+    analytics_min_group_size: int = 10
+    # Analytics cache TTL (seconds). 0 disables caching.
+    analytics_cache_ttl_seconds: int = 300
+    # Maximum date range (days) a single analytics query can span. Prevents
+    # expensive full-history scans.
+    analytics_max_date_range_days: int = 365
+
     @field_validator("celery_broker_url", mode="before")
     @classmethod
     def validate_celery_broker_url(cls, v: str | None, info: dict) -> str:
