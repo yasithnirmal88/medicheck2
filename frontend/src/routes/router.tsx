@@ -31,6 +31,7 @@ const RecommendationCenter = React.lazy(() => import('../features/dashboard/page
 const AssessmentsPage = React.lazy(() => import('../features/dashboard/pages/Assessments'))
 const TimelinePage = React.lazy(() => import('../features/health-timeline/pages/TimelinePage'))
 const ComparePage = React.lazy(() => import('../features/health-timeline/pages/ComparePage'))
+const TrajectoryPage = React.lazy(() => import('../features/health-timeline/pages/TrajectoryPage'))
 const ProfileWizard = React.lazy(() => import('../features/profile/pages/ProfileWizard'))
 const ProfileSections = React.lazy(() => import('../features/profile/pages/ProfileSections'))
 const ProfileVersions = React.lazy(() => import('../features/profile/pages/ProfileVersions'))
@@ -261,6 +262,14 @@ export default function Router() {
           element={
             <RequirePatient fallbackPath="/cms/dashboard">
               <PatientLayoutWithContent content={<ComparePage />} />
+            </RequirePatient>
+          }
+        />
+        <Route
+          path="/timeline/trajectory"
+          element={
+            <RequirePatient fallbackPath="/cms/dashboard">
+              <PatientLayoutWithContent content={<TrajectoryPage />} />
             </RequirePatient>
           }
         />

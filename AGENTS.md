@@ -294,3 +294,85 @@ observability via structured logs. If replay is later needed, add additive
 - AI failure -> `available=false` safe fallback; standard questionnaire always works.
 - Intake is read-only w.r.t. CDSE/questionnaire/branching/CMS. RBAC + session ownership
   preserved. No cross-patient intake.
+
+## Phase 4 -- Longitudinal Risk Trajectory + AI Change Explanation (ADDITIVE)
+Full report: `MEDICHECK_AI_PHASE4_LONGITUDINAL_REPORT.md`. Builds on Phases 1-3.
+The trajectory is computed READ-ONLY from existing immutable, timestamped,
+trace-ID-bearing deterministic assessment results/reports. **No new tables, no
+migrations, no schema changes.** The deterministic CDSE remains the clinical
+source of truth; AI explains observed changes only (never decides them).
+
+### Phase 4 architecture (key files -- read before touching)
+- DTOs: `backend/app/application/dtos/longitudinal_dtos.py` -- the deterministic
+  longitudinal data contract (LongitudinalAssessmentPoint, TrajectoryComparison,
+  ChangeEvent, HealthTrajectory) + AI contract (LongitudinalExplanationContext
+  with computed `allowed_*_ids` allow-lists, LongitudinalExplanationResponse with
+  `bind_context()` allow-list validation that REJECTS hallucinated
+  indicator/condition/recommendation/evidence ids -- same pattern as Phase 1/2).
+  TrendLabel (improving/stable/worsening/new/removed/persistent/insufficient_data)
+  is deterministic; the LLM never chooses these. SEVERITY_ORDER is the existing
+  CDSE body-system category ordering (Normal<Monitor<Needs Attention<Recommend
+  Screening<Urgent Medical Review); SCORE_DELTA_THRESHOLD=1.0.
+- Deterministic engine: `backend/app/application/services/longitudinal_analysis_service.py`
+  (`LongitudinalAnalysisService`) -- INDEPENDENT of any LLM. Loads the caller's
+  most-recent N reports (bounded 1-100, default 20), re-orders oldest->newest,
+  batch-loads body-system names, builds points from report (body-system
+  category/score) + CDSE result (indicators/conditions/recommendations), compares
+  adjacent points. `compare_specific(user_id, prev, curr)` for arbitrary owned
+  pairs (ownership-verified; cross-user -> None -> 404). `_extract_trace_id()`
+  reuses the Phase 1 pattern (trace_id is in `assessment_results.summary`).
+- AI explanation: `backend/app/application/services/longitudinal_explanation_service.py`
+  (`LongitudinalExplanationService`) -- reuses Phase 2 `EvidenceRetrievalService`
+  (deterministic; AI never chooses evidence) + Phase 1 provider/allow-list
+  pattern. Versioned prompt: `backend/app/application/ai/longitudinal_prompts.py`
+  (`LONGITUDINAL_PROMPT_VERSION="1.0"`, binds AI to EXPLAINING only -- no
+  diagnose/predict/score/alter/invent). Provider Protocol + stub:
+  `backend/app/application/ai/longitudinal_provider.py` (StubLongitudinalProvider
+  builds valid JSON strictly from context; `assert_non_diagnostic` rejects
+  diagnostic/predictive language). AI failure/validation failure ->
+  `trajectory_unavailable_fallback` (available=False); trajectory stays available.
+  Insufficient data (<2 assessments) -> AI NOT called (provider.calls==0).
+- API: `backend/app/api/v1/endpoints/trajectory.py` (prefix `/trajectory`, tag
+  `trajectory`) -- `GET /trajectory?limit=N`, `GET
+  /trajectory/compare/{prev}/{curr}`, `POST /trajectory/explanation` (body
+  `{previous_session_id?, current_session_id?}`, defaults to latest two). All
+  enforce `get_current_user` + caller-scoped ownership. Registered in
+  `app/api/v1/router.py`.
+- Frontend: `frontend/src/features/health-timeline/api/trajectoryService.ts`
+  (typed client + types), `hooks/useTrajectory.ts` (TanStack hooks),
+  `pages/TrajectoryPage.tsx` (timeline + recharts trend chart + body-system
+  cards + finding changes + AI explanation clearly separated/labelled +
+  disclaimer + empty states). Route `/timeline/trajectory` in router.tsx.
+  `frontend/src/test/setup.ts` now has a ResizeObserver stub (recharts needs it;
+  jsdom doesn't implement it) -- affects ALL chart tests.
+
+### Phase 4 score semantics (from CDSE + ReportService -- do not invent)
+- Indicator score = sum of option weights; activated if >= 1.0.
+- Condition score = sum of contributing indicator scores; confidence = score/
+  max_possible in [0,1].
+- Body-system score (report) = sum of activated indicator scores -> mapped to a
+  category label via severity thresholds (the SEVERITY_ORDER above). Stored as
+  String(50) but is a float string -> `_safe_float()` parses it.
+- overall_severity = the highest-severity body-system category (READ-ONLY, a
+  categorical label, NEVER an invented numeric "health score").
+
+### Phase 4 test commands (verified)
+- Backend: `... python -m pytest tests/test_longitudinal_phase4.py -q` -> 34 pass.
+- Frontend: `CI=true npx vitest run src/features/health-timeline/pages/__tests__/TrajectoryPage.test.tsx` -> 16 pass.
+- Full suites: backend 286 pass, frontend 59 pass, typecheck clean, build OK.
+
+### Phase 4 safety invariants (do NOT regress)
+- Trajectory is READ-ONLY w.r.t. CDSE/Phase 1/2/3/CMS/RBAC/questionnaire
+  branching. No DB writes, no schema changes. CDSE/Phase 1/2/3 services
+  unchanged (verified by `git diff` -- only router.py + new files).
+- AI may ONLY reference indicator/condition/recommendation/evidence ids present
+  in the deterministic trajectory context. Hallucinated ids are REJECTED ->
+  `available=false` fallback. No PHI in context (only trace_ids, dates, change
+  dicts, allow-listed evidence).
+- Deterministic trajectory remains available when AI is unavailable. AI is NOT
+  called for insufficient data (<2 assessments) or unauthorized requests.
+- Possible conditions are NEVER upgraded to diagnoses. No disease
+  progression/resolution claims. No predictions. The stub's
+  `assert_non_diagnostic` enforces this.
+- Patient ownership: trajectory scoped to caller; cross-user specific-compare
+  -> 404.
