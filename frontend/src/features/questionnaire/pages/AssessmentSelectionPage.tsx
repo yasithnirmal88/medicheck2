@@ -87,6 +87,32 @@ const AssessmentSelectionPage: React.FC = () => {
           </div>
         </section>
 
+        {/* AI intake entry point (Phase 3) */}
+        <section className="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 dark:border-indigo-900/40 dark:bg-indigo-900/10">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-indigo-500" aria-hidden="true" />
+              <div>
+                <h2 className="text-sm font-semibold text-indigo-900 dark:text-indigo-200">
+                  Not sure where to start? Describe what you&apos;re experiencing
+                </h2>
+                <p className="mt-1 text-sm text-indigo-700/80 dark:text-indigo-300/80">
+                  AI-assisted intake can help identify relevant information and suggest a few questions. It&apos;s optional —
+                  you can always pick an assessment below.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate('/assessments/intake')}
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+              Try AI intake
+            </button>
+          </div>
+        </section>
+
         {/* Search */}
         <section className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="relative max-w-md flex-1">

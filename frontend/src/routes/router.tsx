@@ -22,6 +22,7 @@ const QuestionnaireListPage = React.lazy(() => import('../features/questionnaire
 const QuestionnaireSessionPage = React.lazy(() => import('../features/questionnaire/pages/QuestionnaireSessionPage'))
 const QuestionnaireHistoryPage = React.lazy(() => import('../features/questionnaire/pages/QuestionnaireHistoryPage'))
 const AssessmentSelectionPage = React.lazy(() => import('../features/questionnaire/pages/AssessmentSelectionPage'))
+const IntakePage = React.lazy(() => import('../features/questionnaire/pages/IntakePage'))
 const AssessmentHistory = React.lazy(() => import('../features/dashboard/pages/AssessmentHistory'))
 const ReportViewer = React.lazy(() => import('../features/dashboard/pages/ReportViewer'))
 const ResultsDashboard = React.lazy(() => import('../features/dashboard/pages/ResultsDashboard'))
@@ -196,6 +197,14 @@ export default function Router() {
           element={
             <RequirePatient fallbackPath="/cms/dashboard">
               <PatientLayoutWithContent content={<AssessmentSelectionPage />} />
+            </RequirePatient>
+          }
+        />
+        <Route
+          path="/assessments/intake"
+          element={
+            <RequirePatient fallbackPath="/cms/dashboard">
+              <PatientLayoutWithContent content={<IntakePage />} />
             </RequirePatient>
           }
         />

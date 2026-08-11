@@ -227,5 +227,70 @@ Full findings: `CMS_CONTENT_FORENSIC_REPORT.md`. Key facts to preserve:
   NOT auto-grant CMS roles on signup.
 
 ### Test commands (verified)
-- Backend: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/ -q -W error::DeprecationWarning` -> 217 pass.
-- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 33 pass, typecheck clean.
+- Backend: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/ -q -W error::DeprecationWarning` -> 252 pass.
+- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 43 pass, typecheck clean.
+
+## Phase 3 -- AI Clinical Intake + Candidate Indicator Extraction (ADDITIVE)
+AI-assisted conversational intake is an INPUT INTERPRETATION layer ONLY. It feeds INTO
+the untouched deterministic CDSE; it never diagnoses/scores/sets severity/activates
+indicators/creates content. Patient text -> AI extraction -> structured observations ->
+validated candidate indicators -> existing questions -> existing branching -> CDSE.
+Full design: `MEDICHECK_AI_PHASE3_INTAKE_REPORT.md`.
+
+### Backend intake architecture
+- DTOs: `app/application/dtos/intake_dtos.py` -- `ObservationDTO` (negation/temporality/
+  certainty preserved), `CandidateIndicatorDTO`, `CandidateQuestionDTO`,
+  `CandidateQuestionGroupDTO`, `ClarificationDTO`, `IntakeResponse`, bounded
+  `IndicatorCatalog`/`IndicatorCatalogEntry`. `IntakeResponse` validator rejects candidate
+  `reason` text reading as a diagnosis. `safe_intake_response()` is the fallback.
+- Provider: `app/application/ai/intake_provider.py` -- `AIClinicalIntakeProvider` Protocol
+  + deterministic `StubClinicalIntakeProvider` (keyword + bounded synonym map, negation/
+  uncertainty/temporality/duration/frequency detection, no network/API key).
+  `get_intake_provider()` selects via `settings.ai_provider`. `AIIntakeProviderError` ->
+  safe fallback. Prompt: `intake_prompts.py` (`INTAKE_PROMPT_VERSION="1.0"`).
+- Services:
+  - `ai_intake_service.py` `AIIntakeService` (orchestrator): bounded catalog (active +
+    non-deleted indicators, limit 60) -> provider -> parse -> observations ->
+    validation -> question discovery -> `IntakeResponse`. `IntakeTrace` records safe
+    metrics; raw patient text is NOT logged.
+  - `intake_validation_service.py` `CandidateValidationService`: DB is authoritative.
+    Rejects unknown/inactive/deleted indicator IDs (allow-list, never creates/inserts),
+    invalid confidence, orphan observations. `ValidationTrace` for observability.
+  - `intake_question_service.py` `AIIntakeQuestionService`: validated candidate indicator
+    IDs -> batched `QuestionIndicatorLinkModel` (active) -> `QuestionModel`
+    (status=active, deleted_at IS NULL) -> `QuestionGroupModel` (is_active, deleted_at
+    IS NULL). No N+1. Deterministic ranking (group display_order, then question
+    order_index). Dedup. Template scope respected. `source="cms"` only.
+- Endpoint: `app/api/v1/endpoints/ai_intake.py` -- `POST /api/v1/ai/intake/extract`.
+  Reuses `get_current_user`; verifies session ownership (other user -> 404). Scoped to
+  caller; no cross-patient intake. Registered in `router.py` as `ai_intake_router`.
+
+### Persistence (NONE)
+Phase 3 is session-scoped/in-memory. No new tables, no migrations, no schema changes.
+Intake is read-only w.r.t. the clinical schema. trace_id returned for client correlation;
+observability via structured logs. If replay is later needed, add additive
+`ai_intake_*` tables WITHOUT touching CDSE tables.
+
+### Frontend intake architecture
+- API: `features/questionnaire/api/intakeService.ts` -- `extractIntake`, typed
+  `IntakeResponse`/`IntakeObservation`/etc. Never throws on AI unavailability.
+- Page: `features/questionnaire/pages/IntakePage.tsx` -- OPTIONAL assisted entry point
+  at `/assessments/intake`. Textarea -> observations (with negated/uncertain/temporality
+  badges) + candidate indicators + clarifications + recommended existing question groups.
+  User can edit/reject/skip/continue. Non-diagnostic language. Starts a NORMAL
+  questionnaire session (`useStartSession`) -> existing branching -> existing CDSE.
+- Entry point: "Try AI intake" banner on `AssessmentSelectionPage.tsx`.
+- Route: `/assessments/intake` in `routes/router.tsx`. Standard `/assessments` unchanged.
+
+### Phase 3 test commands (verified)
+- Backend: `... python -m pytest tests/test_ai_intake_phase3.py -q` -> 35 pass.
+- Frontend: `CI=true npx vitest run src/features/questionnaire/pages/__tests__/IntakePage.test.tsx` -> 10 pass.
+- Full suites: backend 252 pass, frontend 43 pass, typecheck clean, build OK.
+
+### Phase 3 safety invariants (do NOT regress)
+- AI may ONLY cite `indicator_id` values in the bounded catalog (active + non-deleted).
+  Unknown/inactive/deleted/hallucinated IDs are REJECTED, never created/inserted.
+- `IntakeResponse` validator rejects diagnostic language in candidate reasons.
+- AI failure -> `available=false` safe fallback; standard questionnaire always works.
+- Intake is read-only w.r.t. CDSE/questionnaire/branching/CMS. RBAC + session ownership
+  preserved. No cross-patient intake.
