@@ -5,6 +5,8 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user, get_db, get_redis
+from app.application.dtos.ai_dtos import AIExplanationResponse
+from app.application.services.ai_explanation_service import AIExplanationService
 from app.application.services.report_service import ReportService
 from app.core.cache import CacheService
 
@@ -81,4 +83,26 @@ async def compare_reports(
         res = await svc.compare_reports(id1, id2, user_id=current_user.id)
         return res
     except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/{session_id}/explanation", response_model=AIExplanationResponse)
+async def get_report_explanation(
+    session_id: str,
+    current_user=Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    """AI-assisted explanation of an already-generated deterministic report.
+
+    The deterministic report is never modified or recalculated. The AI only
+    explains the existing result. If the AI provider is unavailable or returns
+    an invalid response, a safe fallback (``available=False``) is returned so
+    the clinical report is never broken. Authentication + ownership use the
+    same dependency/access checks as the other report endpoints.
+    """
+    svc = AIExplanationService(session)
+    try:
+        return await svc.explain_report(session_id, current_user.id)
+    except ValueError as exc:
+        # No report owned by this user for this session.
         raise HTTPException(status_code=404, detail=str(exc))

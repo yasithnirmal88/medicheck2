@@ -160,6 +160,29 @@ class Settings(BaseSettings):
     celery_broker_url: str = ""
     celery_result_backend: str = ""
 
+    # ── AI Explanation (Phase 1) ───────────────────────────────────────
+    # Provider selection. "stub" (default) uses a deterministic local
+    # provider that requires no external API and never breaks the clinical
+    # report. A real vendor provider may be plugged in via the provider
+    # abstraction without changing the service layer.
+    ai_provider: str = "stub"
+    ai_model: str = ""
+    ai_api_key: str = ""
+    # Hard timeout (seconds) for an AI explanation request. A timeout is
+    # treated as an AI failure, never a clinical-report failure.
+    ai_request_timeout_seconds: float = 20.0
+    # ── Phase 2: Evidence-Grounded RAG ────────────────────────────────
+    # Structured retrieval over MediCheck's approved evidence repository
+    # (EvidenceReferenceModel + indicator_evidence_links). No vector DB.
+    # Maximum number of evidence records supplied to the AI per explanation.
+    ai_rag_evidence_limit: int = 5
+    # Per-linked-entity cap so a single indicator cannot monopolise the
+    # evidence budget. Kept small for auditability.
+    ai_rag_per_entity_cap: int = 2
+    # Maximum excerpt length (chars) sent to the AI. Evidence summaries are
+    # already short Text fields; this is a hard safety bound.
+    ai_rag_excerpt_max_chars: int = 500
+
     @field_validator("celery_broker_url", mode="before")
     @classmethod
     def validate_celery_broker_url(cls, v: str | None, info: dict) -> str:

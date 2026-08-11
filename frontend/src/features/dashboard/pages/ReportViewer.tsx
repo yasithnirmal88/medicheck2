@@ -4,6 +4,7 @@ import Card from '@/shared/ui/Card'
 import { useQuery } from '@tanstack/react-query'
 import { fetchReportBySession } from '../api/patientService'
 import { useParams } from 'react-router-dom'
+import ReportExplanation from '../components/ReportExplanation'
 
 interface BodySystemAssessment {
   id: string
@@ -106,6 +107,12 @@ export default function ReportViewer() {
             </div>
           )}
         </Card>
+
+        {/* AI explanation is a clearly separated, additive section. The
+            deterministic clinical report above is never replaced or hidden. */}
+        {!isLoading && report ? (
+          <ReportExplanation sessionId={id} />
+        ) : null}
       </div>
     </AppLayout>
   )
