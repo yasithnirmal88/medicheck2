@@ -132,6 +132,46 @@ THREE sidebar layouts existed; after P3-4 only two remain and both are routed:
 - Preserve RBAC; don't expose user data during loading. Preserve UI/functionality.
 - Backend deps NOT preinstalled in sandbox -- must `pip install` before running tests.
 
+## Phase 5 -- Multilingual + Voice AI Clinical Intake (feat/multilingual-voice-intake-phase5, PR #15)
+- **Architectural invariant:** language is an INTERFACE layer ONLY. Sinhala/Tamil/English
+  descriptions of the same clinical concept resolve to the SAME canonical indicator ID. The
+  knowledge graph is NEVER fragmented by language. Voice is another input channel: audio ->
+  STT -> transcript -> patient reviews/edits -> existing Phase 3 intake pipeline.
+- `app/application/ai/language.py` -- normalize/detect/resolve. Unicode-script detection
+  (Sinhala U+0D80-0DFF, Tamil U+0B80-0BFF), >=25% threshold, English never "detected" (default
+  fallback). `resolve_language(text, selected)` -> detected if confident, else selected/default.
+- `app/application/ai/stt_provider.py` -- `SpeechToTextProvider` Protocol +
+  `StubSpeechToTextProvider` (deterministic, returns English placeholder). Audio is transient
+  in-memory, NEVER stored/logged. `MAX_AUDIO_BYTES=10MB`. `get_stt_provider()` via
+  `settings.stt_provider`.
+- `app/application/ai/multilingual_prompts.py` -- version `1.1-multilingual` (extends Phase 3's 1.0).
+- `intake_dtos.py` -- `IntakeLanguage=Literal["en","si","ta"]`, `IntakeInputType=Literal["text","voice"]`.
+  Added `language`/`input_type`/`detected_language` to `IntakeRequestContext` + `IntakeResponse`.
+  `safe_intake_response()` now accepts language/input_type kwargs (backward compat: all optional).
+  `_coerce_language()` is local (not importing ai.language) to avoid circular import.
+- `intake_provider.py` -- `_SYNONYMS` now has Sinhala/Tamil entries mapping to SAME canonical
+  keyword. `_NEGATION_CUES`/`_UNCERTAINTY_CUES`/`_HISTORICAL_CUES`/`_RECENT_CUES`/`_RECURRING_CUES`
+  all have Sinhala/Tamil cues. `_localized_clarification(language)` returns localized
+  informational (non-diagnostic) clarification.
+- `ai_intake_service.py` -- `extract(text, *, session_ref, language=None, input_type="text")`.
+  `transcribe_audio(audio_bytes, *, language, content_type)`. `IntakeTrace` has
+  language/input_type/detected_language (logged, NO raw text/audio logged). `__init__` takes
+  optional `stt_provider`.
+- `ai_intake.py` -- `POST /extract` (language validation -> 422 if unsupported), `POST /transcribe`
+  (multipart audio, transient, 422/413 on failure -> "type instead"), `GET /languages`
+  (en/si/ta + labels). Error responses use `error.message` (custom ErrorResponse handler), NOT `detail`.
+- `config.py` -- `supported_intake_languages="en,si,ta"`, `stt_provider="stub"`, `stt_model=""`,
+  `stt_request_timeout_seconds=20.0`.
+- Frontend: `intakeService.ts` has `transcribeAudio` (FormData multipart) + `fetchLanguages`.
+  `useVoiceRecorder.ts` (MediaRecorder hook, isSupported check, in-memory Blob). `IntakePage.tsx`
+  has language selector + mic button (hidden if !isSupported) + transcript review banner.
+- **AssessmentSessionModel** field is `questionnaire_template_id` (NOT `template_id`).
+- **Async inspection:** `inspect(db_session.bind)` fails on AsyncEngine; use
+  `PRAGMA table_info(table)` via `text()` for SQLite schema checks in tests.
+- No DB migrations, no schema changes. CDSE/domain/ORM models/migrations unchanged (verified).
+- Tests: 50 backend Phase 5 (test_intake_phase5.py) + 3 frontend. 336 backend total / 62 frontend.
+  Run: `cd backend && ALLOW_MOCK_AUTH=true ... python -m pytest tests/test_intake_phase5.py -q`.
+
 ## Assessments pages (two distinct routes -- keep straight)
 - `/assessments` --Üí `features/questionnaire/pages/AssessmentSelectionPage.tsx`. The REAL
   working flow: uses `useNavigate` + `useStartSession` (TanStack mutation) to call the
