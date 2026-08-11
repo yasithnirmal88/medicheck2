@@ -33,6 +33,7 @@ export interface AuthState {
   isAuthenticated: boolean
   isPatient: boolean
   isDoctor: boolean
+  isCHW: boolean
   canAccessCMS: boolean
 }
 
@@ -55,6 +56,7 @@ const defaultContext: AuthContextType = {
   isAuthenticated: false,
   isPatient: false,
   isDoctor: false,
+  isCHW: false,
   canAccessCMS: false,
   setRole: () => {},
   refreshRole: async () => {},
@@ -255,7 +257,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     error,
     isAuthenticated: !!user,
     isPatient: role === 'patient',
-    isDoctor: role !== 'patient' && role !== null,
+    isDoctor: role !== 'patient' && role !== null && role !== 'community_health_worker',
+    isCHW: role === 'community_health_worker',
     canAccessCMS: checkCanAccessCMS(role),
     setRole: handleSetRole,
     refreshRole,

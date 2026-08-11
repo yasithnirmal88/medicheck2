@@ -301,8 +301,54 @@ export const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
 
   if (isAuthenticated && role) {
     // User is already logged in, redirect based on role
-    const redirectPath = role === 'patient' ? '/app' : '/cms/dashboard'
+    let redirectPath = role === 'patient' ? '/app' : '/cms/dashboard'
+    if (role === 'community_health_worker') {
+      redirectPath = '/chw'
+    }
     return <Navigate to={redirectPath} replace />
+  }
+
+  return children
+}
+
+// ============================================================================
+// RequireCHW - Community Health Worker routes (Phase 8)
+// ============================================================================
+
+interface RequireCHWProps {
+  children: React.ReactElement
+  fallbackPath?: string
+}
+
+/**
+ * RequireCHW - Ensures user is a Community Health Worker (or senior staff).
+ *
+ * Admits the COMMUNITY_HEALTH_WORKER role and admin roles (medical_director,
+ * super_admin) who may supervise/escalate CHW work. Patients and CMS-only
+ * roles are redirected. Mirrors the backend get_chw_user dependency.
+ */
+export const RequireCHW: React.FC<RequireCHWProps> = ({
+  children,
+  fallbackPath = '/app',
+}) => {
+  const { isAuthenticated, loading, roleLoading, role } = useAuthContext()
+  const location = useLocation()
+
+  if (loading || roleLoading) {
+    return <LoadingPage />
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  const chwRoles: UserRole[] = ['community_health_worker', 'medical_director', 'super_admin']
+
+  if (!role || !chwRoles.includes(role)) {
+    console.warn(
+      `Access denied: Role "${role}" is not permitted to access CHW routes`
+    )
+    return <Navigate to={fallbackPath} replace />
   }
 
   return children

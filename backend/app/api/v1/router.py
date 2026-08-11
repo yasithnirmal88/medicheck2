@@ -18,6 +18,7 @@ from app.api.v1.endpoints.analytics import router as analytics_router
 from app.api.v1.endpoints.assessments import router as assessments_router
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.cdse import router as cdse_router
+from app.api.v1.endpoints.chw import router as chw_router
 from app.api.v1.endpoints.graph import router as graph_router
 from app.api.v1.endpoints.health import router as health_router
 from app.api.v1.endpoints.profile import router as profile_router
@@ -44,6 +45,7 @@ router.include_router(assessments_router)
 router.include_router(ai_intake_router)
 router.include_router(analytics_router)
 router.include_router(ai_governance_router)
+router.include_router(chw_router)
 router.include_router(cms_router)
 router.include_router(cms_content_router)
 router.include_router(cms_builder_router)

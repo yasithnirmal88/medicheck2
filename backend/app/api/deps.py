@@ -185,3 +185,23 @@ async def get_ai_governance_user(
     if not has_role(current_user.roles, Role.RESEARCH_REVIEWER):
         raise AuthorizationError(detail="AI governance access required")
     return current_user
+
+
+async def get_chw_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """Community Health Worker access (Phase 8).
+
+    Requires the COMMUNITY_HEALTH_WORKER role (level 3). Admits CHWs to the
+    scoped CHW workflow only. Because CHW is below READ_ONLY_REVIEWER (level 5),
+    ``get_cms_user`` (>=5) correctly denies CHWs all CMS access — so a CHW can
+    never reach clinical-content management endpoints. Least-privilege by
+    construction: no CMS_* and no READ_ASSESSMENTS_ALL permission is granted.
+    """
+    if Role.COMMUNITY_HEALTH_WORKER not in current_user.roles:
+        # Admins/medical directors may also operate the CHW workflow for
+        # supervision/escalation, but ordinary patients and CMS-only roles
+        # are denied. Use has_role so the hierarchy admits senior staff.
+        if not has_role(current_user.roles, Role.MEDICAL_DIRECTOR):
+            raise AuthorizationError(detail="Community Health Worker access required")
+    return current_user
