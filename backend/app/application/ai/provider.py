@@ -45,11 +45,19 @@ class AIExplanationProvider(Protocol):
 
 
 class AIProviderError(RuntimeError):
-    """Raised when an AI provider cannot produce a usable response.
+    """Raised when an AI provider cannot produce a response at all.
 
-    Carrying this exception lets ``AIExplanationService`` map any provider
-    failure (timeout, network, auth, malformed output) to a single, safe
-    fallback — the clinical report is never affected.
+    This is a *provider-down* condition: timeout, network, auth, rate limit.
+    Maps to ``AIQualityStatus.PROVIDER_UNAVAILABLE`` in the audit trail.
+    """
+
+
+class AIValidationFailure(RuntimeError):
+    """Raised when the AI returns a syntactically or semantically invalid
+    response (non-JSON, unknown indicator id, hallucinated citation).
+
+    The provider *was* reachable, but its output is unusable. Maps to
+    ``AIQualityStatus.VALIDATION_FAILED`` in the audit trail.
     """
 
 
@@ -202,10 +210,17 @@ def _severity_explanation(severity: str | None) -> str:
 def get_explanation_provider() -> AIExplanationProvider:
     """Return the configured AI explanation provider.
 
-    Defaults to the deterministic stub provider. A real vendor provider can be
-    selected by setting ``AI_PROVIDER`` and implementing the Protocol here.
+    Defaults to the deterministic stub provider. Phase 7 adds a
+    ``personalized-stub`` provider that supports multilingual + health-literacy
+    levels; select it by setting ``AI_PROVIDER=personalized-stub``.
     """
     name = (settings.ai_provider or "stub").strip().lower()
+    if name == "personalized-stub":
+        from app.application.ai.personalized_provider import (
+            PersonalizedExplanationProvider,
+        )
+
+        return PersonalizedExplanationProvider()
     if name == "stub":
         return StubExplanationProvider()
     # Unknown / unconfigured vendor → fall back to the stub so the report is
