@@ -86,6 +86,10 @@ class Permission(str, Enum):
     # de-identified, aggregated population metrics. Never grants individual
     # patient data access.
     ANALYTICS_VIEW_POPULATION = "analytics:view:population"
+    # Phase 7 — AI governance. Grants read access to aggregate AI quality
+    # metrics (fallback rate, validation failures, language distribution).
+    # Never grants access to patient PHI or individual AI audit records.
+    AI_VIEW_GOVERNANCE = "ai:view:governance"
 
 
 class Role(str, Enum):
@@ -277,6 +281,7 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.CMS_READ_VERSION_HISTORY,
         Permission.CMS_APPROVE_CONTENT,
         Permission.ANALYTICS_VIEW_POPULATION,
+        Permission.AI_VIEW_GOVERNANCE,
     } | _READ_ALL,
     Role.MEDICAL_DIRECTOR: {
         Permission.READ_USER,
@@ -291,6 +296,7 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.CMS_APPROVE_CONTENT,
         Permission.CMS_WRITE_PUBLISH,
         Permission.ANALYTICS_VIEW_POPULATION,
+        Permission.AI_VIEW_GOVERNANCE,
     } | _READ_ALL | _WRITE_ALL,
     Role.SUPER_ADMIN: {
         Permission.READ_USER,
@@ -308,6 +314,7 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.CMS_APPROVE_CONTENT,
         Permission.CMS_WRITE_PUBLISH,
         Permission.ANALYTICS_VIEW_POPULATION,
+        Permission.AI_VIEW_GOVERNANCE,
     } | _READ_ALL | _WRITE_ALL,
 }
 
