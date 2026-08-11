@@ -36,6 +36,13 @@ ObservationType = Literal[
     "symptom", "history", "behavior", "measurement", "context", "other"
 ]
 
+#: Phase 5 — supported intake languages. The language layer is an INTERFACE
+#: layer only: localized input always resolves to the SAME canonical indicator
+#: IDs. See ``app.application.ai.language``.
+IntakeLanguage = Literal["en", "si", "ta"]
+IntakeInputType = Literal["text", "voice"]
+DEFAULT_INTAKE_LANGUAGE: IntakeLanguage = "en"
+
 # A safe fallback shown when AI intake is unavailable. The standard questionnaire
 # remains fully functional regardless of AI availability.
 INTAKE_UNAVAILABLE_MESSAGE = (
@@ -285,6 +292,11 @@ class IntakeRequestContext(BaseModel):
     the patient message, a pseudonymous session reference, and a bounded
     indicator catalog. No PHI beyond the patient's own message, no auth tokens,
     no unrelated patient records, no internal DB credentials.
+
+    Phase 5: ``language`` and ``input_type`` carry multilingual + voice
+    metadata. The language is an interface-layer concern only — localized input
+    always resolves to the SAME canonical indicator IDs; the knowledge graph is
+    never fragmented by language.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -294,6 +306,12 @@ class IntakeRequestContext(BaseModel):
     catalog: IndicatorCatalog
     prompt_version: str
     available_question_group_ids: list[str] = Field(default_factory=list)
+    language: IntakeLanguage = DEFAULT_INTAKE_LANGUAGE
+    input_type: IntakeInputType = "text"
+    detected_language: str | None = Field(
+        default=None,
+        description="script-detected language when confident (interface metadata only)",
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -321,6 +339,10 @@ class IntakeResponse(BaseModel):
     clarifications: list[ClarificationDTO] = Field(default_factory=list)
     available: bool = True
     message: str | None = None
+    # Phase 5 — multilingual/voice traceability metadata.
+    language: IntakeLanguage = DEFAULT_INTAKE_LANGUAGE
+    input_type: IntakeInputType = "text"
+    detected_language: str | None = None
 
     @field_validator("candidate_indicators")
     @classmethod
@@ -342,14 +364,47 @@ class IntakeResponse(BaseModel):
         return self
 
 
-def safe_intake_response(trace_id: str, prompt_version: str) -> IntakeResponse:
-    """Build the safe fallback response used on any provider failure."""
+def safe_intake_response(
+    trace_id: str,
+    prompt_version: str,
+    *,
+    language: str = DEFAULT_INTAKE_LANGUAGE,
+    input_type: str = "text",
+    detected_language: str | None = None,
+) -> IntakeResponse:
+    """Build the safe fallback response used on any provider failure.
+
+    Phase 5: carries language/input_type metadata so even the fallback path is
+    traceable. The standard questionnaire remains functional regardless.
+    """
     return IntakeResponse(
         trace_id=trace_id,
         prompt_version=prompt_version,
         available=False,
         message=INTAKE_UNAVAILABLE_MESSAGE,
+        language=_coerce_language(language),
+        input_type=input_type if input_type in ("text", "voice") else "text",
+        detected_language=detected_language,
     )
+
+
+def _coerce_language(value: str | None) -> IntakeLanguage:
+    """Coerce an arbitrary language string to a supported code.
+
+    Kept local (not importing the AI language module) to avoid a circular
+    import; the authoritative normalization lives in
+    ``app.application.ai.language.normalize_language``.
+    """
+    if not value:
+        return DEFAULT_INTAKE_LANGUAGE
+    v = value.strip().lower()
+    if v in ("en", "eng", "en-us", "en-gb"):
+        return "en"
+    if v in ("si", "sin", "si-lk", "sinh", "sinhala"):
+        return "si"
+    if v in ("ta", "tam", "ta-lk", "tamil"):
+        return "ta"
+    return DEFAULT_INTAKE_LANGUAGE
 
 
 def new_trace_id() -> str:

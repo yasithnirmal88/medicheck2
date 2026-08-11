@@ -34,39 +34,91 @@ logger = get_logger(__name__)
 
 #: Negation cues. If one precedes the matched concept within a small window,
 #: the observation polarity is "negative" and the candidate is dropped.
+#: Phase 5 — multilingual cues (English/Sinhala/Tamil).
 _NEGATION_CUES = (
     "no ", "not ", "don't", "dont", "doesn't", "doesnt", "didn't", "didnt",
     "haven't", "havent", "never", "without", "denies", "deny", "absent",
     "free of", "no longer", "stopped",
+    # Sinhala
+    "නෑ", "නැහැ", "නොමැත", "නැති", "නැත", "නොවේ", "කිසිවක්",
+    # Tamil
+    "இல்லை", "இல்ல", "கிடையாது", "இல்லையென",
 )
 
 #: Uncertainty cues → certainty="uncertain", confidence reduced.
+#: Phase 5 — multilingual cues.
 _UNCERTAINTY_CUES = (
     "maybe", "might", "perhaps", "i think", "sometimes feel", "not sure",
     "wondering", "wonder if", "could be", "seems like", "i guess",
     "possibly", "unclear", "not certain",
+    # Sinhala
+    "වගේ", "යම්", "බොහොම", "දැඩි", "හිතනවා", "දන්නෙ නෑ",
+    # Tamil
+    "தான்", "என்று", "நினைக்கிறேன்", "தெரியவில்லை",
 )
 
-#: Temporality cues.
+#: Temporality cues. Phase 5 — multilingual.
 _HISTORICAL_CUES = (
     "used to", "previously", "in the past", "before", "had a history of",
     "history of", "formerly", "ago",
+    # Sinhala
+    "කලින්", "බලන්න", "පෙර", "අතීතයේ",
+    # Tamil
+    "முன்பு", "முன்னதாக", "கடந்த",
 )
-_RECENT_CUES = ("recently", "lately", "past few", "last week", "last month", "this week")
+_RECENT_CUES = (
+    "recently", "lately", "past few", "last week", "last month", "this week",
+    # Sinhala
+    "මෑතක", "මීට", "මේ", "පසුගිය",
+    # Tamil
+    "சமீபமாக", "இப்போது",
+)
 _RECURRING_CUES = (
     "sometimes", "occasionally", "every now and then", "on and off",
     "from time to time", "intermittent", "now and then",
+    # Sinhala
+    "සමහරවිට", "කිට්ටුවට", "ක්ෂණික",
+    # Tamil
+    "சில நேரம்", "இடைக்கிடை",
 )
 
 #: Patient-language synonyms for common indicator-name keywords. Lets the
 #: deterministic stub map everyday wording (e.g. "tired") to indicator names
 #: (e.g. "Exertional Fatigue") without an external NLP dependency. This is a
 #: bounded map, not a clinical knowledge base.
+#:
+#: Phase 5 — multilingual synonyms. Sinhala/Tamil phrases map to the SAME
+#: canonical keyword (and thus the SAME indicator). The language layer is an
+#: interface layer: localized input never fragments the clinical graph.
 _SYNONYMS: dict[str, tuple[str, ...]] = {
-    "fatigue": ("tired", "tiredness", "exhausted", "exhaustion", "no energy", "low energy", "weariness"),
-    "exertional": ("exertion", "exerting", "climbing stairs", "walking upstairs", "stairs", "on exertion", "during exercise", "activity"),
-    "dyspnea": ("short of breath", "shortness of breath", "breathless", "breathlessness", "can't breathe", "cannot breathe"),
-    "dizziness": ("dizzy", "lightheaded", "light-headed", "faint", "fainting", "vertigo"),
+    "fatigue": (
+        "tired", "tiredness", "exhausted", "exhaustion", "no energy", "low energy", "weariness",
+        # Sinhala
+        "මහන්සියි", "මහන්සි", "වෙහෙස", "වෙහෙසට පත්", "උණුසුම් දැනෙනවා",
+        # Tamil
+        "சோர்வு", "களைப்பு", "அயர்ச்சி",
+    ),
+    "exertional": (
+        "exertion", "exerting", "climbing stairs", "walking upstairs", "stairs", "on exertion", "during exercise", "activity",
+        # Sinhala
+        "පඩි", "පඩි නගිද්දී", "පඩි නැග්ගාම", "ව්යායාම",
+        # Tamil
+        "படிகள்", "படியேற", "உடற்பயிற்சி",
+    ),
+    "dyspnea": (
+        "short of breath", "shortness of breath", "breathless", "breathlessness", "can't breathe", "cannot breathe",
+        # Sinhala
+        "හුස්ම ගන්න අමාරුයි", "හුස්ම", "හුස්ම ගන්න", "පණුවෙනවා",
+        # Tamil
+        "மூச்சு", "மூச்சு வாங்க", "மூச்சுத் திணறல்",
+    ),
+    "dizziness": (
+        "dizzy", "lightheaded", "light-headed", "faint", "fainting", "vertigo",
+        # Sinhala
+        "ඔලුව කැරකෙනවා", "කැරකෙනවා", "මුලාවෙනවා",
+        # Tamil
+        "தலைச்சுற்றல்", "தலை கறங்க",
+    ),
     "syncope": ("fainted", "fainting", "passed out", "blackout"),
     "edema": ("swelling", "swollen", "puffy", "fluid retention"),
     "palpitations": ("palpitation", "racing heart", "pounding heart", "irregular heartbeat", "fluttering heart"),
@@ -221,10 +273,11 @@ def _stub_extract(context: IntakeRequestContext) -> str:
 
     # If the text mentions something ambiguous and we matched at least one
     # indicator, add an informational clarification (non-diagnostic).
+    # Phase 5: localized to the patient's language when possible.
     if observations and not candidates:
         clarifications.append(
             {
-                "text": "Can you describe when this happens and how long it has been going on?",
+                "text": _localized_clarification(context.language),
                 "source": "ai_generated",
                 "observation_id": observations[0]["source_text"],
                 "linked_indicator_id": None,
@@ -298,6 +351,19 @@ def _duration(text: str) -> str | None:
 def _frequency(text: str) -> str | None:
     m = _FREQUENCY_RE.search(text)
     return m.group("f") if m else None
+
+
+def _localized_clarification(language: str) -> str:
+    """Informational clarification in the patient's language (non-diagnostic).
+
+    Always informational: asks when/how-long/how-often. Never suggests an
+    answer, never diagnoses. Falls back to English.
+    """
+    if language == "si":
+        return "මේ කවදාද වෙන්නේ කියලා සහ කොච්චර කාලයක් තියෙනවද කියලා විස්තර කරන්න පුළුවන්ද?"
+    if language == "ta":
+        return "இது எப்போது நிகழ்கிறது மற்றும் எவ்வளவு காலமாக உள்ளது என விளக்கலாமா?"
+    return "Can you describe when this happens and how long it has been going on?"
 
 
 def get_intake_provider() -> AIClinicalIntakeProvider:

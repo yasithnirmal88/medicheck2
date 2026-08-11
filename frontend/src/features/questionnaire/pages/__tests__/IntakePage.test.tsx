@@ -8,7 +8,8 @@ import type { IntakeResponse } from '../../api/intakeService'
 
 // Mock the API service.
 const extractIntake = vi.hoisted(() => vi.fn())
-vi.mock('../../api/intakeService', () => ({ extractIntake }))
+const transcribeAudio = vi.hoisted(() => vi.fn())
+vi.mock('../../api/intakeService', () => ({ extractIntake, transcribeAudio }))
 
 // Mock the questionnaire hooks (start session + templates).
 const startSession = vi.hoisted(() => vi.fn())
@@ -17,6 +18,18 @@ const useTemplates = vi.hoisted(() => vi.fn())
 vi.mock('../../hooks/useQuestionnaire', () => ({
   useStartSession,
   useTemplates,
+}))
+
+// Mock the voice recorder hook — jsdom has no MediaRecorder.
+vi.mock('../../hooks/useVoiceRecorder', () => ({
+  useVoiceRecorder: () => ({
+    state: 'idle',
+    errorMessage: null,
+    isSupported: false,
+    start: vi.fn(),
+    stop: vi.fn(),
+    reset: vi.fn(),
+  }),
 }))
 
 function makeClient() {
@@ -40,6 +53,9 @@ const successResponse: IntakeResponse = {
   prompt_version: '1.0',
   available: true,
   message: null,
+  language: 'en',
+  input_type: 'text',
+  detected_language: null,
   observations: [
     {
       id: 'obs-1',
@@ -86,6 +102,7 @@ const successResponse: IntakeResponse = {
 
 beforeEach(() => {
   extractIntake.mockReset()
+  transcribeAudio.mockReset()
   useStartSession.mockReset()
   useTemplates.mockReset()
   useTemplates.mockReturnValue({ data: [] })
@@ -197,5 +214,38 @@ describe('IntakePage', () => {
     await screen.findByText(/We noticed a few things that may be relevant/i)
     expect(document.body.textContent).toContain('not a diagnosis')
     expect(document.body.textContent).not.toMatch(/AI detected your disease/i)
+  })
+
+  // ── Phase 5: multilingual + voice ─────────────────────────────────
+
+  it('renders a language selector with English, Sinhala, and Tamil', () => {
+    const client = makeClient()
+    renderPage(client)
+    const select = screen.getByLabelText(/Select your language/i) as HTMLSelectElement
+    expect(select).toBeInTheDocument()
+    const options = Array.from(select.options).map((o) => o.value)
+    expect(options).toEqual(['en', 'si', 'ta'])
+  })
+
+  it('sends the selected language to the extract API', async () => {
+    extractIntake.mockResolvedValue(successResponse)
+    const client = makeClient()
+    renderPage(client)
+    fireEvent.change(screen.getByLabelText(/Select your language/i), { target: { value: 'si' } })
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'මට හුස්ම ගන්න අමාරුයි' } })
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }))
+    await waitFor(() => expect(extractIntake).toHaveBeenCalled())
+    const call = extractIntake.mock.calls[0][0]
+    expect(call.language).toBe('si')
+  })
+
+  it('shows non-diagnostic disclaimer regardless of language', async () => {
+    extractIntake.mockResolvedValue({ ...successResponse, language: 'si' })
+    const client = makeClient()
+    renderPage(client)
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'tired' } })
+    fireEvent.click(screen.getByRole('button', { name: /Continue/i }))
+    await screen.findByText(/We noticed a few things that may be relevant/i)
+    expect(document.body.textContent).toContain('not a diagnosis')
   })
 })

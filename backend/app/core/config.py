@@ -183,6 +183,17 @@ class Settings(BaseSettings):
     # already short Text fields; this is a hard safety bound.
     ai_rag_excerpt_max_chars: int = 500
 
+    # ── Phase 5: Multilingual + Voice AI Clinical Intake ─────────────
+    # Supported intake languages (en/si/ta). The language layer is an INTERFACE
+    # layer only — localized input resolves to the SAME canonical indicator IDs.
+    supported_intake_languages: str = "en,si,ta"
+    # Speech-to-text provider. Default stub works without external credentials.
+    stt_provider: str = "stub"
+    stt_model: str = ""
+    # Hard timeout (seconds) for a speech-to-text request. A timeout is treated
+    # as a voice failure, never an assessment failure (patient can type instead).
+    stt_request_timeout_seconds: float = 20.0
+
     @field_validator("celery_broker_url", mode="before")
     @classmethod
     def validate_celery_broker_url(cls, v: str | None, info: dict) -> str:

@@ -9,41 +9,67 @@ import {
   HelpCircle,
   Loader2,
   MessageSquareText,
+  Mic,
   Repeat,
   Sparkles,
+  Square,
   X,
 } from 'lucide-react'
 import AppLayout from '@/layouts/AppLayout'
 import Card from '@/shared/ui/Card'
-import { extractIntake, type IntakeResponse, type IntakeObservation } from '../api/intakeService'
+import {
+  extractIntake,
+  transcribeAudio,
+  type IntakeLanguage,
+  type IntakeResponse,
+  type IntakeObservation,
+} from '../api/intakeService'
 import { useStartSession, useTemplates } from '../hooks/useQuestionnaire'
+import { useVoiceRecorder } from '../hooks/useVoiceRecorder'
 
 /**
- * Phase 3 — AI Clinical Intake.
+ * Phase 3/5 — AI Clinical Intake (multilingual + voice).
  *
  * An OPTIONAL assisted entry point. The patient describes what they are
- * experiencing in natural language; the AI extracts structured observations
- * and maps them to EXISTING clinical indicators. The knowledge graph then
- * recommends relevant existing question groups. The patient can edit, reject
- * interpretations, skip AI entirely, or continue to the standard
- * questionnaire. The deterministic CDSE remains the clinical decision layer.
+ * experiencing in natural language (typed or spoken, in English/Sinhala/Tamil);
+ * the AI extracts structured observations and maps them to EXISTING clinical
+ * indicators. The knowledge graph then recommends relevant existing question
+ * groups. The patient can edit, reject interpretations, skip AI entirely, or
+ * continue to the standard questionnaire. The deterministic CDSE remains the
+ * clinical decision layer.
+ *
+ * Phase 5: the language layer is an INTERFACE layer only — localized input
+ * always resolves to the SAME canonical indicator IDs. Voice input is
+ * transcribed to text, reviewed/edited by the patient, THEN fed into the same
+ * Phase 3 intake pipeline. Audio is never stored or logged.
  *
  * Safety language: no diagnoses, no "AI detected your disease". Only
  * informational phrasing such as "we identified some information that may be
  * relevant".
  */
+
+const LANGUAGES: { code: IntakeLanguage; label: string }[] = [
+  { code: 'en', label: 'English' },
+  { code: 'si', label: 'සිංහල' },
+  { code: 'ta', label: 'தமிழ்' },
+]
 const IntakePage: React.FC = () => {
   const navigate = useNavigate()
   const [text, setText] = useState('')
+  const [language, setLanguage] = useState<IntakeLanguage>('en')
+  const [transcribing, setTranscribing] = useState(false)
+  const [voiceError, setVoiceError] = useState<string | null>(null)
+  const [inputType, setInputType] = useState<'text' | 'voice'>('text')
   const [result, setResult] = useState<IntakeResponse | null>(null)
   const [rejectedObservations, setRejectedObservations] = useState<Set<string>>(new Set())
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const { data: templates } = useTemplates()
   const startSession = useStartSession()
+  const recorder = useVoiceRecorder()
 
   const mutation = useMutation({
-    mutationFn: () => extractIntake({ text }),
+    mutationFn: () => extractIntake({ text, language, input_type: inputType }),
     onSuccess: (data) => {
       setResult(data)
       setRejectedObservations(new Set())
@@ -53,6 +79,35 @@ const IntakePage: React.FC = () => {
       setErrorMsg('Something went wrong. You can continue with the standard questionnaire.')
     },
   })
+
+  const handleStartRecording = async () => {
+    setVoiceError(null)
+    await recorder.start()
+  }
+
+  const handleStopRecording = async () => {
+    const blob = await recorder.stop()
+    if (!blob) return
+    setTranscribing(true)
+    try {
+      const result = await transcribeAudio(blob, language)
+      setText(result.transcript)
+      setInputType('voice')
+    } catch {
+      setVoiceError('Voice input isn\'t available right now. You can type instead.')
+    } finally {
+      setTranscribing(false)
+    }
+  }
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setText(e.target.value)
+    setInputType('text')
+  }
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setLanguage(e.target.value as IntakeLanguage)
+  }
 
   const activeObservations = useMemo(
     () => (result?.observations ?? []).filter((o) => !rejectedObservations.has(o.id)),
@@ -124,30 +179,66 @@ const IntakePage: React.FC = () => {
 
         <Card className="space-y-4">
           <form onSubmit={handleSubmit} className="space-y-3">
-            <label htmlFor="intake-text" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-              How are you feeling?
-            </label>
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="intake-text" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+                How are you feeling?
+              </label>
+              <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                Language:
+                <select
+                  value={language}
+                  onChange={handleLanguageChange}
+                  disabled={isLoading || !!result || transcribing}
+                  aria-label="Select your language"
+                  className="rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                >
+                  {LANGUAGES.map((l) => (
+                    <option key={l.code} value={l.code}>{l.label}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
             <textarea
               id="intake-text"
               className="w-full min-h-[120px] rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
               placeholder="I have been getting tired when climbing stairs..."
               value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={isLoading || !!result}
+              onChange={handleTextChange}
+              disabled={isLoading || !!result || transcribing}
               aria-describedby="intake-help"
             />
             <p id="intake-help" className="text-xs text-gray-500">
-              You can edit your description, reject an interpretation, or skip this step at any time.
+              You can type, speak, edit your description, reject an interpretation, or skip this step at any time.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               {!result && (
                 <button
                   type="submit"
                   className="inline-flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                  disabled={isLoading || !text.trim()}
+                  disabled={isLoading || transcribing || !text.trim()}
                 >
                   {isLoading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <ArrowRight className="w-4 h-4" aria-hidden />}
                   {isLoading ? 'Analyzing...' : 'Continue'}
+                </button>
+              )}
+              {!result && recorder.isSupported && recorder.state !== 'recording' && (
+                <button
+                  type="button"
+                  onClick={handleStartRecording}
+                  disabled={isLoading || transcribing}
+                  className="inline-flex items-center gap-2 rounded border border-indigo-300 dark:border-indigo-700 px-4 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 disabled:opacity-50"
+                >
+                  {transcribing ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Mic className="w-4 h-4" aria-hidden />}
+                  {transcribing ? 'Transcribing...' : 'Speak'}
+                </button>
+              )}
+              {recorder.state === 'recording' && (
+                <button
+                  type="button"
+                  onClick={handleStopRecording}
+                  className="inline-flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+                >
+                  <Square className="w-4 h-4" aria-hidden /> Stop
                 </button>
               )}
               <button
@@ -158,12 +249,25 @@ const IntakePage: React.FC = () => {
                 Skip AI intake
               </button>
             </div>
+            {inputType === 'voice' && text && !result && (
+              <div className="rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+                <p className="font-medium">Please review your transcript</p>
+                <p className="mt-1">This was transcribed from your voice. Edit it above if anything is incorrect, then continue. We won&apos;t interpret it until you confirm.</p>
+              </div>
+            )}
           </form>
 
           {errorMsg && (
             <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
               <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
               <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {voiceError && (
+            <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+              <span>{voiceError}</span>
             </div>
           )}
 

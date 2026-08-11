@@ -79,6 +79,9 @@ export interface IntakeClarification {
   linked_question_id: string | null
 }
 
+export type IntakeLanguage = 'en' | 'si' | 'ta'
+export type IntakeInputType = 'text' | 'voice'
+
 export interface IntakeResponse {
   trace_id: string
   prompt_version: string
@@ -89,21 +92,74 @@ export interface IntakeResponse {
   clarifications: IntakeClarification[]
   available: boolean
   message: string | null
+  // Phase 5 — multilingual/voice traceability metadata.
+  language: IntakeLanguage
+  input_type: IntakeInputType
+  detected_language: string | null
 }
 
 export interface IntakeExtractRequest {
   session_id?: string
   text: string
+  language?: IntakeLanguage
+  input_type?: IntakeInputType
+}
+
+export interface TranscribeResponse {
+  transcript: string
+  language: string
+  detected_language: string | null
+  confidence: number
+}
+
+export interface SupportedLanguage {
+  code: IntakeLanguage
+  label: string
+}
+
+export interface LanguagesResponse {
+  languages: SupportedLanguage[]
+  default: string
 }
 
 /**
  * Extract structured observations + candidate indicators from patient free text.
  * Never throws on AI unavailability — returns `available=false` so the caller
  * can keep the standard questionnaire path working.
+ *
+ * Phase 5: `language` carries the user-selected language; the backend also
+ * performs best-effort script detection. Localized input always resolves to
+ * the SAME canonical indicator IDs — the language layer is interface-only.
  */
 export const extractIntake = async (
   payload: IntakeExtractRequest,
 ): Promise<IntakeResponse> => {
   const res = await api.post<IntakeResponse>('/ai/intake/extract', payload)
+  return res.data
+}
+
+/**
+ * Phase 5 — transcribe audio to text for patient review.
+ * Audio is processed transiently (never stored). The transcript is returned
+ * for the patient to review/edit BEFORE clinical interpretation.
+ */
+export const transcribeAudio = async (
+  audioBlob: Blob,
+  language: IntakeLanguage,
+): Promise<TranscribeResponse> => {
+  const form = new FormData()
+  form.append('audio', audioBlob, 'recording.webm')
+  form.append('language', language)
+  const res = await api.post<TranscribeResponse>('/ai/intake/transcribe', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data
+}
+
+/**
+ * Phase 5 — list supported intake languages for the UI selector.
+ */
+export const fetchLanguages = async (): Promise<LanguagesResponse> => {
+  const res = await api.get<LanguagesResponse>('/ai/intake/languages')
   return res.data
 }
