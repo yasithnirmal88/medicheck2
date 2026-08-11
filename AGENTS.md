@@ -132,6 +132,46 @@ THREE sidebar layouts existed; after P3-4 only two remain and both are routed:
 - Preserve RBAC; don't expose user data during loading. Preserve UI/functionality.
 - Backend deps NOT preinstalled in sandbox -- must `pip install` before running tests.
 
+## Phase 5 -- Multilingual + Voice AI Clinical Intake (feat/multilingual-voice-intake-phase5, PR #15)
+- **Architectural invariant:** language is an INTERFACE layer ONLY. Sinhala/Tamil/English
+  descriptions of the same clinical concept resolve to the SAME canonical indicator ID. The
+  knowledge graph is NEVER fragmented by language. Voice is another input channel: audio ->
+  STT -> transcript -> patient reviews/edits -> existing Phase 3 intake pipeline.
+- `app/application/ai/language.py` -- normalize/detect/resolve. Unicode-script detection
+  (Sinhala U+0D80-0DFF, Tamil U+0B80-0BFF), >=25% threshold, English never "detected" (default
+  fallback). `resolve_language(text, selected)` -> detected if confident, else selected/default.
+- `app/application/ai/stt_provider.py` -- `SpeechToTextProvider` Protocol +
+  `StubSpeechToTextProvider` (deterministic, returns English placeholder). Audio is transient
+  in-memory, NEVER stored/logged. `MAX_AUDIO_BYTES=10MB`. `get_stt_provider()` via
+  `settings.stt_provider`.
+- `app/application/ai/multilingual_prompts.py` -- version `1.1-multilingual` (extends Phase 3's 1.0).
+- `intake_dtos.py` -- `IntakeLanguage=Literal["en","si","ta"]`, `IntakeInputType=Literal["text","voice"]`.
+  Added `language`/`input_type`/`detected_language` to `IntakeRequestContext` + `IntakeResponse`.
+  `safe_intake_response()` now accepts language/input_type kwargs (backward compat: all optional).
+  `_coerce_language()` is local (not importing ai.language) to avoid circular import.
+- `intake_provider.py` -- `_SYNONYMS` now has Sinhala/Tamil entries mapping to SAME canonical
+  keyword. `_NEGATION_CUES`/`_UNCERTAINTY_CUES`/`_HISTORICAL_CUES`/`_RECENT_CUES`/`_RECURRING_CUES`
+  all have Sinhala/Tamil cues. `_localized_clarification(language)` returns localized
+  informational (non-diagnostic) clarification.
+- `ai_intake_service.py` -- `extract(text, *, session_ref, language=None, input_type="text")`.
+  `transcribe_audio(audio_bytes, *, language, content_type)`. `IntakeTrace` has
+  language/input_type/detected_language (logged, NO raw text/audio logged). `__init__` takes
+  optional `stt_provider`.
+- `ai_intake.py` -- `POST /extract` (language validation -> 422 if unsupported), `POST /transcribe`
+  (multipart audio, transient, 422/413 on failure -> "type instead"), `GET /languages`
+  (en/si/ta + labels). Error responses use `error.message` (custom ErrorResponse handler), NOT `detail`.
+- `config.py` -- `supported_intake_languages="en,si,ta"`, `stt_provider="stub"`, `stt_model=""`,
+  `stt_request_timeout_seconds=20.0`.
+- Frontend: `intakeService.ts` has `transcribeAudio` (FormData multipart) + `fetchLanguages`.
+  `useVoiceRecorder.ts` (MediaRecorder hook, isSupported check, in-memory Blob). `IntakePage.tsx`
+  has language selector + mic button (hidden if !isSupported) + transcript review banner.
+- **AssessmentSessionModel** field is `questionnaire_template_id` (NOT `template_id`).
+- **Async inspection:** `inspect(db_session.bind)` fails on AsyncEngine; use
+  `PRAGMA table_info(table)` via `text()` for SQLite schema checks in tests.
+- No DB migrations, no schema changes. CDSE/domain/ORM models/migrations unchanged (verified).
+- Tests: 50 backend Phase 5 (test_intake_phase5.py) + 3 frontend. 336 backend total / 62 frontend.
+  Run: `cd backend && ALLOW_MOCK_AUTH=true ... python -m pytest tests/test_intake_phase5.py -q`.
+
 ## Assessments pages (two distinct routes -- keep straight)
 - `/assessments` --Üí `features/questionnaire/pages/AssessmentSelectionPage.tsx`. The REAL
   working flow: uses `useNavigate` + `useStartSession` (TanStack mutation) to call the
@@ -227,5 +267,152 @@ Full findings: `CMS_CONTENT_FORENSIC_REPORT.md`. Key facts to preserve:
   NOT auto-grant CMS roles on signup.
 
 ### Test commands (verified)
-- Backend: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/ -q -W error::DeprecationWarning` -> 217 pass.
-- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 33 pass, typecheck clean.
+- Backend: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/ -q -W error::DeprecationWarning` -> 252 pass.
+- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 43 pass, typecheck clean.
+
+## Phase 3 -- AI Clinical Intake + Candidate Indicator Extraction (ADDITIVE)
+AI-assisted conversational intake is an INPUT INTERPRETATION layer ONLY. It feeds INTO
+the untouched deterministic CDSE; it never diagnoses/scores/sets severity/activates
+indicators/creates content. Patient text -> AI extraction -> structured observations ->
+validated candidate indicators -> existing questions -> existing branching -> CDSE.
+Full design: `MEDICHECK_AI_PHASE3_INTAKE_REPORT.md`.
+
+### Backend intake architecture
+- DTOs: `app/application/dtos/intake_dtos.py` -- `ObservationDTO` (negation/temporality/
+  certainty preserved), `CandidateIndicatorDTO`, `CandidateQuestionDTO`,
+  `CandidateQuestionGroupDTO`, `ClarificationDTO`, `IntakeResponse`, bounded
+  `IndicatorCatalog`/`IndicatorCatalogEntry`. `IntakeResponse` validator rejects candidate
+  `reason` text reading as a diagnosis. `safe_intake_response()` is the fallback.
+- Provider: `app/application/ai/intake_provider.py` -- `AIClinicalIntakeProvider` Protocol
+  + deterministic `StubClinicalIntakeProvider` (keyword + bounded synonym map, negation/
+  uncertainty/temporality/duration/frequency detection, no network/API key).
+  `get_intake_provider()` selects via `settings.ai_provider`. `AIIntakeProviderError` ->
+  safe fallback. Prompt: `intake_prompts.py` (`INTAKE_PROMPT_VERSION="1.0"`).
+- Services:
+  - `ai_intake_service.py` `AIIntakeService` (orchestrator): bounded catalog (active +
+    non-deleted indicators, limit 60) -> provider -> parse -> observations ->
+    validation -> question discovery -> `IntakeResponse`. `IntakeTrace` records safe
+    metrics; raw patient text is NOT logged.
+  - `intake_validation_service.py` `CandidateValidationService`: DB is authoritative.
+    Rejects unknown/inactive/deleted indicator IDs (allow-list, never creates/inserts),
+    invalid confidence, orphan observations. `ValidationTrace` for observability.
+  - `intake_question_service.py` `AIIntakeQuestionService`: validated candidate indicator
+    IDs -> batched `QuestionIndicatorLinkModel` (active) -> `QuestionModel`
+    (status=active, deleted_at IS NULL) -> `QuestionGroupModel` (is_active, deleted_at
+    IS NULL). No N+1. Deterministic ranking (group display_order, then question
+    order_index). Dedup. Template scope respected. `source="cms"` only.
+- Endpoint: `app/api/v1/endpoints/ai_intake.py` -- `POST /api/v1/ai/intake/extract`.
+  Reuses `get_current_user`; verifies session ownership (other user -> 404). Scoped to
+  caller; no cross-patient intake. Registered in `router.py` as `ai_intake_router`.
+
+### Persistence (NONE)
+Phase 3 is session-scoped/in-memory. No new tables, no migrations, no schema changes.
+Intake is read-only w.r.t. the clinical schema. trace_id returned for client correlation;
+observability via structured logs. If replay is later needed, add additive
+`ai_intake_*` tables WITHOUT touching CDSE tables.
+
+### Frontend intake architecture
+- API: `features/questionnaire/api/intakeService.ts` -- `extractIntake`, typed
+  `IntakeResponse`/`IntakeObservation`/etc. Never throws on AI unavailability.
+- Page: `features/questionnaire/pages/IntakePage.tsx` -- OPTIONAL assisted entry point
+  at `/assessments/intake`. Textarea -> observations (with negated/uncertain/temporality
+  badges) + candidate indicators + clarifications + recommended existing question groups.
+  User can edit/reject/skip/continue. Non-diagnostic language. Starts a NORMAL
+  questionnaire session (`useStartSession`) -> existing branching -> existing CDSE.
+- Entry point: "Try AI intake" banner on `AssessmentSelectionPage.tsx`.
+- Route: `/assessments/intake` in `routes/router.tsx`. Standard `/assessments` unchanged.
+
+### Phase 3 test commands (verified)
+- Backend: `... python -m pytest tests/test_ai_intake_phase3.py -q` -> 35 pass.
+- Frontend: `CI=true npx vitest run src/features/questionnaire/pages/__tests__/IntakePage.test.tsx` -> 10 pass.
+- Full suites: backend 252 pass, frontend 43 pass, typecheck clean, build OK.
+
+### Phase 3 safety invariants (do NOT regress)
+- AI may ONLY cite `indicator_id` values in the bounded catalog (active + non-deleted).
+  Unknown/inactive/deleted/hallucinated IDs are REJECTED, never created/inserted.
+- `IntakeResponse` validator rejects diagnostic language in candidate reasons.
+- AI failure -> `available=false` safe fallback; standard questionnaire always works.
+- Intake is read-only w.r.t. CDSE/questionnaire/branching/CMS. RBAC + session ownership
+  preserved. No cross-patient intake.
+
+## Phase 4 -- Longitudinal Risk Trajectory + AI Change Explanation (ADDITIVE)
+Full report: `MEDICHECK_AI_PHASE4_LONGITUDINAL_REPORT.md`. Builds on Phases 1-3.
+The trajectory is computed READ-ONLY from existing immutable, timestamped,
+trace-ID-bearing deterministic assessment results/reports. **No new tables, no
+migrations, no schema changes.** The deterministic CDSE remains the clinical
+source of truth; AI explains observed changes only (never decides them).
+
+### Phase 4 architecture (key files -- read before touching)
+- DTOs: `backend/app/application/dtos/longitudinal_dtos.py` -- the deterministic
+  longitudinal data contract (LongitudinalAssessmentPoint, TrajectoryComparison,
+  ChangeEvent, HealthTrajectory) + AI contract (LongitudinalExplanationContext
+  with computed `allowed_*_ids` allow-lists, LongitudinalExplanationResponse with
+  `bind_context()` allow-list validation that REJECTS hallucinated
+  indicator/condition/recommendation/evidence ids -- same pattern as Phase 1/2).
+  TrendLabel (improving/stable/worsening/new/removed/persistent/insufficient_data)
+  is deterministic; the LLM never chooses these. SEVERITY_ORDER is the existing
+  CDSE body-system category ordering (Normal<Monitor<Needs Attention<Recommend
+  Screening<Urgent Medical Review); SCORE_DELTA_THRESHOLD=1.0.
+- Deterministic engine: `backend/app/application/services/longitudinal_analysis_service.py`
+  (`LongitudinalAnalysisService`) -- INDEPENDENT of any LLM. Loads the caller's
+  most-recent N reports (bounded 1-100, default 20), re-orders oldest->newest,
+  batch-loads body-system names, builds points from report (body-system
+  category/score) + CDSE result (indicators/conditions/recommendations), compares
+  adjacent points. `compare_specific(user_id, prev, curr)` for arbitrary owned
+  pairs (ownership-verified; cross-user -> None -> 404). `_extract_trace_id()`
+  reuses the Phase 1 pattern (trace_id is in `assessment_results.summary`).
+- AI explanation: `backend/app/application/services/longitudinal_explanation_service.py`
+  (`LongitudinalExplanationService`) -- reuses Phase 2 `EvidenceRetrievalService`
+  (deterministic; AI never chooses evidence) + Phase 1 provider/allow-list
+  pattern. Versioned prompt: `backend/app/application/ai/longitudinal_prompts.py`
+  (`LONGITUDINAL_PROMPT_VERSION="1.0"`, binds AI to EXPLAINING only -- no
+  diagnose/predict/score/alter/invent). Provider Protocol + stub:
+  `backend/app/application/ai/longitudinal_provider.py` (StubLongitudinalProvider
+  builds valid JSON strictly from context; `assert_non_diagnostic` rejects
+  diagnostic/predictive language). AI failure/validation failure ->
+  `trajectory_unavailable_fallback` (available=False); trajectory stays available.
+  Insufficient data (<2 assessments) -> AI NOT called (provider.calls==0).
+- API: `backend/app/api/v1/endpoints/trajectory.py` (prefix `/trajectory`, tag
+  `trajectory`) -- `GET /trajectory?limit=N`, `GET
+  /trajectory/compare/{prev}/{curr}`, `POST /trajectory/explanation` (body
+  `{previous_session_id?, current_session_id?}`, defaults to latest two). All
+  enforce `get_current_user` + caller-scoped ownership. Registered in
+  `app/api/v1/router.py`.
+- Frontend: `frontend/src/features/health-timeline/api/trajectoryService.ts`
+  (typed client + types), `hooks/useTrajectory.ts` (TanStack hooks),
+  `pages/TrajectoryPage.tsx` (timeline + recharts trend chart + body-system
+  cards + finding changes + AI explanation clearly separated/labelled +
+  disclaimer + empty states). Route `/timeline/trajectory` in router.tsx.
+  `frontend/src/test/setup.ts` now has a ResizeObserver stub (recharts needs it;
+  jsdom doesn't implement it) -- affects ALL chart tests.
+
+### Phase 4 score semantics (from CDSE + ReportService -- do not invent)
+- Indicator score = sum of option weights; activated if >= 1.0.
+- Condition score = sum of contributing indicator scores; confidence = score/
+  max_possible in [0,1].
+- Body-system score (report) = sum of activated indicator scores -> mapped to a
+  category label via severity thresholds (the SEVERITY_ORDER above). Stored as
+  String(50) but is a float string -> `_safe_float()` parses it.
+- overall_severity = the highest-severity body-system category (READ-ONLY, a
+  categorical label, NEVER an invented numeric "health score").
+
+### Phase 4 test commands (verified)
+- Backend: `... python -m pytest tests/test_longitudinal_phase4.py -q` -> 34 pass.
+- Frontend: `CI=true npx vitest run src/features/health-timeline/pages/__tests__/TrajectoryPage.test.tsx` -> 16 pass.
+- Full suites: backend 286 pass, frontend 59 pass, typecheck clean, build OK.
+
+### Phase 4 safety invariants (do NOT regress)
+- Trajectory is READ-ONLY w.r.t. CDSE/Phase 1/2/3/CMS/RBAC/questionnaire
+  branching. No DB writes, no schema changes. CDSE/Phase 1/2/3 services
+  unchanged (verified by `git diff` -- only router.py + new files).
+- AI may ONLY reference indicator/condition/recommendation/evidence ids present
+  in the deterministic trajectory context. Hallucinated ids are REJECTED ->
+  `available=false` fallback. No PHI in context (only trace_ids, dates, change
+  dicts, allow-listed evidence).
+- Deterministic trajectory remains available when AI is unavailable. AI is NOT
+  called for insufficient data (<2 assessments) or unauthorized requests.
+- Possible conditions are NEVER upgraded to diagnoses. No disease
+  progression/resolution claims. No predictions. The stub's
+  `assert_non_diagnostic` enforces this.
+- Patient ownership: trajectory scoped to caller; cross-user specific-compare
+  -> 404.

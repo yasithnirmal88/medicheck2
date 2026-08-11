@@ -36,7 +36,8 @@ export default function TimelinePage() {
       <div className="max-w-4xl mx-auto p-4">
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-semibold">Health Timeline</h1>
-          <div>
+          <div className="flex items-center gap-4">
+            <Link to="/timeline/trajectory" className="text-sm text-indigo-600">View trajectory</Link>
             <button onClick={() => setOrder(order === 'desc' ? 'asc' : 'desc')} className="text-sm text-indigo-600">Order: {order === 'desc' ? 'Newest' : 'Oldest'}</button>
           </div>
         </div>
