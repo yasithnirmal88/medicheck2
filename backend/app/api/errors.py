@@ -16,8 +16,27 @@ logger = get_logger(__name__)
 
 async def validation_error_handler(
     request: Request,
-    exc: RequestValidationError,
+    exc: RequestValidationError | AppException,
 ) -> JSONResponse:
+    # Handles both Pydantic RequestValidationError (request-body validation)
+    # and our AppException-based ValidationError (service-layer validation).
+    if isinstance(exc, AppException):
+        logger.warning(
+            "Validation error for %s %s: %s",
+            request.method,
+            request.url.path,
+            exc.detail,
+        )
+        body = ErrorResponse(
+            success=False,
+            error=ErrorBody(
+                code=exc.code or "validation_error",
+                message=exc.detail or "Validation failed",
+                details=[],
+            ),
+        ).model_dump()
+        return JSONResponse(status_code=exc.status_code, content=body)
+
     errors: list[dict[str, Any]] = []
     for error in exc.errors():
         errors.append(

@@ -90,6 +90,13 @@ class Permission(str, Enum):
     # metrics (fallback rate, validation failures, language distribution).
     # Never grants access to patient PHI or individual AI audit records.
     AI_VIEW_GOVERNANCE = "ai:view:governance"
+    # Phase 8 — Community Health Worker. Scoped patient-assist capabilities.
+    # CHW may create/continue assessments for assigned patients and record
+    # consent, but never gains unrestricted patient access or CMS control.
+    CHW_CREATE_ASSESSMENT = "chw:create:assessment"
+    CHW_READ_ASSIGNED = "chw:read:assigned"
+    CHW_RECORD_CONSENT = "chw:record:consent"
+    CHW_SYNC_OFFLINE = "chw:sync:offline"
 
 
 class Role(str, Enum):
@@ -102,6 +109,7 @@ class Role(str, Enum):
     RESEARCH_REVIEWER = "research_reviewer"
     CONTENT_EDITOR = "content_editor"
     READ_ONLY_REVIEWER = "read_only_reviewer"
+    COMMUNITY_HEALTH_WORKER = "community_health_worker"
 
     @property
     def permissions(self) -> set[Permission]:
@@ -122,6 +130,7 @@ _ROLE_DISPLAY_NAMES: dict[Role, str] = {
     Role.CONTENT_EDITOR: "Content Editor",
     Role.READ_ONLY_REVIEWER: "Read-Only Reviewer",
     Role.SUPER_ADMIN: "Super Admin",
+    Role.COMMUNITY_HEALTH_WORKER: "Community Health Worker",
 }
 
 
@@ -204,6 +213,22 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.READ_ASSESSMENTS,
         Permission.CREATE_ASSESSMENTS,
         Permission.READ_HEALTH,
+    },
+    # Phase 8 — Community Health Worker. Least-privilege: may create
+    # assessments for explicitly assigned patients, record consent, and sync
+    # offline sessions. Explicitly does NOT receive any CMS_* or
+    # READ_ASSESSMENTS_ALL permission, so CHWs cannot manage clinical content
+    # or browse arbitrary patient records. Placed at hierarchy level 3 (below
+    # READ_ONLY_REVIEWER=5) so get_cms_user (>=5) correctly denies CHWs.
+    Role.COMMUNITY_HEALTH_WORKER: {
+        Permission.READ_USER,
+        Permission.UPDATE_USER,
+        Permission.READ_ASSESSMENTS,
+        Permission.READ_HEALTH,
+        Permission.CHW_CREATE_ASSESSMENT,
+        Permission.CHW_READ_ASSIGNED,
+        Permission.CHW_RECORD_CONSENT,
+        Permission.CHW_SYNC_OFFLINE,
     },
     Role.DOCTOR: {
         Permission.READ_USER,
@@ -320,6 +345,7 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
 
 _ROLE_HIERARCHY: dict[Role, int] = {
     Role.PATIENT: 0,
+    Role.COMMUNITY_HEALTH_WORKER: 3,
     Role.READ_ONLY_REVIEWER: 5,
     Role.GENERAL_PHYSICIAN: 10,
     Role.DOCTOR: 10,
