@@ -13,6 +13,7 @@ from app.api.v1.cms.questions import router as cms_router
 from app.api.v1.cms.rules import router as cms_rules_router
 from app.api.v1.endpoints.admin import router as admin_router
 from app.api.v1.endpoints.ai_intake import router as ai_intake_router
+from app.api.v1.endpoints.analytics import router as analytics_router
 from app.api.v1.endpoints.assessments import router as assessments_router
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.cdse import router as cdse_router
@@ -40,6 +41,7 @@ router.include_router(trajectory_router)
 router.include_router(questions_router)
 router.include_router(assessments_router)
 router.include_router(ai_intake_router)
+router.include_router(analytics_router)
 router.include_router(cms_router)
 router.include_router(cms_content_router)
 router.include_router(cms_builder_router)

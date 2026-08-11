@@ -96,6 +96,19 @@ async def extract_intake(
             # Cross-patient attempt → 404 (do not reveal ownership to the caller).
             raise HTTPException(status_code=404, detail="Session not found")
 
+        # Phase 6 — persist language/input_type into session.extra_metadata
+        # so population analytics can measure accessibility (SDG 3.8/10).
+        # This populates an EXISTING JSON column (no schema change). Only
+        # the resolved language + input_type are stored — never raw text or
+        # audio. If the metadata already exists, preserve other keys.
+        from app.application.ai.language import normalize_language
+        resolved_lang = normalize_language(payload.language) if payload.language else "en"
+        meta = dict(row.extra_metadata or {})
+        meta["language"] = resolved_lang
+        meta["input_type"] = input_type
+        row.extra_metadata = meta
+        await session.commit()
+
     # Phase 5 — validate language if explicitly supplied.
     if payload.language is not None and not is_supported_language(payload.language):
         raise HTTPException(

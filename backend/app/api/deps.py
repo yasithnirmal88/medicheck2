@@ -149,3 +149,21 @@ async def get_cms_user(
     if not has_role(current_user.roles, Role.READ_ONLY_REVIEWER):
         raise AuthorizationError(detail="CMS access required")
     return current_user
+
+
+async def get_analytics_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """Population analytics access (Phase 6).
+
+    Requires a role with ANALYTICS_VIEW_POPULATION permission. This is granted
+    to RESEARCH_REVIEWER, MEDICAL_DIRECTOR, and SUPER_ADMIN (level >=25).
+    Population analytics never grants individual patient data access — only
+    de-identified, aggregated metrics.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="Analytics access required")
+    if not has_role(current_user.roles, Role.RESEARCH_REVIEWER):
+        raise AuthorizationError(detail="Analytics access required")
+    return current_user

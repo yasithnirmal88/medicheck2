@@ -416,3 +416,15 @@ source of truth; AI explains observed changes only (never decides them).
   `assert_non_diagnostic` enforces this.
 - Patient ownership: trajectory scoped to caller; cross-user specific-compare
   -> 404.
+
+## Phase 6: Population Health + SDG Analytics (COMPLETE)
+- Added `Permission.ANALYTICS_READ_POPULATION` to rbac.py; granted to RESEARCH_REVIEWER (level 5), MEDICAL_DIRECTOR (30), SUPER_ADMIN (40). Denied to patient/doctor/roleless. Dependency `get_analytics_user` in deps.py.
+- New service `population_analytics_service.py` (SQL-level aggregation only - GROUP BY/COUNT/SUM, no N+1). Small-cell suppression k=10 (configurable). De-identified: no user_id/email/session_id in ANY response.
+- New router `app/api/v1/endpoints/analytics.py` (7 routes: overview, severity, body-systems, indicators, trajectory, accessibility, sdg). All under `/api/v1/analytics/*`. Registered in `app/api/v1/router.py`.
+- Phase 5 integration: `ai_intake.py` persists `language`+`input_type` to `session.extra_metadata` (existing JSON column - NO migration). Accessibility endpoint reads via SQL JSON extraction.
+- Phase 4 integration: trajectory endpoint reuses TrendLabel enum.
+- Disclaimers on EVERY response (not prevalence / not diagnosis / not progression / not demographics / not SDG achievement).
+- IMPORTANT: use `case(...)` from sqlalchemy, NOT `func.case(...)` - `func.case` does not accept `else_` kwarg (TypeError).
+- Frontend: `features/analytics/` module. Route `/cms/analytics` under DoctorLayout. Nav item "Population Analytics" (BarChart3 icon).
+- Test commands: backend `python -m pytest tests/test_population_analytics_phase6.py -q` -> 22 pass. Frontend `CI=true npx vitest run src/features/analytics` -> 7 pass.
+- Constraints honored: NO clinical decision engine changes, NO schema migrations, NO LLM APIs. AI is explanation/extraction layer only.

@@ -53,6 +53,9 @@ const PublishingWorkflowsPage = React.lazy(() => import('../features/cms/pages/P
 const SearchPage = React.lazy(() => import('../features/cms/pages/SearchPage').then(m => ({ default: m.SearchPage })))
 const SettingsPage = React.lazy(() => import('../features/cms/pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
 
+// Phase 6 — Population Health & SDG Analytics
+const AnalyticsDashboardPage = React.lazy(() => import('../features/analytics/pages/AnalyticsDashboardPage'))
+
 // Content list pages - one lazy component per entity type, wired to its
 // dedicated page. Previously a single ContentListPageWrapper (hardcoded to
 // QuestionsListPage) was used for every content route, so diseases, symptoms,
@@ -347,6 +350,9 @@ export default function Router() {
           <Route path="users" element={<UsersRolesPage />} />
           <Route path="search" element={<SearchPage />} />
           <Route path="settings" element={<SettingsPage />} />
+
+          {/* Phase 6 — Population Health & SDG Analytics */}
+          <Route path="analytics" element={<AnalyticsDashboardPage />} />
         </Route>
 
         {/* ============================================================ */}
