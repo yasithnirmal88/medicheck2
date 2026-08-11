@@ -270,6 +270,86 @@ Full findings: `CMS_CONTENT_FORENSIC_REPORT.md`. Key facts to preserve:
 - Backend: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/ -q -W error::DeprecationWarning` -> 252 pass.
 - Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 43 pass, typecheck clean.
 
+## Phase 7 — AI-Powered Personalized Risk Communication, Transparency & AI Governance (read before touching AI layer)
+
+### Core invariant (NEVER violate)
+The AI is an EXPLANATION layer ONLY. It must NEVER: diagnose a disease,
+calculate a clinical score, determine severity, create recommendations,
+invent evidence, or modify the deterministic assessment. Translation
+(EN/SI/TA) must NEVER upgrade certainty (possible != confirmed, monitor !=
+urgent, risk != diagnosis). The deterministic Clinical Decision Service (CDSE)
+is the clinical authority; AI only explains its output.
+
+### New files (Phase 7)
+- `backend/app/application/ai/personalized_provider.py` - `PersonalizedExplanationProvider`
+  (deterministic local provider, name="personalized-stub"). Multilingual (EN/SI/TA)
+  phrase tables + literacy-adapted text generators (simple/standard/detailed).
+  Select via `AI_PROVIDER=personalized-stub`. Default remains "stub".
+- `backend/app/application/ai/phase7_prompts.py` - `PHASE7_PROMPT_VERSION`="3.0-personalized",
+  `AI_TRANSPARENCY_NOTICE`, `SDG_3_4_DISCLAIMER`.
+- `backend/app/application/services/ai_audit_service.py` - `AIAuditService`. Records
+  metadata (NOT PHI) about every AI explanation. `record()` writes hashes + ids only.
+  `get_governance_summary()` returns aggregate counts for the CMS dashboard.
+- `backend/app/application/services/question_explanation_service.py` -
+  `QuestionExplanationService.explain_question()` - "Why was I asked this?" Uses
+  EXISTING knowledge-graph links (question->indicator->condition, question->evidence).
+  Never invents relationships. Ownership: caller must own the session.
+- `backend/app/infrastructure/persistence/models/ai_interaction_audit.py` -
+  `AIInteractionAuditModel` (additive table). Stores trace_id, session_id,
+  request_type, provider, model, prompt_version, language, literacy_level,
+  input_context_hash, output_hash, status, status_reason. NO raw PHI columns.
+- `backend/alembic/versions/20260810_ai_interaction_audits.py` - migration
+  (additive, idempotent). down_revision=20260808_emergency_contact_json.
+- `backend/app/api/v1/endpoints/ai_governance.py` - `GET /api/v1/ai-governance/summary`
+  (RBAC: RESEARCH_REVIEWER+, returns de-identified aggregate metrics only).
+- `backend/tests/test_ai_phase7.py` - 29 tests covering all Phase 7 features.
+- `frontend/.../ReportExplanation.tsx` - updated with language/literacy selectors,
+  source breakdown section, transparency notice, quality status badge.
+- `frontend/.../__tests__/ReportExplanationPhase7.test.tsx` - 11 frontend tests.
+
+### Modified files (Phase 7)
+- `ai_dtos.py` - added `language`, `literacy_level`, `quality_status`,
+  `source_breakdown`, `transparency_notice`, `provider`, `model` to
+  `AIExplanationResponse`. Added `LiteracyLevel` enum (simple/standard/detailed),
+  `AIQualityStatus` enum (valid/fallback/validation_failed/provider_unavailable/
+  evidence_unavailable), `SourceBreakdownItem` model. `UNAVAILABLE_FALLBACK`
+  now sets quality_status + transparency_notice.
+- `ai_explanation_service.py` - `explain_report()` now accepts `language` +
+  `literacy_level` kwargs. Writes audit records on every outcome (success,
+  provider_unavailable, validation_failed). Builds `source_breakdown` +
+  sets `transparency_notice` + `quality_status`. Cache key includes lang+level.
+- `provider.py` - split `AIProviderError` (provider DOWN) from
+  `AIValidationFailure` (output INVALID). `get_explanation_provider()` supports
+  "personalized-stub". StubExplanationProvider unchanged.
+- `report.py` endpoint - `POST /{session_id}/explanation` accepts `language` +
+  `literacy_level` query params. Added `GET /{session_id}/question-explanation`.
+- `rbac.py` - added `Permission.AI_VIEW_GOVERNANCE`. Granted to
+  RESEARCH_REVIEWER, MEDICAL_DIRECTOR, SUPER_ADMIN.
+- `deps.py` - added `get_ai_governance_user` dependency (RBAC: RESEARCH_REVIEWER+).
+- `config.py` - added `ai_audit_enabled`, `ai_default_language`,
+  `ai_default_literacy_level` settings.
+- `router.py` - registered `ai_governance_router`.
+- `patientService.ts` - `AIExplanation` interface extended with Phase 7 fields.
+  `fetchReportExplanation()` now accepts `{language, literacy_level}` params.
+  Added `fetchQuestionExplanation()`, `QuestionExplanation` interface,
+  `AISourceBreakdownItem`, `AIQualityStatus`, `LiteracyLevel` types.
+
+### AI audit trail (governance)
+- Every `explain_report()` call writes an `AIInteractionAuditModel` record.
+- Stores ONLY: trace_id, session_id, request_type, provider, model,
+  prompt_version, language, literacy_level, input_context_hash (SHA-256 of
+  entity-id dict), output_hash (SHA-256 of AI output), status, status_reason.
+- NO raw patient text, NO clinical content, NO free-text PHI.
+- `get_governance_summary()` aggregates: total_requests, fallback_rate_pct,
+  validation_failure_rate_pct, by_status, by_language, by_provider, by_prompt_version.
+- `GET /api/v1/ai-governance/summary` requires `AI_VIEW_GOVERNANCE` permission.
+  Individual audit records are NEVER exposed through the API (only aggregates).
+
+### Test commands (Phase 7 verified)
+- Backend Phase 7: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/test_ai_phase7.py -q -W error::DeprecationWarning` -> 29 pass.
+- Full backend suite passes in batches (238 total tests). Run in groups if timeout.
+- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 80 pass (11 new). Build OK.
+
 ## Phase 3 -- AI Clinical Intake + Candidate Indicator Extraction (ADDITIVE)
 AI-assisted conversational intake is an INPUT INTERPRETATION layer ONLY. It feeds INTO
 the untouched deterministic CDSE; it never diagnoses/scores/sets severity/activates
