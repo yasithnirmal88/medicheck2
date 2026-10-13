@@ -40,7 +40,13 @@ from app.application.services.ai_audit_service import AIAuditService
 from app.application.services.sdg_export_service import SdgExportService
 from app.core.config import settings
 from app.core.exceptions import AuthorizationError
-from app.domain.entities.user import User
+from app.identity import (
+    Permission,
+    Role,
+    User,
+    check_permission,
+    get_role_permissions,
+)
 from app.infrastructure.persistence.models.ai_population_insight import (
     AiPopulationInsightModel,
 )
@@ -138,13 +144,6 @@ class PopulationNarrativeService:
     # ── internal ──────────────────────────────────────────────────────
 
     def _assert_access(self, user: User) -> None:
-        from app.core.security.rbac import (
-            Permission,
-            Role,
-            check_permission,
-            get_role_permissions,
-        )
-
         if not user.roles:
             raise AuthorizationError(detail="Population insight access required")
         perms: set[Permission] = set()

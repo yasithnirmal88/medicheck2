@@ -24,7 +24,7 @@ from app.application.dtos.ai_governance_dtos import (
 from app.application.services.ai_operational_suggestion_service import (
     AiOperationalSuggestionService,
 )
-from app.domain.entities.user import User
+from app.identity import User
 
 router = APIRouter(
     prefix="/ai-care-coordination", tags=["ai-care-coordination"]

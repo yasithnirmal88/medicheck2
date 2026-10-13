@@ -44,7 +44,7 @@ from app.application.services.equity_intelligence_service import (
 from app.application.services.population_narrative_service import (
     PopulationNarrativeService,
 )
-from app.domain.entities.user import User
+from app.identity import User
 
 router = APIRouter(prefix="/ai-equity", tags=["ai-equity-intelligence"])
 

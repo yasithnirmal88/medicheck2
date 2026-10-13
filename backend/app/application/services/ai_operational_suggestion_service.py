@@ -42,7 +42,13 @@ from app.application.dtos.ai_governance_dtos import (
 from app.application.services.ai_audit_service import AIAuditService
 from app.core.config import settings
 from app.core.exceptions import AuthorizationError
-from app.domain.entities.user import User
+from app.identity import (
+    Permission,
+    Role,
+    User,
+    check_permission,
+    get_role_permissions,
+)
 from app.infrastructure.persistence.models.ai_operational_suggestion import (
     AiOperationalSuggestionModel,
 )
@@ -181,8 +187,6 @@ class AiOperationalSuggestionService:
     # ── internal helpers ─────────────────────────────────────────────
 
     def _assert_chw_access(self, user: User) -> None:
-        from app.core.security.rbac import Permission, Role, check_permission, get_role_permissions
-
         if not user.roles:
             raise AuthorizationError(detail="Operational AI access required")
         perms: set[Permission] = set()
