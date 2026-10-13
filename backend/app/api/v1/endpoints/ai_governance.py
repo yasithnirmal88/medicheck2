@@ -20,7 +20,7 @@ router = APIRouter(prefix="/ai-governance", tags=["ai-governance"])
 
 @router.get("/summary")
 async def get_governance_summary(
-    current_user: User = Depends(get_ai_governance_user),
+    __current_user: User = Depends(get_ai_governance_user),
     session: AsyncSession = Depends(get_db),
 ):
     """Aggregate AI quality metrics for the governance dashboard.

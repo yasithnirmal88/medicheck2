@@ -81,7 +81,7 @@ async def get_current_user(
         raise
     except Exception as exc:
         logger.error("Token verification failed: %s", exc)
-        raise AuthenticationError(detail="Invalid authentication token")
+        raise AuthenticationError(detail="Invalid authentication token") from exc
 
     repo = SQLUserRepository(session)
     user = await repo.find_by_firebase_uid(firebase_uid)
@@ -148,7 +148,7 @@ async def get_current_super_admin(
 
 async def get_cms_user(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[AsyncSession, Depends(get_db)],
+    _session: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     if not current_user.roles:
         raise AuthorizationError(detail="CMS access required")
@@ -159,7 +159,7 @@ async def get_cms_user(
 
 async def get_analytics_user(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[AsyncSession, Depends(get_db)],
+    _session: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     """Population analytics access (Phase 6).
 
@@ -177,7 +177,7 @@ async def get_analytics_user(
 
 async def get_ai_governance_user(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[AsyncSession, Depends(get_db)],
+    __session: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     """AI governance access (Phase 7).
 
@@ -204,12 +204,11 @@ async def get_chw_user(
     never reach clinical-content management endpoints. Least-privilege by
     construction: no CMS_* and no READ_ASSESSMENTS_ALL permission is granted.
     """
-    if Role.COMMUNITY_HEALTH_WORKER not in current_user.roles:
-        # Admins/medical directors may also operate the CHW workflow for
-        # supervision/escalation, but ordinary patients and CMS-only roles
-        # are denied. Use has_role so the hierarchy admits senior staff.
-        if not has_role(current_user.roles, Role.MEDICAL_DIRECTOR):
-            raise AuthorizationError(detail="Community Health Worker access required")
+    if (Role.COMMUNITY_HEALTH_WORKER not in current_user.roles
+        and not has_role(current_user.roles, Role.MEDICAL_DIRECTOR)):
+        # Ordinary patients and CMS-only roles are denied; the CHW role or a
+        # hierarchy level high enough to supervise the workflow is required.
+        raise AuthorizationError(detail="Community Health Worker access required")
     return current_user
 
 

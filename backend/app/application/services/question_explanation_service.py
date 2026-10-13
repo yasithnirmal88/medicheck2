@@ -115,7 +115,7 @@ class QuestionExplanationService:
             QuestionIndicatorLinkModel.active.is_(True),
         )
         links = (await self.session.execute(link_q)).scalars().all()
-        indicator_ids = [l.indicator_id for l in links]
+        indicator_ids = [link.indicator_id for link in links]
 
         indicators: list[dict] = []
         conditions: list[dict] = []

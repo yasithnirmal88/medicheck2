@@ -28,8 +28,11 @@ COPY . .
 
 EXPOSE 8000
 
+# Readiness probe: /ready returns 503 until DB AND Redis are reachable, so an
+# unready instance is pulled out of rotation. /health remains the liveness
+# endpoint (always 200) for existing monitors/healthchecks.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl --fail http://localhost:8000/api/v1/health || exit 1
+    CMD curl --fail http://localhost:8000/api/v1/ready || exit 1
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

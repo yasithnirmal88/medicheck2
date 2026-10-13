@@ -3,9 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from typing import Any
 
-from alembic import command
 from alembic.config import Config
-
 from sqlalchemy import MetaData
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -14,6 +12,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
+from alembic import command
 from app.core.config import settings
 from app.core.logging import get_logger
 

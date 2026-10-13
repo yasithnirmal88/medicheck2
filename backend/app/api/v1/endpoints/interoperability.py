@@ -19,7 +19,6 @@ from app.api.deps import get_db
 from app.application.dtos.analytics_dtos import AnalyticsFilters
 from app.application.dtos.fhir_dtos import FhirExportResponse
 from app.application.dtos.interoperability_dtos import (
-    SdgExportFormat,
     SdgExportResponse,
 )
 from app.application.services.care_continuity_service import CareContinuityService
@@ -102,7 +101,7 @@ async def list_exports(
     ),
 )
 async def export_sdg(
-    user: Annotated[User, Depends(get_sdg_export_user)],
+    _user: Annotated[User, Depends(get_sdg_export_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     start_date: datetime.date | None = Query(default=None),
     end_date: datetime.date | None = Query(default=None),
@@ -118,7 +117,7 @@ async def export_sdg(
     description="Same SDG export as /sdg but returned as CSV (machine-readable).",
 )
 async def export_sdg_csv(
-    user: Annotated[User, Depends(get_sdg_export_user)],
+    _user: Annotated[User, Depends(get_sdg_export_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     start_date: datetime.date | None = Query(default=None),
     end_date: datetime.date | None = Query(default=None),
@@ -145,7 +144,7 @@ async def export_sdg_csv(
     ),
 )
 async def get_care_continuity(
-    user: Annotated[User, Depends(get_sdg_export_user)],
+    __user: Annotated[User, Depends(get_sdg_export_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     start_date: datetime.date | None = Query(default=None),
     end_date: datetime.date | None = Query(default=None),

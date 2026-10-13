@@ -3,10 +3,13 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dtos.profile_dtos import HealthProfileDTO, PersonalInfoDTO
+from app.core.logging import get_logger
 from app.identity import User
 from app.infrastructure.persistence.repositories.sql_profile_repository import (
     SQLProfileRepository,
 )
+
+logger = get_logger(__name__)
 
 
 class ProfileService:
@@ -189,7 +192,9 @@ class ProfileService:
             await self.repo.upsert_lifestyle(profile.id, snapshot["lifestyle"])
         if snapshot.get("nutrition"):
             await self.repo.upsert_nutrition(profile.id, snapshot["nutrition"])
-        # Note: restoring list-based sections (medical_histories etc) requires more sophisticated merging. For now, create new records from snapshot lists if present.
+        # Note: restoring list-based sections (medical_histories etc) requires
+        # more sophisticated merging. For now, create new records from snapshot
+        # lists if present.
         for key, add_fn in (
             ("medical_history", self.repo.add_medical_history),
             ("medical_histories", self.repo.add_medical_history),

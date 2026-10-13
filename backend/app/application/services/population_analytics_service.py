@@ -26,7 +26,7 @@ import datetime
 import logging
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select, and_, case, false
+from sqlalchemy import and_, case, false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dtos.analytics_dtos import (
@@ -36,8 +36,8 @@ from app.application.dtos.analytics_dtos import (
     AnalyticsOverviewResponse,
     BodySystemMetric,
     BodySystemsResponse,
-    IndicatorTrendEntry,
     IndicatorsResponse,
+    IndicatorTrendEntry,
     LanguageMetric,
     OverviewMetrics,
     SDGDashboardResponse,
@@ -281,7 +281,7 @@ class PopulationAnalyticsService:
         return round(rate, 1), False
 
     async def _time_series(
-        self, start, end, bucket: str, base
+        self, _start, _end, bucket: str, base
     ) -> list[TimeSeriesPoint]:
         """Aggregate assessments into time buckets (SQL-level)."""
         trunc = _truncate_fn(bucket)
@@ -323,8 +323,12 @@ class PopulationAnalyticsService:
         base = and_(
             AssessmentSessionModel.deleted_at.is_(None),
             AssessmentSessionModel.status == _COMPLETED,
-            AssessmentSessionModel.started_at >= datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC),
-            AssessmentSessionModel.started_at <= datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC),
+            AssessmentSessionModel.started_at >= datetime.datetime.combine(
+                        start, datetime.time.min, tzinfo=_UTC
+                    ),
+            AssessmentSessionModel.started_at <= datetime.datetime.combine(
+                        end, datetime.time.max, tzinfo=_UTC
+                    ),
             HealthAssessmentModel.session_id == AssessmentSessionModel.id,
             (
                 AssessmentSessionModel.user_id.in_(user_ids)
@@ -398,8 +402,12 @@ class PopulationAnalyticsService:
         base = and_(
             AssessmentSessionModel.deleted_at.is_(None),
             AssessmentSessionModel.status == _COMPLETED,
-            AssessmentSessionModel.started_at >= datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC),
-            AssessmentSessionModel.started_at <= datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC),
+            AssessmentSessionModel.started_at >= datetime.datetime.combine(
+                        start, datetime.time.min, tzinfo=_UTC
+                    ),
+            AssessmentSessionModel.started_at <= datetime.datetime.combine(
+                        end, datetime.time.max, tzinfo=_UTC
+                    ),
             HealthAssessmentModel.session_id == AssessmentSessionModel.id,
             (
                 AssessmentSessionModel.user_id.in_(user_ids)
@@ -475,8 +483,12 @@ class PopulationAnalyticsService:
                 and_(
                     AssessmentSessionModel.deleted_at.is_(None),
                     AssessmentSessionModel.status == _COMPLETED,
-                    AssessmentSessionModel.started_at >= datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC),
-                    AssessmentSessionModel.started_at <= datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC),
+                    AssessmentSessionModel.started_at >= datetime.datetime.combine(
+                        start, datetime.time.min, tzinfo=_UTC
+                    ),
+                    AssessmentSessionModel.started_at <= datetime.datetime.combine(
+                        end, datetime.time.max, tzinfo=_UTC
+                    ),
                     (
                         AssessmentSessionModel.user_id.in_(user_ids)
                         if user_ids
@@ -567,8 +579,12 @@ class PopulationAnalyticsService:
                 and_(
                     AssessmentSessionModel.deleted_at.is_(None),
                     AssessmentSessionModel.status == _COMPLETED,
-                    AssessmentSessionModel.started_at >= datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC),
-                    AssessmentSessionModel.started_at <= datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC),
+                    AssessmentSessionModel.started_at >= datetime.datetime.combine(
+                        start, datetime.time.min, tzinfo=_UTC
+                    ),
+                    AssessmentSessionModel.started_at <= datetime.datetime.combine(
+                        end, datetime.time.max, tzinfo=_UTC
+                    ),
                     (
                         AssessmentSessionModel.user_id.in_(user_ids)
                         if user_ids
@@ -597,7 +613,7 @@ class PopulationAnalyticsService:
         trend_counts: dict[str, int] = {t: 0 for t in _TRAJECTORY_TRENDS}
         patients_with_trajectory = 0
 
-        for user_id, bs_dict in user_bs_scores.items():
+        for _user_id, bs_dict in user_bs_scores.items():
             has_multiple = any(len(scores) >= 2 for scores in bs_dict.values())
             if not has_multiple:
                 continue
@@ -762,7 +778,7 @@ class PopulationAnalyticsService:
 
         # SDG 10 — Reduced inequalities (language equity).
         lang_count = sum(
-            1 for l in accessibility.accessibility.by_language if not l.suppressed
+            1 for row in accessibility.accessibility.by_language if not row.suppressed
         )
 
         sections = [

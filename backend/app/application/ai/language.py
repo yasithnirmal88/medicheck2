@@ -40,7 +40,7 @@ LANGUAGE_LABELS: dict[str, str] = {
 _LANGUAGE_ALIASES: dict[str, str] = {
     "en": LANGUAGE_EN, "eng": LANGUAGE_EN, "en-us": LANGUAGE_EN, "en-gb": LANGUAGE_EN,
     "si": LANGUAGE_SI, "sin": LANGUAGE_SI, "si-lk": LANGUAGE_SI, "sinh": LANGUAGE_SI, "sinhala": LANGUAGE_SI,
-    "ta": LANGUAGE_TA, "tam": LANGUAGE_TA, "ta-lk": LANGUAGE_TA, "tam": LANGUAGE_TA, "tamil": LANGUAGE_TA,
+    "ta": LANGUAGE_TA, "tam": LANGUAGE_TA, "ta-lk": LANGUAGE_TA, "tamil": LANGUAGE_TA,
 }
 
 # Unicode script ranges for deterministic detection.

@@ -44,6 +44,23 @@ class TestProductionBootValidation:
         with pytest.raises(RuntimeError, match="ALLOW_MOCK_AUTH"):
             validate_production_boot()
 
+    def test_mock_auth_in_staging_refuses_to_boot(self, monkeypatch):
+        monkeypatch.setattr(settings, "environment", Environment.STAGING)
+        monkeypatch.setattr(settings, "allow_mock_auth", True)
+        with pytest.raises(RuntimeError, match="ALLOW_MOCK_AUTH"):
+            validate_production_boot()
+
+    def test_mock_auth_in_development_allowed(self, monkeypatch):
+        monkeypatch.setattr(settings, "environment", Environment.DEVELOPMENT)
+        monkeypatch.setattr(settings, "allow_mock_auth", True)
+        validate_production_boot()  # must not raise
+
+    def test_create_app_refuses_mock_auth_in_staging(self, monkeypatch):
+        monkeypatch.setattr(settings, "environment", Environment.STAGING)
+        monkeypatch.setattr(settings, "allow_mock_auth", True)
+        with pytest.raises(RuntimeError, match="ALLOW_MOCK_AUTH"):
+            create_app()
+
     def test_missing_firebase_credentials_refuses_to_boot(self, monkeypatch):
         _prod_settings(monkeypatch, firebase_credentials_json=None)
         monkeypatch.setattr(settings, "firebase_credentials_path", None)

@@ -23,7 +23,7 @@ async def create_body_system(
 
 @router.get("/body-systems")
 async def list_body_systems(
-    current_user=Depends(get_current_admin), session: AsyncSession = Depends(get_db)
+    _current_user=Depends(get_current_admin), session: AsyncSession = Depends(get_db)
 ):
     svc = AdminService(session)
     return await svc.repo.list_body_systems()
@@ -43,7 +43,7 @@ async def create_indicator(
 @router.get("/indicators")
 async def list_indicators(
     body_system_id: str | None = Query(None),
-    current_user=Depends(get_current_admin),
+    _current_user=Depends(get_current_admin),
     session: AsyncSession = Depends(get_db),
 ):
     svc = AdminService(session)
@@ -64,7 +64,7 @@ async def create_evidence(
 @router.get("/evidence")
 async def list_evidence(
     limit: int = Query(50),
-    current_user=Depends(get_current_admin),
+    _current_user=Depends(get_current_admin),
     session: AsyncSession = Depends(get_db),
 ):
     svc = AdminService(session)
@@ -85,7 +85,7 @@ async def create_recommendation(
 @router.get("/recommendations")
 async def list_recommendations(
     limit: int = Query(100),
-    current_user=Depends(get_current_admin),
+    _current_user=Depends(get_current_admin),
     session: AsyncSession = Depends(get_db),
 ):
     svc = AdminService(session)
@@ -96,7 +96,7 @@ async def list_recommendations(
 async def audit_logs(
     entity_type: str | None = Query(None),
     limit: int = Query(100),
-    current_user=Depends(get_current_admin),
+    _current_user=Depends(get_current_admin),
     session: AsyncSession = Depends(get_db),
 ):
     svc = AdminService(session)

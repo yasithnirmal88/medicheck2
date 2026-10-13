@@ -51,7 +51,7 @@ def _role_to_dict(role: RoleModel) -> dict[str, Any]:
 
 @router.get("/users")
 async def list_users(
-    current_user: Annotated[User, Depends(get_current_admin)],
+    _current_user: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=200),
@@ -75,7 +75,7 @@ async def list_users(
 @router.get("/users/{user_id}")
 async def get_user(
     user_id: str,
-    current_user: Annotated[User, Depends(get_current_admin)],
+    _current_user: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLUserRepository(session)
@@ -88,7 +88,7 @@ async def get_user(
 @router.put("/users/{user_id}/roles")
 async def update_user_roles(
     user_id: str,
-    current_user: Annotated[User, Depends(get_current_admin)],
+    _current_user: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -117,7 +117,7 @@ async def update_user_roles(
 @router.post("/users/{user_id}/toggle-active")
 async def toggle_user_active(
     user_id: str,
-    current_user: Annotated[User, Depends(get_current_admin)],
+    _current_user: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     stmt = select(UserModel).where(UserModel.id == user_id)
@@ -131,7 +131,7 @@ async def toggle_user_active(
 
 @router.get("/roles")
 async def list_roles(
-    current_user: Annotated[User, Depends(get_current_admin)],
+    _current_user: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     stmt = select(RoleModel).where(RoleModel.deleted_at.is_(None)).order_by(
@@ -144,11 +144,12 @@ async def list_roles(
 @router.get("/roles/{role_id}/permissions")
 async def get_role_permissions(
     role_id: str,
-    current_user: Annotated[User, Depends(get_current_admin)],
+    __current_user: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     # Local import: the route function shadows the rbac helper name.
-    from app.identity import Role as RBACRole, get_role_permissions
+    from app.identity import Role as RBACRole
+    from app.identity import get_role_permissions
 
     stmt = select(RoleModel).where(RoleModel.id == role_id)
     role = (await session.execute(stmt)).scalar_one_or_none()

@@ -24,8 +24,8 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.application.ai.longitudinal_prompts import LONGITUDINAL_PROMPT_VERSION
 from app.application.ai.ai_budget import enforce_ai_budget
+from app.application.ai.longitudinal_prompts import LONGITUDINAL_PROMPT_VERSION
 from app.application.ai.longitudinal_provider import (
     AIProviderError,
     LongitudinalExplanationProvider,

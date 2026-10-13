@@ -35,21 +35,20 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.ai.ai_budget import enforce_ai_budget
+from app.application.ai.language import normalize_language
 from app.application.ai.phase7_prompts import (
     AI_TRANSPARENCY_NOTICE,
-    PHASE7_PROMPT_VERSION,
 )
 from app.application.ai.prompts import PROMPT_VERSION
 from app.application.ai.provider import (
-    AIProviderError,
-    AIValidationFailure,
     AIExplanationProvider,
+    AIProviderError,
+    AIValidationError,
     get_explanation_provider,
 )
-from app.application.ai.language import normalize_language
-from app.application.ai.ai_budget import enforce_ai_budget
-from app.core.exceptions import AIBudgetExceededError
 from app.application.dtos.ai_dtos import (
+    UNAVAILABLE_FALLBACK,
     AIExplanationResponse,
     AIQualityStatus,
     BodySystemContext,
@@ -60,13 +59,13 @@ from app.application.dtos.ai_dtos import (
     RecommendationContext,
     ReportExplanationContext,
     SourceBreakdownItem,
-    UNAVAILABLE_FALLBACK,
     screen_diagnostic_claims,
 )
 from app.application.services.ai_audit_service import AIAuditService
 from app.application.services.evidence_retrieval_service import (
     EvidenceRetrievalService,
 )
+from app.core.exceptions import AIBudgetExceededError
 from app.core.logging import get_logger
 from app.infrastructure.persistence.models.clinical_indicator import (
     ClinicalIndicatorModel,
@@ -304,7 +303,7 @@ class AIExplanationService:
                 status="provider_unavailable",
                 status_reason=str(exc)[:200],
             )
-        except AIValidationFailure as exc:
+        except AIValidationError as exc:
             logger.warning("AI output invalid for session %s: %s", session_id, exc)
             response = UNAVAILABLE_FALLBACK.model_copy(deep=True)
             response.trace_id = trace_id
@@ -541,12 +540,12 @@ class AIExplanationService:
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise AIValidationFailure("non-JSON AI output") from exc
+            raise AIValidationError("non-JSON AI output") from exc
         if not isinstance(data, dict):
-            raise AIValidationFailure("AI output is not a JSON object")
+            raise AIValidationError("AI output is not a JSON object")
         # Bounded copy to avoid huge payloads.
         if len(json.dumps(data)) > 50000:
-            raise AIValidationFailure("AI output too large")
+            raise AIValidationError("AI output too large")
         response = AIExplanationResponse(
             summary=str(data.get("summary", "")).strip(),
             key_findings=data.get("key_findings", []) or [],
@@ -580,7 +579,7 @@ class AIExplanationService:
                 *(r.explanation for r in response.recommendation_explanations),
             )
         except ValueError as exc:
-            raise AIValidationFailure(str(exc)) from exc
+            raise AIValidationError(str(exc)) from exc
         return response
 
     # --- read-only knowledge graph loaders (names only) ---
@@ -629,7 +628,7 @@ class AIExplanationService:
         rows = await self.session.execute(
             select(LaboratoryTestModel).where(LaboratoryTestModel.id.in_(ids))
         )
-        return {l.id: l for l in rows.scalars().all()}
+        return {lab.id: lab for lab in rows.scalars().all()}
 
 
     @staticmethod

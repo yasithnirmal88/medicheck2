@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.core.exceptions import AuthenticationError, ConflictError
 from app.core.logging import get_logger
 from app.core.security.firebase import verify_firebase_token
+from app.core.security.rbac import Role
 from app.domain.entities.user import User
 from app.domain.repositories.user_repository import UserRepository
 
@@ -18,8 +19,10 @@ class AuthService:
         firebase_token: str,
         full_name: str,
         email: str | None = None,
-        role: str = "patient",
     ) -> User:
+        # SECURITY: the role is NEVER taken from the caller. Public
+        # self-registration always produces a PATIENT account; any other role
+        # must be granted by an administrator through the identity admin API.
         claims = await verify_firebase_token(firebase_token)
         firebase_uid = claims["uid"]
         user_email = email or claims.get("email", "")
@@ -46,12 +49,12 @@ class AuthService:
             email=user_email,
             full_name=user_name,
             avatar_url=avatar_url,
-            role=role,
+            role=Role.PATIENT.value,
         )
         user.email_verified = claims.get("email_verified", False)
 
         created = await self._user_repo.create(user)
-        logger.info("User registered: %s (%s) with role: %s", created.id, created.email, role)
+        logger.info("User registered: %s (%s) as patient", created.id, created.email)
         return created
 
     async def get_or_create_user(self, firebase_token: str) -> User:

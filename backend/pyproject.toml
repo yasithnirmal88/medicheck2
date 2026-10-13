@@ -47,6 +47,22 @@ exclude = ["fix_exposed_defects.py", "repair_test_infrastructure.py"]
 select = ["E", "F", "I", "N", "W", "UP", "B", "SIM", "ARG"]
 ignore = ["N805", "UP042", "SIM110"]
 
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends",
+    "fastapi.Body",
+    "fastapi.Query",
+    "fastapi.Header",
+    "fastapi.Path",
+    "fastapi.Cookie",
+    "fastapi.Form",
+    "fastapi.File",
+    "fastapi.security.HTTPBearer",
+    "fastapi.security.HTTPBasic",
+    "fastapi.security.OAuth2PasswordBearer",
+    "fastapi.security.APIKeyHeader",
+]
+
 [tool.ruff.format]
 quote-style = "double"
 
@@ -56,6 +72,11 @@ quote-style = "double"
 "repair_test_infrastructure.py" = ["E501"]
 "workers/tasks/*" = ["ARG001"]
 "app/infrastructure/seed.py" = ["E501"]
+# FHIR R4 wire-format DTOs: field names are the serialized camelCase keys
+# (resourceType, birthDate, valueQuantity...) — renaming would break JSON output.
+"app/application/dtos/fhir_dtos.py" = ["N815"]
+# Medical seed content: long question text strings are intentionally verbose.
+"app/infrastructure/seed_medical.py" = ["E501"]
 
 [tool.mypy]
 python_version = "3.12"

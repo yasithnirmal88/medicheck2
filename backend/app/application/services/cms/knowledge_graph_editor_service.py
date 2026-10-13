@@ -288,7 +288,7 @@ class KnowledgeGraphEditorService:
             "evidence": EvidenceReferenceModel,
         }
 
-        model_cls = entity_model_map.get(entity_type)
+        entity_model_map.get(entity_type)
         downstream: list[dict[str, Any]] = []
         upstream: list[dict[str, Any]] = []
 

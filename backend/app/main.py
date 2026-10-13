@@ -25,15 +25,15 @@ from app.api.middleware import (
     RequestTimingMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.core.security.rate_limit import RateLimitMiddleware as AppRateLimitMiddleware
 from app.core.config import Environment, settings
 from app.core.exceptions import (
-    AppException,
+    AppError,
     AuthenticationError,
     NotFoundError,
     ValidationError,
 )
 from app.core.logging import get_logger, setup_logging
+from app.core.security.rate_limit import RateLimitMiddleware as AppRateLimitMiddleware
 from app.identity import get_firebase_app
 from app.infrastructure.database import close_db
 from app.infrastructure.redis import close_redis
@@ -42,18 +42,23 @@ logger = get_logger(__name__)
 
 
 def validate_production_boot() -> None:
-    """Fail fast on production misconfigurations that must never boot.
+    """Fail fast on misconfigurations that must never boot.
 
-    Warn-only behavior hides auth bypasses and insecure defaults in deploy
-    logs; these three conditions refuse to start instead. Non-production
-    environments (dev/test/CI) are unaffected.
+    Mock authentication is refused in ANY deployed environment (staging and
+    production) - it is a local-development convenience only. Production
+    additionally refuses missing Firebase credentials and the default database
+    password. Non-deployed environments (development/CI) are unaffected.
     """
+    if settings.allow_mock_auth and settings.environment in (
+        Environment.STAGING,
+        Environment.PRODUCTION,
+    ):
+        raise RuntimeError(
+            "SECURITY: ALLOW_MOCK_AUTH must never be enabled in "
+            f"{settings.environment.value}. It is for local development only."
+        )
     if settings.environment != Environment.PRODUCTION:
         return
-    if settings.allow_mock_auth:
-        raise RuntimeError(
-            "SECURITY: ALLOW_MOCK_AUTH must never be enabled in production."
-        )
     if not settings.firebase_credentials:
         raise RuntimeError(
             "SECURITY: Firebase credentials are required in production "
@@ -131,10 +136,16 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Security startup validation (warnings for softer misconfigurations).
     if not settings.secret_key or settings.secret_key == "change-me-to-a-random-secret-key":
-        logger.warning("SECURITY: SECRET_KEY is not set or is the default value. Set a strong random key in .env for production.")
+        logger.warning(
+            "SECURITY: SECRET_KEY is not set or is the default value. "
+            "Set a strong random key in .env for production."
+        )
     if settings.environment == Environment.PRODUCTION:
         if not settings.cors_origins:
-            logger.warning("SECURITY: CORS_ORIGINS is not set explicitly; falling back to the built-in allow-list. Set explicit origins in production.")
+            logger.warning(
+            "SECURITY: CORS_ORIGINS is not set explicitly; falling back to "
+            "the built-in allow-list. Set explicit origins in production."
+        )
         if settings.allowed_hosts_list == ["*"]:
             logger.warning("SECURITY: ALLOWED_HOSTS is set to wildcard. Restrict to specific domains in production.")
         if settings.enable_security_headers:
@@ -166,6 +177,9 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def create_app() -> FastAPI:
+    # Fail fast at construction time (not just in lifespan) so a misconfigured
+    # deployment cannot even build the ASGI app.
+    validate_production_boot()
     _import_persistence_models()
 
     docs_on = settings.docs_enabled_resolved
@@ -227,7 +241,7 @@ def _setup_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AuthenticationError, auth_error_handler)
     app.add_exception_handler(NotFoundError, not_found_error_handler)
     app.add_exception_handler(ValidationError, validation_error_handler)
-    app.add_exception_handler(AppException, app_exception_handler)
+    app.add_exception_handler(AppError, app_exception_handler)
     app.add_exception_handler(Exception, generic_error_handler)
 
     from fastapi.exceptions import RequestValidationError

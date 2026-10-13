@@ -1,24 +1,37 @@
 name: Deploy
 
+# Trigger only AFTER the "CI" workflow completes. The job is skipped unless
+# CI succeeded, so a failing (or cancelled) CI run can never deploy. Building
+# from the specific commit CI validated (workflow_run.head_sha) keeps the
+# deployed artifacts byte-for-byte the ones that passed the gate.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
 
 jobs:
   deploy:
     name: Build & Deploy
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    # BLOCKS deployment on a failed/cancelled CI run. Skipped entirely when
+    # CI did not complete successfully (conclusion is failure, cancelled, or
+    # the CI run was for a different branch).
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
     permissions:
       contents: read
       packages: write
 
     steps:
+      # Check out the exact commit that CI validated (workflow_run SHA), NOT
+      # the default branch tip (which may have moved since).
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # ─── Login to Container Registry ────────────────────
       - name: Log in to GitHub Container Registry
@@ -66,7 +79,6 @@ jobs:
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           script: |
             cd /opt/medicheck
-            docker compose down
             docker compose pull
             docker compose up -d
             docker image prune -af

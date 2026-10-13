@@ -38,7 +38,7 @@ def _rule_set_to_dict(rs: QuestionnaireRuleSetModel) -> dict[str, Any]:
 
 @router.get("")
 async def list_rule_sets(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     questionnaire_id: str | None = Query(None),
 ):
@@ -59,7 +59,7 @@ async def list_rule_sets(
 @router.get("/{rule_set_id}")
 async def get_rule_set(
     rule_set_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     stmt = select(QuestionnaireRuleSetModel).where(
@@ -120,7 +120,7 @@ async def update_rule_set(
 
 @router.post("/evaluate")
 async def evaluate_rule(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -132,7 +132,7 @@ async def evaluate_rule(
 
 @router.post("/evaluate/batch")
 async def evaluate_ruleset(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -143,10 +143,7 @@ async def evaluate_ruleset(
 
     results = svc.evaluate_ruleset(rules, context)
 
-    if logic == "ANY":
-        matched = any(r["matched"] for r in results)
-    else:
-        matched = all(r["matched"] for r in results)
+    matched = any(r["matched"] for r in results) if logic == "ANY" else all(r["matched"] for r in results)
 
     return {
         "matched": matched,
@@ -159,7 +156,7 @@ async def evaluate_ruleset(
 
 @router.post("/simulate")
 async def simulate_rules(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -171,7 +168,7 @@ async def simulate_rules(
 
 @router.post("/validate")
 async def validate_expression(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -187,7 +184,7 @@ async def validate_expression(
 
 @router.post("/compute")
 async def compute_variable(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -200,7 +197,7 @@ async def compute_variable(
 
 @router.post("/detect-conflicts")
 async def detect_conflicts(
-    user: Annotated[User, Depends(get_cms_user)],
+    __user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):

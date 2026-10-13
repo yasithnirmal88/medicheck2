@@ -22,7 +22,6 @@ from app.application.dtos.referral_dtos import (
 from app.application.services.facility_service import FacilityService
 from app.identity import (
     User,
-    get_current_user,
     get_interop_user,
     get_referral_user,
 )
@@ -38,7 +37,7 @@ router = APIRouter(prefix="/facilities", tags=["Facilities (Phase 10)"])
     summary="List facilities (operational metadata)",
 )
 async def list_facilities(
-    user: Annotated[User, Depends(get_referral_user)],
+    _user: Annotated[User, Depends(get_referral_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = FacilityService(session)
@@ -52,7 +51,7 @@ async def list_facilities(
 )
 async def get_facility(
     facility_id: str,
-    user: Annotated[User, Depends(get_referral_user)],
+    _user: Annotated[User, Depends(get_referral_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = FacilityService(session)
@@ -66,7 +65,7 @@ async def get_facility(
 )
 async def create_facility(
     req: FacilityCreateRequest,
-    user: Annotated[User, Depends(get_interop_user)],
+    __user: Annotated[User, Depends(get_interop_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = FacilityService(session)

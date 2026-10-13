@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import uuid
 
-import httpx
 import pytest
 from httpx import AsyncClient
 from sqlalchemy import select
@@ -175,6 +174,38 @@ class TestBudgetUnit:
         )
         assert provider.metered is True
 
+    @pytest.mark.asyncio
+    async def test_resolve_client_awaits_redis(self, monkeypatch):
+        """The default Redis path must be awaited and actually used."""
+        async def fake_get_redis_client():
+            return "the-awaitable-client"
+
+        monkeypatch.setattr(
+            "app.infrastructure.redis.get_redis_client", fake_get_redis_client
+        )
+        result = await budget_module._resolve_client(None)
+        assert result == "the-awaitable-client"
+
+    @pytest.mark.asyncio
+    async def test_redis_tier_is_the_enforcement_path(self, monkeypatch):
+        """Budgets must be enforced through Redis, not the local store."""
+        _budgets(monkeypatch, hourly=2, daily=1000, global_daily=1000)
+        fake = FakeRedis()
+
+        async def fake_get_redis_client():
+            return fake
+
+        monkeypatch.setattr(
+            "app.infrastructure.redis.get_redis_client", fake_get_redis_client
+        )
+        uid = f"redis-{uuid.uuid4().hex[:8]}"
+        await enforce_ai_budget(user_id=uid, operation="op", metered=True)
+        await enforce_ai_budget(user_id=uid, operation="op", metered=True)
+        with pytest.raises(AIBudgetExceededError):
+            await enforce_ai_budget(user_id=uid, operation="op", metered=True)
+        assert fake.calls > 0
+        assert any(":op:hour:" in key for key in fake.data)
+
 
 class TestBudgetServiceWiring:
     @pytest.mark.asyncio
@@ -190,9 +221,11 @@ class TestBudgetServiceWiring:
         s_id, ind_id = await _seed_assessment(db_session, "u-budget")
         _budgets(monkeypatch, hourly=1, daily=1000, global_daily=1000)
         fake = FakeRedis()
-        monkeypatch.setattr(
-            budget_module, "_resolve_client", lambda explicit: fake
-        )
+
+        async def _fake_resolve(explicit):  # noqa: ANN001
+            return fake
+
+        monkeypatch.setattr(budget_module, "_resolve_client", _fake_resolve)
         _explanation_cache.clear()
 
         provider, captured = _chat_client(
@@ -226,8 +259,8 @@ class TestBudgetServiceWiring:
     async def test_intake_extract_passes_user_id_to_budget(
         self, db_session: AsyncSession, monkeypatch
     ):
-        from tests.test_ai_intake_phase3 import _seed_graph
         from app.application.ai.intake_provider import StubClinicalIntakeProvider
+        from tests.test_ai_intake_phase3 import _seed_graph
 
         await _seed_graph(db_session, uid="budex")
         seen: dict = {}

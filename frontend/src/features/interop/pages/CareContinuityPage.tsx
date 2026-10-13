@@ -6,7 +6,6 @@
  * de-identified and small-cell-suppressed.
  */
 import React from 'react'
-import { Activity, Clock, TrendingDown, Stethoscope } from 'lucide-react'
 import { useCareContinuity } from '../hooks/useInteropQueries'
 import {
   SectionCard,

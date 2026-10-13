@@ -10,7 +10,6 @@ import { useNavigate } from 'react-router-dom'
 import { ShieldPlus, Stethoscope, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import AuthLayout from '../components/AuthLayout'
-import Button from '@/shared/ui/Button'
 
 type AccountType = 'patient' | 'doctor'
 

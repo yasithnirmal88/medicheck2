@@ -103,7 +103,7 @@ class StubSpeechToTextProvider:
         audio_bytes: bytes,
         *,
         language: str = DEFAULT_INTAKE_LANGUAGE,
-        content_type: str = "audio/webm",
+        content_type: str = "audio/webm",  # noqa: ARG002 (protocol contract)
     ) -> TranscriptResult:
         if not audio_bytes:
             raise SpeechToTextError("empty audio")

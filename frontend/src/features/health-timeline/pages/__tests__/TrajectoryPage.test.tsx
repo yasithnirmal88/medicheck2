@@ -54,6 +54,7 @@ function point(
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- mock trajectory builder
 function trajectory(p1: any, p2: any, bsPrev: any, bsCurr: any): HealthTrajectory {
   const trend = bsCurr.score > bsPrev.score ? 'worsening' : bsCurr.score < bsPrev.score ? 'improving' : 'stable'
   return {

@@ -246,7 +246,7 @@ KIDNEY_GROUPS: list[dict[str, Any]] = [
 ]
 
 
-def _cv_questions(cv_id: str, groups: dict[str, str]) -> list[dict[str, Any]]:
+def _cv_questions(_cv_id: str, groups: dict[str, str]) -> list[dict[str, Any]]:
     return [
         {
             "group_id": groups["CV_BASIC"],
@@ -443,7 +443,7 @@ def _cv_questions(cv_id: str, groups: dict[str, str]) -> list[dict[str, Any]]:
     ]
 
 
-def _kd_questions(kd_id: str, groups: dict[str, str]) -> list[dict[str, Any]]:
+def _kd_questions(_kd_id: str, groups: dict[str, str]) -> list[dict[str, Any]]:
     return [
         {
             "group_id": groups["KD_BASIC"],

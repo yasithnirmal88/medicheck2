@@ -94,8 +94,8 @@ class SdgExportService:
         self,
         sdg: SDGDashboardResponse,
         continuity,
-        start: date | None,
-        end: date | None,
+        _start: date | None,
+        _end: date | None,
     ) -> list[SdgExportRow]:
         period = f"{sdg.period_start.isoformat()}/{sdg.period_end.isoformat()}"
         rows: list[SdgExportRow] = []
@@ -164,7 +164,7 @@ class SdgExportService:
         ))
         # Referral rate (referred / screened).
         m = continuity.metrics
-        referred_val, referred_supp = (m.referred, m.referred < self._k_check())
+        _referred_val, _referred_supp = (m.referred, m.referred < self._k_check())
         screened_val = m.screened
         ref_rate = None
         ref_supp = False
@@ -210,7 +210,14 @@ class SdgExportService:
         rows.append(_row(
             "sdg-3-8-care-funnel", "SDG 3.8",
             None, False, None, None,
-            "Funnel: screened->flagged->referred->referral_received->appointment_scheduled->care_received->followup_completed. "
+            "Funnel: "
+            + "->".join(
+                stage_label for stage_label in [
+                    "screened", "flagged", "referred", "referral_received",
+                    "appointment_scheduled", "care_received", "followup_completed",
+                ]
+            )
+            + ". "
             + "; ".join(f"{s.stage}={s.count}" + ("(suppressed)" if s.suppressed else "") for s in continuity.funnel),
             "Each stage is k-anonymity-suppressed independently.",
         ))

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Generic, TypeVar
+from typing import TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -23,7 +23,7 @@ class ErrorResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class SuccessResponse(BaseModel, Generic[T]):
+class SuccessResponse[T](BaseModel):
     success: bool = Field(True)
     data: T
 
@@ -43,7 +43,7 @@ class TimestampedResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class PaginationResponse(BaseModel, Generic[T]):
+class PaginationResponse[T](BaseModel):
     items: list[T]
     total: int = 0
     page: int = 1

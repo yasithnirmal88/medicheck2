@@ -42,31 +42,31 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.dtos.chw_dtos import (
     AssignedPatient,
     AssignedPatientsResponse,
+    CachedQuestion,
+    CachedQuestionGroup,
+    CachedQuestionOption,
+    CachedTemplate,
     ChwDashboardResponse,
     ChwSessionSummary,
     ConsentRequest,
     ConsentResponse,
     DeviceRegistrationRequest,
     DeviceRegistrationResponse,
-    OfflineAnswerItem,
     OfflineContentBundleResponse,
     OfflineContentListResponse,
-    SyncPackageRequest,
-    SyncResultResponse,
-    CachedTemplate,
-    CachedQuestionGroup,
-    CachedQuestion,
-    CachedQuestionOption,
     QrHandoffRequest,
     QrHandoffResponse,
+    SyncPackageRequest,
+    SyncResultResponse,
 )
+from app.application.services.answer_values import coerce_float, match_option
 from app.core.exceptions import AuthorizationError, NotFoundError, ValidationError
 from app.identity import get_user_summaries
-from app.infrastructure.persistence.models.assessment_session import (
-    AssessmentSessionModel,
-)
 from app.infrastructure.persistence.models.assessment_answer import (
     AssessmentAnswerModel,
+)
+from app.infrastructure.persistence.models.assessment_session import (
+    AssessmentSessionModel,
 )
 from app.infrastructure.persistence.models.assessment_sync_record import (
     AssessmentSyncRecordModel,
@@ -475,22 +475,41 @@ class ChwService:
                         detail=f"Question {ans.question_id} not found"
                     )
                 score_value = 0.0
+                option_id: str | None = None
+                stored_value: str | None = None
+                numeric_value: float | None = None
                 if not ans.is_skipped:
-                    option_value = ans.response_value.get("value")
-                    if option_value:
+                    raw_value = (
+                        ans.response_value.get("value")
+                        if isinstance(ans.response_value, dict)
+                        else None
+                    )
+                    if raw_value is not None and raw_value != "":
                         o_stmt = select(QuestionOptionModel).where(
                             QuestionOptionModel.question_id == q.id,
                             QuestionOptionModel.is_active.is_(True),
                         )
-                        for o in (await self.session.execute(o_stmt)).scalars().all():
-                            if o.value == str(option_value) or o.code == str(option_value):
-                                score_value = o.score_value
-                                break
+                        options = (await self.session.execute(o_stmt)).scalars().all()
+                        matched = match_option(options, raw_value)
+                        if matched is not None:
+                            score_value = matched.score_value or 0.0
+                            option_id = matched.id
+                            stored_value = (
+                                matched.value
+                                if matched.value is not None
+                                else str(raw_value)
+                            )
+                        else:
+                            stored_value = str(raw_value)
+                        numeric_value = coerce_float(raw_value)
                 answer_model = AssessmentAnswerModel(
                     session_id=session_id,
                     question_id=ans.question_id,
                     question_version=ans.question_version,
                     question_code=q.code,
+                    option_id=option_id,
+                    value=stored_value,
+                    numeric_value=numeric_value,
                     response_value=ans.response_value,
                     score_value=score_value,
                     is_skipped=ans.is_skipped,
@@ -508,10 +527,11 @@ class ChwService:
             session_model.answers_count = len(req.answers)
 
             # 9. Run the deterministic CDSE (server-side, as the patient).
+            from sqlalchemy.orm import selectinload
+
             from app.application.services.clinical_decision_service import (
                 ClinicalDecisionService,
             )
-            from sqlalchemy.orm import selectinload
 
             # Re-fetch the session with answers eager-loaded so the CDSE's
             # ``sess.answers`` access does not trigger a lazy load (which

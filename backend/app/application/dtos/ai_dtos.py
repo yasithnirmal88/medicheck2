@@ -18,7 +18,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-
 # ---------------------------------------------------------------------------
 # Phase 7 — Health literacy levels + AI quality status
 # ---------------------------------------------------------------------------
@@ -262,7 +261,7 @@ class AIExplanationResponse(BaseModel):
     model_config = {"from_attributes": True}
 
     @model_validator(mode="after")
-    def _validate_referenced_ids(self) -> "AIExplanationResponse":
+    def _validate_referenced_ids(self) -> AIExplanationResponse:
         # The allow-lists are injected by the service via context. When this
         # model is constructed directly (e.g. the unavailable fallback) there
         # is nothing to validate, so we only enforce when sets were attached.
@@ -306,7 +305,7 @@ class AIExplanationResponse(BaseModel):
         allowed_indicator_ids: set[str],
         allowed_recommendation_ids: set[str],
         allowed_evidence_ids: set[str] | None = None,
-    ) -> "AIExplanationResponse":
+    ) -> AIExplanationResponse:
         """Attach the deterministic allow-lists so the validator can run.
 
         Called by the service after parsing raw provider output. The evidence

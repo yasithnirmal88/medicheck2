@@ -39,7 +39,7 @@ router = APIRouter(prefix="/cms", tags=["CMS"])
 
 @router.get("/questions")
 async def cms_list_questions(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLQuestionRepository(session)
@@ -143,7 +143,7 @@ async def cms_update_question(
 @router.delete("/questions/{id}")
 async def cms_delete_question(
     id: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLQuestionRepository(session)
@@ -154,7 +154,7 @@ async def cms_delete_question(
 @router.get("/questions/{id}/versions")
 async def cms_get_question_versions(
     id: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     from sqlalchemy import select
@@ -216,7 +216,7 @@ async def cms_create_question_version(
 @router.post("/questions/{id}/options")
 async def cms_add_option(
     id: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict[str, Any] = Body(...),
 ):
@@ -240,9 +240,9 @@ async def cms_add_option(
 
 @router.put("/questions/{id}/options/{opt_id}")
 async def cms_update_option(
-    id: str,
+    id: str,  # noqa: ARG001
     opt_id: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict[str, Any] = Body(...),
 ):
@@ -277,9 +277,9 @@ async def cms_update_option(
 
 @router.delete("/questions/{id}/options/{opt_id}")
 async def cms_delete_option(
-    id: str,
+    id: str,  # noqa: ARG001
     opt_id: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLQuestionOptionRepository(session)
@@ -299,7 +299,7 @@ async def cms_delete_option(
 @router.post("/questions/{id}/dependencies")
 async def cms_add_dependency(
     id: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict[str, Any] = Body(...),
 ):
@@ -331,9 +331,9 @@ async def cms_add_dependency(
 
 @router.delete("/questions/{id}/dependencies/{dep_id}")
 async def cms_remove_dependency(
-    id: str,
+    id: str,  # noqa: ARG001
     dep_id: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     from sqlalchemy import select
@@ -356,7 +356,7 @@ async def cms_remove_dependency(
 
 @router.get("/body-systems")
 async def cms_list_body_systems(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLBodySystemRepository(session)
@@ -367,7 +367,7 @@ async def cms_list_body_systems(
 @router.put("/body-systems/{code}")
 async def cms_update_body_system(
     code: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict[str, Any] = Body(...),
 ):
@@ -402,7 +402,7 @@ async def cms_update_body_system(
 
 @router.get("/question-groups")
 async def cms_list_question_groups(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     body_system_id: str | None = None,
 ):
@@ -424,7 +424,7 @@ async def cms_list_question_groups(
 
 @router.post("/question-groups")
 async def cms_create_question_group(
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict[str, Any] = Body(...),
 ):
@@ -445,7 +445,7 @@ async def cms_create_question_group(
 @router.put("/question-groups/{id}")
 async def cms_update_question_group(
     id: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict[str, Any] = Body(...),
 ):
@@ -477,7 +477,7 @@ async def cms_update_question_group(
 
 @router.get("/templates")
 async def cms_list_templates(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLQuestionnaireRepository(session)
@@ -487,7 +487,7 @@ async def cms_list_templates(
 
 @router.post("/templates")
 async def cms_create_template(
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict[str, Any] = Body(...),
 ):
@@ -510,7 +510,7 @@ async def cms_create_template(
 @router.put("/templates/{id}")
 async def cms_update_template(
     id: str,
-    admin: Annotated[User, Depends(get_current_admin)],
+    __admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict[str, Any] = Body(...),
 ):

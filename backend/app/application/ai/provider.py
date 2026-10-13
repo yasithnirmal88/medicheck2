@@ -53,7 +53,7 @@ class AIProviderError(RuntimeError):
     """
 
 
-class AIValidationFailure(RuntimeError):
+class AIValidationError(RuntimeError):
     """Raised when the AI returns a syntactically or semantically invalid
     response (non-JSON, unknown indicator id, hallucinated citation).
 

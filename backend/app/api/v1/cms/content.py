@@ -206,9 +206,9 @@ async def create_content(
         item = await svc.create_entity(canonical, data, user.id)
         return item
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
     except TypeError as e:
-        raise HTTPException(400, f"Invalid data: {e}")
+        raise HTTPException(400, f"Invalid data: {e}") from e
 
 
 @router.put("/{entity_type}/{entity_id}")
@@ -233,7 +233,7 @@ async def update_content(
         item = await svc.update_entity(canonical, entity_id, data, user.id)
         return item
     except ValueError as e:
-        raise HTTPException(404 if "not found" in str(e) else 400, str(e))
+        raise HTTPException(404 if "not found" in str(e) else 400, str(e)) from e
 
 
 @router.delete("/{entity_type}/{entity_id}")
@@ -278,13 +278,13 @@ async def update_content_status(
         )
         return item
     except ValueError as e:
-        raise HTTPException(400, str(e))
+        raise HTTPException(400, str(e)) from e
 
 
 @router.get("/{entity_type}/count")
 async def count_content(
     entity_type: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    __user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     status: str | None = Query(None),
 ):

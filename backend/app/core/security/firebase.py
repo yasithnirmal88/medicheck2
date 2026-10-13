@@ -94,9 +94,15 @@ def _verify_id_token_sync(id_token: str, app: firebase_admin.App) -> dict[str, A
 async def verify_firebase_token(id_token: str) -> dict[str, Any]:
     app = get_firebase_app()
     if app is None:
+        # SECURITY: mock auth is a LOCAL DEVELOPMENT convenience only. In a
+        # deployed environment (staging/production) we never fall back to it,
+        # even if ALLOW_MOCK_AUTH was mistakenly left enabled - a real auth
+        # backend is required.
+        if settings.environment in (Environment.STAGING, Environment.PRODUCTION):
+            raise AuthenticationError(
+                detail="Firebase is not configured - authentication is required"
+            )
         if not settings.allow_mock_auth:
-            if settings.environment in (Environment.STAGING, Environment.PRODUCTION):
-                raise AuthenticationError(detail="Firebase is not configured - authentication is required")
             raise AuthenticationError(
                 detail="Firebase is not configured. Set allow_mock_auth=True for development only."
             )

@@ -36,8 +36,8 @@ from typing import Any
 
 import httpx
 
-from app.application.ai.intake_provider import AIIntakeProviderError
 from app.application.ai.intake_prompts import INTAKE_SYSTEM_PROMPT
+from app.application.ai.intake_provider import AIIntakeProviderError
 from app.application.ai.longitudinal_prompts import LONGITUDINAL_SYSTEM_PROMPT
 from app.application.ai.longitudinal_provider import (
     AIProviderError as LongitudinalProviderError,

@@ -41,7 +41,14 @@ class ClinicalEvidenceService:
                             "journal": result.get("fulljournalname", ""),
                             "pub_date": result.get("pubdate", ""),
                             "authors": authors,
-                            "doi": next((id_obj.get("value") for id_obj in result.get("articleids", []) if id_obj.get("idtype") == "doi"), None),
+                            "doi": next(
+                                (
+                                    id_obj.get("value")
+                                    for id_obj in result.get("articleids", [])
+                                    if id_obj.get("idtype") == "doi"
+                                ),
+                                None,
+                            ),
                             "source": "PubMed",
                         }
         except Exception as e:

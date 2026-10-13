@@ -68,14 +68,19 @@ class _LocalBudgetStore:
 _LOCAL_STORE = _LocalBudgetStore()
 
 
-def _resolve_client(explicit: Any | None) -> Any | None:
-    """Return an async Redis client, or None when unavailable (→ local)."""
+async def _resolve_client(explicit: Any | None) -> Any | None:
+    """Return an awaited async Redis client, or None when unavailable (→ local).
+
+    ``get_redis_client()`` is itself async (it pings the pool), so this
+    MUST be awaited - returning the bare coroutine would silently disable
+    the Redis tier and emit a "coroutine was never awaited" warning.
+    """
     if explicit is not None:
         return explicit
     try:
         from app.infrastructure.redis import get_redis_client
 
-        return get_redis_client()
+        return await get_redis_client()
     except Exception as exc:
         logger.warning(
             "AI budget: redis unavailable (%s); using local fallback",
@@ -135,7 +140,7 @@ async def enforce_ai_budget(
     if not metered:
         return
     now = time.time()
-    client = _resolve_client(redis_client)
+    client = await _resolve_client(redis_client)
     for key, limit, ttl, label, scope in _tiers(user_id, operation, now):
         if not limit or limit <= 0:
             continue  # tier disabled
