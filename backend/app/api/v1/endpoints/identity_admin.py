@@ -63,17 +63,9 @@ async def list_users(
     search: str | None = Query(None),
 ):
     repo = SQLUserRepository(session)
-    users = await repo.find_all(skip=skip, limit=limit)
-    total = await repo.count()
+    users = await repo.find_all(skip=skip, limit=limit, search=search)
+    total = await repo.count(search=search)
     items = [u.to_dict() for u in users]
-    if search:
-        s = search.lower()
-        items = [
-            i for i in items
-            if s in (i.get("email") or "").lower()
-            or s in (i.get("full_name") or "").lower()
-        ]
-        total = len(items)
     return {"items": items, "total": total, "skip": skip, "limit": limit}
 
 

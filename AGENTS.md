@@ -978,3 +978,53 @@ First enforced bounded-context boundary (microservices extraction path).
   review. Generated `frontend/src/api/generated/model/registerRequest*.ts`
   still carries the stale `role` field (regenerate via `export_openapi` +
   orval when convenient; harmless -- unused).
+
+## Security & RBAC hardening (section 2 — branch fix/security-rbac-hardening, off medicheck2/main)
+Read before touching auth identity, profile section writes, admin user listing,
+or the audit middleware.
+- **2.1 nullable email**: Firebase PHONE-auth tokens carry no `email` claim.
+  `User.email` is now `str | None` and `User.create` normalizes
+  `(email or "").strip().lower() or None`; `UserModel.email` is `nullable=True`
+  (unique allows multiple NULLs). `deps.get_current_user` / `auth_service` coerce
+  `claims.get("email") or None`; the 3 auth DTOs (`VerifyTokenResponse`,
+  `AuthenticatedUserResponse`, `UserResponse`) have a `field_validator("email",
+  mode="before")` turning `""` -> None. Migration
+  `20261013_users_email_nullable` (down_revision `20261013_merge_phase11_heads`,
+  single head) drops NOT NULL on PG; SQLite no-op (create_all). Without this, a
+  phone-only user 500'd on `/auth/me` (EmailStr rejects `""`) and collided on the
+  unique constraint.
+- **2.2 profile mass assignment**: `sql_profile_repository._assignable_values(
+  model, data)` whitelists real columns minus `_PROTECTED_COLUMNS={id,profile_id,
+  created_at,updated_at,deleted_at}`; applied in every `upsert_*` / `add_*`.
+  Client keys can no longer set a foreign `profile_id`/`id` or un-delete rows.
+- **2.3 list_users search is SQL-side**: `UserRepository.find_all`/`count` take
+  `search: str | None` (ilike on email/full_name via `or_`); `identity_admin.
+  list_users` passes it down, so `total` reflects the filtered set (was filtering
+  AFTER pagination -> wrong `total`/empty pages).
+- **2.4 identity boundary**: `get_chw_operational_user`, `get_population_insight_user`,
+  `get_insight_reviewer_user` are exported from `app.identity` (added to
+  `IDENTITY_DEP_NAMES` + facade test); phase-11 endpoints import them from there.
+- **2.5 get_current_doctor**: fixed comparison (was `user_roles & clinician_roles`
+  mixing strings with Role enums); now `user_roles & {r.value for r in
+  clinician_roles}`. Function is currently unreferenced (kept correct anyway).
+- **2.6 audit identity not spoofable**: `get_current_user` sets
+  `request.state.user_id = user.id`; both `AuditLogMiddleware` (live
+  `app/api/middleware.py`) and the dead `app/api/middleware/audit.py` log
+  `getattr(request.state,"user_id",None) or "anonymous"` instead of the
+  client-supplied `x-user-id` header.
+- **2.7 dead security config**: `csrf_protection_enabled` defaulted to False
+  (stateless Bearer API; CSRFProtectMiddleware is never added); the commented
+  `# app.add_middleware(CSRFProtectMiddleware)` line was removed; `SECRET_KEY`
+  warnings in `config.py`/`main.py` corrected (reserved, not used for Firebase
+  tokens).
+- **Also fixed here (pre-existing, found while testing)**: `auth.py` register
+  still passed the removed `role=request.role` -> AttributeError/500; removed.
+  `ProfileVersionModel.created_at` shadowed BaseModel's `server_default` with no
+  default -> every profile section write 500'd (`profile_versions.created_at`
+  NOT NULL); restored `server_default=func.now()`. Profile writes now work.
+- Tests: `backend/tests/test_security_rbac_section2.py` (8: email nullability,
+  mass-assignment, SQL search, audit non-spoofable). Regression verified:
+  auth/RBAC/profile/identity/migrations/production-readiness/register/user-roles,
+  `test_critical_production_fixes`, `test_mock_auth_unique_email`,
+  `test_emergency_contact_p3`, `test_profile_service_p3`, phase-11 (51), clinical
+  (17) — all pass; `ruff check backend/app` clean.

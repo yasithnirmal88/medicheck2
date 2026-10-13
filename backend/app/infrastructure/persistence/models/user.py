@@ -18,8 +18,8 @@ class UserModel(BaseModel):
     firebase_uid: Mapped[str] = mapped_column(
         String(128), unique=True, nullable=False
     )
-    email: Mapped[str] = mapped_column(
-        String(255), unique=True, nullable=False
+    email: Mapped[str | None] = mapped_column(
+        String(255), unique=True, nullable=True
     )
     full_name: Mapped[str] = mapped_column(String(255), nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -46,7 +46,7 @@ class UserModel(BaseModel):
         return {
             "id": self.id,
             "firebase_uid": self.firebase_uid,
-            "email": self.email,
+            "email": self.email if self.email else None,
             "full_name": self.full_name,
             "avatar_url": self.avatar_url,
             "email_verified": self.email_verified,

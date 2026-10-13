@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import insert, select, update
+from sqlalchemy import Column, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -19,6 +19,16 @@ from app.infrastructure.persistence.models.nutrition import NutritionModel
 from app.infrastructure.persistence.models.personal_info import PersonalInfoModel
 from app.infrastructure.persistence.models.profile_version import ProfileVersionModel
 from app.infrastructure.persistence.models.surgical_history import SurgicalHistoryModel
+
+#: ORM-managed keys that callers may never set through profile section payloads.
+_PROTECTED_COLUMNS = {"id", "profile_id", "created_at", "updated_at", "deleted_at"}
+
+
+def _assignable_values(model: type, data: dict) -> dict:
+    """Mass-assignment guard: only accept real columns, never ORM-managed
+    identifiers/timestamps. Arbitrary client keys are dropped."""
+    cols = {c.key for c in model.__table__.columns if isinstance(c, Column)}
+    return {k: v for k, v in data.items() if k in cols and k not in _PROTECTED_COLUMNS}
 
 
 class SQLProfileRepository:
@@ -63,6 +73,7 @@ class SQLProfileRepository:
         return await self.create_for_user(user_id)
 
     async def upsert_personal_info(self, profile_id: str, data: dict) -> None:
+        data = _assignable_values(PersonalInfoModel, data)
         q = select(PersonalInfoModel).where(PersonalInfoModel.profile_id == profile_id)
         r = await self.session.execute(q)
         row = r.scalars().first()
@@ -78,6 +89,7 @@ class SQLProfileRepository:
         await self.session.execute(ins)
 
     async def upsert_lifestyle(self, profile_id: str, data: dict) -> None:
+        data = _assignable_values(LifestyleModel, data)
         q = select(LifestyleModel).where(LifestyleModel.profile_id == profile_id)
         r = await self.session.execute(q)
         row = r.scalars().first()
@@ -93,6 +105,7 @@ class SQLProfileRepository:
         await self.session.execute(ins)
 
     async def upsert_nutrition(self, profile_id: str, data: dict) -> None:
+        data = _assignable_values(NutritionModel, data)
         q = select(NutritionModel).where(NutritionModel.profile_id == profile_id)
         r = await self.session.execute(q)
         row = r.scalars().first()
@@ -111,6 +124,7 @@ class SQLProfileRepository:
     async def add_medical_history(
         self, profile_id: str, data: dict
     ) -> MedicalHistoryModel:
+        data = _assignable_values(MedicalHistoryModel, data)
         ins = insert(MedicalHistoryModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
         # return latest
@@ -134,6 +148,7 @@ class SQLProfileRepository:
     async def add_medication(
         self, profile_id: str, data: dict
     ) -> MedicationHistoryModel:
+        data = _assignable_values(MedicationHistoryModel, data)
         ins = insert(MedicationHistoryModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
         q = (
@@ -154,6 +169,7 @@ class SQLProfileRepository:
         return r.scalars().all()
 
     async def add_surgery(self, profile_id: str, data: dict) -> SurgicalHistoryModel:
+        data = _assignable_values(SurgicalHistoryModel, data)
         ins = insert(SurgicalHistoryModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
         q = (
@@ -176,6 +192,7 @@ class SQLProfileRepository:
     async def add_family_history(
         self, profile_id: str, data: dict
     ) -> FamilyHistoryModel:
+        data = _assignable_values(FamilyHistoryModel, data)
         ins = insert(FamilyHistoryModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
         q = (
@@ -196,6 +213,7 @@ class SQLProfileRepository:
         return r.scalars().all()
 
     async def add_allergy(self, profile_id: str, data: dict) -> AllergyModel:
+        data = _assignable_values(AllergyModel, data)
         ins = insert(AllergyModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
         q = (
@@ -216,6 +234,7 @@ class SQLProfileRepository:
         return r.scalars().all()
 
     async def add_immunization(self, profile_id: str, data: dict) -> ImmunizationModel:
+        data = _assignable_values(ImmunizationModel, data)
         ins = insert(ImmunizationModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
         q = (
@@ -236,6 +255,7 @@ class SQLProfileRepository:
         return r.scalars().all()
 
     async def add_measurement(self, profile_id: str, data: dict) -> MeasurementModel:
+        data = _assignable_values(MeasurementModel, data)
         ins = insert(MeasurementModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
         q = (
@@ -256,6 +276,7 @@ class SQLProfileRepository:
         return r.scalars().all()
 
     async def add_lab_report(self, profile_id: str, data: dict) -> LabReportModel:
+        data = _assignable_values(LabReportModel, data)
         ins = insert(LabReportModel).values(profile_id=profile_id, **data)
         await self.session.execute(ins)
         q = (

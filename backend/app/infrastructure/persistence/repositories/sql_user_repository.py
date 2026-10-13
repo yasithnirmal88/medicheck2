@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -66,7 +66,7 @@ class SQLUserRepository(UserRepository):
         return User(
             id=model.id,
             firebase_uid=model.firebase_uid,
-            email=model.email,
+            email=model.email if getattr(model, "email", None) else None,
             full_name=model.full_name,
             avatar_url=model.avatar_url,
             email_verified=model.email_verified,
@@ -104,7 +104,7 @@ class SQLUserRepository(UserRepository):
             raise ValueError(f"User with id {user.id} not found")
 
         model.firebase_uid = user.firebase_uid
-        model.email = user.email
+        model.email = user.email if user.email else None
         model.full_name = user.full_name
         model.avatar_url = user.avatar_url
         model.email_verified = user.email_verified
@@ -129,19 +129,34 @@ class SQLUserRepository(UserRepository):
         skip: int = 0,
         limit: int = 100,
         include_deleted: bool = False,
+        search: str | None = None,
     ) -> list[User]:
-        stmt = self._base_query().offset(skip).limit(limit)
+        stmt = self._base_query()
         if not include_deleted:
             stmt = stmt.where(UserModel.deleted_at.is_(None))
-        stmt = stmt.order_by(UserModel.created_at.desc())
+        if search:
+            stmt = stmt.where(
+                or_(
+                    UserModel.email.ilike(f"%{search}%"),
+                    UserModel.full_name.ilike(f"%{search}%"),
+                )
+            )
+        stmt = stmt.order_by(UserModel.created_at.desc()).offset(skip).limit(limit)
         result = await self._session.execute(stmt)
         models = result.scalars().all()
         return [self._to_entity(m) for m in models]
 
-    async def count(self, include_deleted: bool = False) -> int:
+    async def count(self, include_deleted: bool = False, search: str | None = None) -> int:
         stmt = select(func.count(UserModel.id))
         if not include_deleted:
             stmt = stmt.where(UserModel.deleted_at.is_(None))
+        if search:
+            stmt = stmt.where(
+                or_(
+                    UserModel.email.ilike(f"%{search}%"),
+                    UserModel.full_name.ilike(f"%{search}%"),
+                )
+            )
         result = await self._session.execute(stmt)
         return result.scalar() or 0
 
@@ -149,10 +164,13 @@ class SQLUserRepository(UserRepository):
         roles = set()
         if not is_new and hasattr(model, "roles") and model.roles is not None:
             roles = {r.code for r in model.roles}
+        email = getattr(model, "email", None)
+        if isinstance(email, str) and email.strip() == "":
+            email = None
         return User(
             id=model.id,
             firebase_uid=model.firebase_uid,
-            email=model.email,
+            email=email,
             full_name=model.full_name,
             avatar_url=model.avatar_url,
             email_verified=model.email_verified,

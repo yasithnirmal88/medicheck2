@@ -16,7 +16,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_chw_operational_user, get_db
+from app.api.deps import get_db
 from app.application.dtos.ai_governance_dtos import (
     OperationalSuggestionBatchResponse,
     OperationalSuggestionRecord,
@@ -24,7 +24,7 @@ from app.application.dtos.ai_governance_dtos import (
 from app.application.services.ai_operational_suggestion_service import (
     AiOperationalSuggestionService,
 )
-from app.identity import User
+from app.identity import User, get_chw_operational_user
 
 router = APIRouter(
     prefix="/ai-care-coordination", tags=["ai-care-coordination"]

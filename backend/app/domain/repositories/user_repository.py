@@ -36,9 +36,10 @@ class UserRepository(ABC):
         skip: int = 0,
         limit: int = 100,
         include_deleted: bool = False,
+        search: str | None = None,
     ) -> list[User]:
         pass
 
     @abstractmethod
-    async def count(self, include_deleted: bool = False) -> int:
+    async def count(self, include_deleted: bool = False, search: str | None = None) -> int:
         pass

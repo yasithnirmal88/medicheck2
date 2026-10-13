@@ -47,6 +47,13 @@ class VerifyTokenResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def _normalize_email(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr = Field(..., description="Email to send reset link to")
@@ -88,9 +95,18 @@ class AuthenticatedUserResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def _normalize_email(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
     @classmethod
     def from_entity(cls, user: Any) -> AuthenticatedUserResponse:
         data = user.to_dict() if hasattr(user, "to_dict") else user
+        if isinstance(data, dict) and isinstance(data.get("email"), str) and data["email"].strip() == "":
+            data["email"] = None
         return cls(**data)
 
 
@@ -124,9 +140,18 @@ class UserResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+    @field_validator("email", mode="before")
+    @classmethod
+    def _normalize_email(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
+
     @classmethod
     def from_entity(cls, user: Any) -> UserResponse:
         data = user.to_dict() if hasattr(user, "to_dict") else user
+        if isinstance(data, dict) and isinstance(data.get("email"), str) and data["email"].strip() == "":
+            data["email"] = None
         return cls(**data)
 
 

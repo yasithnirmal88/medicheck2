@@ -22,11 +22,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import (
-    get_db,
-    get_insight_reviewer_user,
-    get_population_insight_user,
-)
+from app.api.deps import get_db
 from app.application.dtos.ai_governance_dtos import (
     EquityInsightResponse,
     InsightReviewResponse,
@@ -44,7 +40,7 @@ from app.application.services.equity_intelligence_service import (
 from app.application.services.population_narrative_service import (
     PopulationNarrativeService,
 )
-from app.identity import User
+from app.identity import User, get_insight_reviewer_user, get_population_insight_user
 
 router = APIRouter(prefix="/ai-equity", tags=["ai-equity-intelligence"])
 
