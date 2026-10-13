@@ -272,3 +272,73 @@ async def get_sdg_export_user(
     if not check_permission(all_perms, Permission.SDG_EXPORT):
         raise AuthorizationError(detail="SDG export access required")
     return current_user
+
+
+def _user_permissions(user: User) -> set[Permission]:
+    perms: set[Permission] = set()
+    for r in user.roles or set():
+        try:
+            perms |= get_role_permissions(Role(r))
+        except ValueError:
+            continue
+    return perms
+
+
+async def get_chw_operational_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """CHW operational AI suggestion access (Phase 11).
+
+    Admits CHWs (own assigned work only — per-operation assignment is verified
+    at the service layer, IDOR protection) and senior staff (medical director /
+    super admin) for supervision. Patients and CMS-only roles are denied.
+    The suggestions are operational/administrative assistance ONLY — they never
+    determine clinical priority, severity, or urgency.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="Operational AI access required")
+    if not check_permission(
+        _user_permissions(current_user),
+        Permission.AI_VIEW_OPERATIONAL_SUGGESTIONS,
+    ):
+        raise AuthorizationError(detail="Operational AI access required")
+    return current_user
+
+
+async def get_population_insight_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """Population AI insight access (Phase 11).
+
+    Requires AI_VIEW_POPULATION_INSIGHTS permission. Granted to
+    RESEARCH_REVIEWER, MEDICAL_DIRECTOR, SUPER_ADMIN. Returns de-identified,
+    aggregated insights only — never individual patient data.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="Population insight access required")
+    if not check_permission(
+        _user_permissions(current_user),
+        Permission.AI_VIEW_POPULATION_INSIGHTS,
+    ):
+        raise AuthorizationError(detail="Population insight access required")
+    return current_user
+
+
+async def get_insight_reviewer_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """AI insight review/publish access (Phase 11).
+
+    Requires AI_REVIEW_INSIGHTS permission. Granted to RESEARCH_REVIEWER,
+    MEDICAL_DIRECTOR, SUPER_ADMIN. Reviewers may approve/reject/edit AI-generated
+    operational or population insights. AI never self-publishes — only a human
+    reviewer can move an insight to PUBLISHED.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="AI review access required")
+    if not check_permission(
+        _user_permissions(current_user),
+        Permission.AI_REVIEW_INSIGHTS,
+    ):
+        raise AuthorizationError(detail="AI review access required")
+    return current_user

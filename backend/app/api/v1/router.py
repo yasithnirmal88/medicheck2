@@ -12,6 +12,12 @@ from app.api.v1.cms.publishing import router as cms_publishing_router
 from app.api.v1.cms.questions import router as cms_router
 from app.api.v1.cms.rules import router as cms_rules_router
 from app.api.v1.endpoints.admin import router as admin_router
+from app.api.v1.endpoints.ai_care_coordination import (
+    router as ai_care_coordination_router,
+)
+from app.api.v1.endpoints.ai_equity_intelligence import (
+    router as ai_equity_intelligence_router,
+)
 from app.api.v1.endpoints.ai_governance import router as ai_governance_router
 from app.api.v1.endpoints.ai_health import router as ai_health_router
 from app.api.v1.endpoints.ai_intake import router as ai_intake_router
@@ -66,3 +72,6 @@ router.include_router(cms_dashboard_router)
 router.include_router(interoperability_router)
 router.include_router(referrals_router)
 router.include_router(facilities_router)
+# Phase 11 — governed AI care coordination & equity intelligence.
+router.include_router(ai_care_coordination_router)
+router.include_router(ai_equity_intelligence_router)

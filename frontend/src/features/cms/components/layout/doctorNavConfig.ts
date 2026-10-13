@@ -26,6 +26,8 @@ import {
   Users,
   Building2,
   ClipboardList,
+  Scale,
+  Sparkles,
 } from 'lucide-react'
 
 export interface DoctorNavItem {
@@ -106,6 +108,14 @@ export const doctorNavGroups: DoctorNavGroup[] = [
       { label: 'Care Continuity', path: '/cms/interop/care-continuity', icon: Network },
       { label: 'Facilities & Referrals', path: '/cms/interop/facilities', icon: Building2 },
       { label: 'CHW Queue', path: '/cms/interop/chw-queue', icon: ClipboardList },
+    ],
+  },
+  {
+    label: 'AI Governance',
+    items: [
+      { label: 'CHW Suggestions', path: '/cms/ai-governance/chw-suggestions', icon: Sparkles },
+      { label: 'Equity Intelligence', path: '/cms/ai-governance/equity', icon: Scale },
+      { label: 'SDG Narratives', path: '/cms/ai-governance/sdg-narratives', icon: Globe2 },
     ],
   },
 ]

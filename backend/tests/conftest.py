@@ -49,7 +49,7 @@ def get_test_settings(database_url: str) -> Settings:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def test_settings(tmp_path_factory) -> Settings:
     tmp_dir = tmp_path_factory.mktemp("pytest-db")
     db_file = tmp_dir / "test_db.sqlite"
@@ -67,10 +67,10 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 @pytest_asyncio.fixture
 async def db_session(test_settings: Settings) -> AsyncGenerator[AsyncSession, None]:
     """
-    Provide an isolated temporary SQLite database per test session.
+    Provide an isolated temporary SQLite database per test module.
 
-    Uses a shared test_settings fixture so the database URL is consistent
-    across the HTTP client and SQLAlchemy engine.
+    Uses a module-scoped test_settings fixture so the database URL stays
+    consistent within a module while avoiding cross-file leakage.
     """
     engine = create_async_engine(
         test_settings.database_url,

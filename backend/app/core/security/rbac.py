@@ -112,6 +112,18 @@ class Permission(str, Enum):
     # SDG / population export (research/public-health). Reuses the
     # analytics gating philosophy: de-identified aggregates only.
     SDG_EXPORT = "sdg:export"
+    # Phase 11 — Governed AI care coordination & equity intelligence.
+    # AI_VIEW_OPERATIONAL_SUGGESTIONS: CHW may view AI operational suggestions
+    # for their OWN assigned referrals (assignment-verified per-operation). The
+    # suggestions are operational/administrative assistance ONLY — they never
+    # determine clinical priority, severity, or urgency.
+    AI_VIEW_OPERATIONAL_SUGGESTIONS = "ai:view:operational_suggestions"
+    # AI_VIEW_POPULATION_INSIGHTS: view de-identified AI population/equity/SDG
+    # insights (aggregated only, never individual patients).
+    AI_VIEW_POPULATION_INSIGHTS = "ai:view:population_insights"
+    # AI_REVIEW_INSIGHTS: approve/reject/edit AI-generated operational or
+    # population insights before publication. AI never self-publishes.
+    AI_REVIEW_INSIGHTS = "ai:review:insights"
 
 
 class Role(str, Enum):
@@ -253,6 +265,10 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         # assigned patients (assignment verified per-operation). No FHIR_EXPORT_ANY,
         # no INTEROP_MANAGE, no SDG_EXPORT.
         Permission.REFERRAL_MANAGE,
+        # Phase 11 — CHW may view AI operational suggestions for their OWN
+        # assigned work (operational/administrative only; never clinical
+        # priority). Per-operation assignment still enforced (IDOR).
+        Permission.AI_VIEW_OPERATIONAL_SUGGESTIONS,
     },
     Role.DOCTOR: {
         Permission.READ_USER,
@@ -344,6 +360,11 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         # Phase 10 — research reviewers may export de-identified SDG aggregates.
         # No patient-level FHIR_EXPORT_ANY, no INTEROP_MANAGE.
         Permission.SDG_EXPORT,
+        # Phase 11 — research reviewers may view + review de-identified AI
+        # population/equity/SDG insights. They do NOT get operational
+        # suggestion access (that is CHW/clinician/admin scoped).
+        Permission.AI_VIEW_POPULATION_INSIGHTS,
+        Permission.AI_REVIEW_INSIGHTS,
     } | _READ_ALL,
     Role.MEDICAL_DIRECTOR: {
         Permission.READ_USER,
@@ -364,6 +385,11 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.INTEROP_MANAGE,
         Permission.REFERRAL_MANAGE,
         Permission.SDG_EXPORT,
+        # Phase 11 — full governed-AI authority: operational suggestions,
+        # population insights, and review/publish control.
+        Permission.AI_VIEW_OPERATIONAL_SUGGESTIONS,
+        Permission.AI_VIEW_POPULATION_INSIGHTS,
+        Permission.AI_REVIEW_INSIGHTS,
     } | _READ_ALL | _WRITE_ALL,
     Role.SUPER_ADMIN: {
         Permission.READ_USER,
@@ -387,6 +413,10 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.INTEROP_MANAGE,
         Permission.REFERRAL_MANAGE,
         Permission.SDG_EXPORT,
+        # Phase 11 — full governed-AI authority.
+        Permission.AI_VIEW_OPERATIONAL_SUGGESTIONS,
+        Permission.AI_VIEW_POPULATION_INSIGHTS,
+        Permission.AI_REVIEW_INSIGHTS,
     } | _READ_ALL | _WRITE_ALL,
 }
 

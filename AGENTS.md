@@ -691,6 +691,119 @@ mappings: `MEDICHECK_SDG_INDICATOR_MAPPING.md`.
 - No real hospital/government integrations built (standards-compatible interfaces
   + documented integration points; mock/demo adapters where real systems absent).
 
+## Phase 11 — Governed AI Care Coordination & Equity Intelligence (feat/governed-ai-care-coordination-phase11)
+Full report: `MEDICHECK_PHASE11_REPORT.md`. Baseline: `MEDICHECK_PHASE11_BASELINE.md`.
+Builds additively on Phases 1–10 (merged to main at c03cfa3). NO clinical
+tables / CDSE / scoring / report / referral-clinical-priority modified.
+
+### Core invariant (NEVER violate)
+AI is an operational/explanation layer ONLY. It NEVER diagnoses, scores, sets
+severity, determines clinical probability/urgency, ranks by disease
+severity/probability/mortality, infers disease prevalence/causation from
+aggregates, self-publishes, or identifies individuals. The CDSE remains the
+ONLY clinical authority. Every AI insight follows:
+`AI suggestion → validated structured data → human review → existing workflow`.
+
+### Backend architecture (key files — read before touching)
+- RBAC (`app/core/security/rbac.py`, additive): 3 new permissions —
+  `AI_VIEW_OPERATIONAL_SUGGESTIONS` (CHW/MEDICAL_DIRECTOR/SUPER_ADMIN; CHW
+  sees OWN suggestions only), `AI_VIEW_POPULATION_INSIGHTS`
+  (RESEARCH_REVIEWER/MEDICAL_DIRECTOR/SUPER_ADMIN),
+  `AI_REVIEW_INSIGHTS` (RESEARCH_REVIEWER/MEDICAL_DIRECTOR/SUPER_ADMIN).
+  Mock-auth users (no roles) denied all three.
+- Config (`app/core/config.py`, additive): Phase 11 settings.
+- Deps (`app/api/deps.py`, additive): `get_operational_suggestions_user`,
+  `get_population_insights_user`, `get_insight_review_user`.
+- Models (NEW, additive tables):
+  - `ai_operational_suggestion.py` `AiOperationalSuggestionModel` — id,
+    chw_user_id, task_id, operational_reason_codes (JSON), explanation,
+    operational_priority_score, requires_human_review, provider, model,
+    prompt_version, quality_status, quality_reason, review_status,
+    reviewer_id, reviewer_comment, edited_output, approved_at, created_at.
+  - `ai_population_insight.py` `AiPopulationInsightModel` — id, insight_type
+    (equity|sdg_narrative), target, period_start/end, narrative,
+    observed_findings/possible_interpretations (JSON), limitations,
+    requires_human_review, provider/model/prompt_version, quality_status/
+    reason, review_status, reviewer fields, edited_output, approved_at,
+    created_at.
+- Migration `alembic/versions/20260812_ai_insights_phase11.py` — additive +
+  idempotent; down_revision=20260810_ai_interaction_audits. NO existing
+  table altered.
+- DTOs `app/application/dtos/ai_governance_dtos.py` —
+  OperationalQueueContext/Suggestion, EquityInsightContext/Output/Finding/
+  Interpretation/MetricContext, SdgNarrativeContext/Output, ReviewRequest
+  (action=approve|reject|edit), InsightReviewResponse. Allow-list validators
+  reject hallucinated/clinical content.
+- Providers (deterministic stubs, NO external API):
+  - `operational_suggestion_provider.py` — StubOperationalSuggestionProvider
+    (name="operational-stub"). OPERATIONAL_REASON_CODES fixed allow-list
+    (overdue/missing_follow_up/aged_referral/appointment_window/unresolved_admin/
+    unsuccessful_contact/facility_unresponsive/offline_pending_sync/
+    no_outstanding_flags). `assert_non_clinical()` rejects clinical terms.
+  - `equity_intelligence_provider.py` — StubEquityIntelligenceProvider
+    (name="equity-stub"). `assert_non_causal()` rejects prevalence/causation/
+    individual-identification claims.
+  - `population_narrative_provider.py` — StubPopulationNarrativeProvider
+    (name="sdg-narrative-stub"). `assert_narrative_safe()` rejects "has been
+    achieved"/"official UN indicator" claims.
+- Services:
+  - `ai_operational_suggestion_service.py` — own-only (chw_user_id==caller),
+    reads referral operational state READ-ONLY, generates + persists
+    suggestions. Never reads/writes clinical priority.
+  - `equity_intelligence_service.py` — consumes Phase 6 ALREADY-DE-IDENTIFIED
+    + k-suppressed aggregates (AI never sees raw patient data). Service-level
+    `_validate_output()` = defense-in-depth against lying providers.
+  - `population_narrative_service.py` — SDG narratives over pre-suppressed
+    aggregates; service-level validation.
+  - `ai_insight_review_service.py` — deterministic review state machine:
+    generated→pending_review→approved→published; ↘rejected (terminal);
+    ↘edited→published. `AI_REVIEW_INSIGHTS` required. Invalid transitions
+    raise ValueError. `edited_output` required for edit action.
+    `_REVIEW_TRANSITIONS` pins the allowed edges.
+- Endpoints: `ai_care_coordination.py` (POST/GET suggestions, own-only),
+  `ai_equity_intelligence.py` (equity-insight, sdg-narratives, review/
+  publish for operational + population). Registered in `router.py`. 7 routes
+  confirmed via openapi.
+- Prompt versions: 1.0-operational-phase11, 1.0-equity-phase11,
+  1.0-sdg-narrative-phase11.
+
+### Frontend architecture
+- `features/ai-governance/` module (mirrors Phase 10 interop patterns):
+  `api/aiGovernanceService.ts`, `hooks/useAiGovernanceQueries.ts`,
+  `components/AiGovernanceUI.tsx` (SectionCard, PrivacyBadge, TransparencyNotice,
+  QualityBadge, ReviewStatusBadge, Error/Loading/EmptyState), 3 pages.
+- Routes (CMS/DoctorLayout): `/cms/ai-governance/chw-suggestions`,
+  `/cms/ai-governance/equity`, `/cms/ai-governance/sdg-narratives`.
+- Nav: "AI Governance" group in DoctorLayout (Sparkles/Scale/Globe2 icons).
+  (After the RootLayout consolidation this group lives in
+  `doctorNavConfig.ts`, see the Layout system section.)
+- Review queue UI: approve/reject/edit actions; publish only after
+  approved/edited; no actions for published/rejected. edit requires text.
+
+### Phase 11 safety invariants (do NOT regress)
+- AI NEVER self-publishes — every insight requires explicit human review
+  (approve/reject/edit) before publish. State machine enforced in
+  `AiInsightReviewService`, not just UI.
+- Operational suggestions use ONLY operational factors; `assert_non_clinical`
+  rejects clinical language. CHW sees OWN queue only (IDOR-proof).
+- Equity/SDG outputs consume ALREADY-suppressed de-identified aggregates;
+  AI never sees raw patient data; k-anonymity unbypassable (inherited Phase 6).
+- `assert_non_causal` / `assert_narrative_safe` + service-level validation =
+  defense in depth. SDG narratives are MediCheck proxies, NEVER official UN
+  indicators, NEVER claim a target "has been achieved".
+- No clinical tables/CDSE/scoring/report/referral-clinical-priority touched.
+  `git diff --stat`: only rbac/config/deps/router modified, all additive
+  (122 insertions, 0 deletions).
+- Every AI call + review transition audited (Phase 7 pattern: hashes + ids,
+  no raw PHI).
+
+### Test commands (verified)
+- Backend Phase 11: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/test_ai_care_coordination_phase11.py -q -W error::DeprecationWarning` -> 51 pass.
+- Full backend regression (run in batches — full suite times out at 600s):
+  511 total pass, 0 fail (126 P6-P10+roles + 147 AI P1-P5+longitudinal +
+  38 clinical/CMS/profile + 149 unit/integration + 51 P11).
+- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run src/features/ai-governance` -> 18 pass; full suite 118 pass, typecheck clean, build OK.
+
 ## Real AI providers (OpenAI-compatible HTTP -- read before touching ai/ providers)
 Stubs are the default, but REAL vendors are now implemented (not just planned).
 Full doc: `MEDICHECK_AI_PROVIDERS.md`.
