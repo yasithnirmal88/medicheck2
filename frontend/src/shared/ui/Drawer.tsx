@@ -1,19 +1,21 @@
 import React from 'react'
-import { createPortal } from 'react-dom'
+import AccessibleDialog from './AccessibleDialog'
 
 const Drawer: React.FC<{
   open: boolean
   onClose: () => void
+  ariaLabel?: string
   children?: React.ReactNode
-}> = ({ open, onClose, children }) => {
-  if (!open) return null
-  return createPortal(
-    <div className="fixed inset-0 z-50 flex">
-      <div className="flex-1" onClick={onClose} />
-      <div className="w-80 bg-white dark:bg-slate-800 p-4 shadow-xl">{children}</div>
-    </div>,
-    document.body,
-  )
-}
+}> = ({ open, onClose, ariaLabel = 'Navigation drawer', children }) => (
+  <AccessibleDialog
+    open={open}
+    onClose={onClose}
+    ariaLabel={ariaLabel}
+    containerClassName="flex justify-end"
+    panelClassName="h-full w-80 overflow-y-auto bg-white p-4 shadow-xl dark:bg-slate-800"
+  >
+    {children}
+  </AccessibleDialog>
+)
 
 export default React.memo(Drawer)

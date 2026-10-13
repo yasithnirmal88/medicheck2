@@ -51,8 +51,9 @@ from app.application.dtos.fhir_dtos import (
     FhirServiceRequest,
     FhirTask,
 )
+from app.application.services.fhir_validation import validate_fhir_bundle
 from app.core.config import settings
-from app.core.exceptions import AuthorizationError, NotFoundError
+from app.core.exceptions import AuthorizationError, InternalError, NotFoundError
 from app.identity import Permission, Role, User, UserSummary, check_permission, get_role_permissions, get_user_summary
 from app.infrastructure.persistence.models.assessment_session import (
     AssessmentSessionModel,
@@ -129,6 +130,15 @@ class FhirExportService:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
         self.profile_repo = SQLProfileRepository(session)
+
+    @staticmethod
+    def _validate_bundle(bundle: FhirBundle) -> None:
+        errors = validate_fhir_bundle(
+            bundle.model_dump(by_alias=True, exclude_none=True)
+        )
+        if errors:
+            logger.error("Generated FHIR Bundle failed validation: %s", errors)
+            raise InternalError(detail="Generated FHIR Bundle failed validation")
 
     # ── Authorization + consent ──────────────────────────────────────
 
@@ -255,6 +265,7 @@ class FhirExportService:
                 "profile": ["https://medicheck.org/fhir/StructureDefinition/MediCheckBundle"],
             },
         )
+        self._validate_bundle(bundle)
 
         resource_types = sorted({e.resource.get("resourceType") for e in bundle.entry})
         manifest = FhirExportManifest(
@@ -335,6 +346,7 @@ class FhirExportService:
             entry=entries,
             meta_info={"lastUpdated": timestamp},
         )
+        self._validate_bundle(bundle)
         resource_types = sorted({e.resource.get("resourceType") for e in bundle.entry})
         manifest = FhirExportManifest(
             export_id=export_id,

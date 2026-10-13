@@ -1,5 +1,6 @@
 
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.services.clinical_decision_service import ClinicalDecisionService
@@ -12,6 +13,11 @@ from app.infrastructure.persistence.models.assessment_session import (
 from app.infrastructure.persistence.models.body_system import BodySystemModel
 from app.infrastructure.persistence.models.clinical_indicator import (
     ClinicalIndicatorModel,
+)
+from app.infrastructure.persistence.models.decision import (
+    ActivatedConditionModel,
+    ActivatedIndicatorModel,
+    AssessmentResultModel,
 )
 from app.infrastructure.persistence.models.question import QuestionModel
 from app.infrastructure.persistence.models.question_group import QuestionGroupModel
@@ -35,7 +41,9 @@ async def test_cdse_process_simple_flow(db_session: AsyncSession):
     await session.commit()
 
     await session.execute(
-        ClinicalIndicatorModel.__table__.insert().values(key="i1", name="Ind 1", body_system_id="bs-cdse")
+        ClinicalIndicatorModel.__table__.insert().values(
+            key="i1", name="Ind 1", body_system_id="bs-cdse", confidence=0.32
+        )
     )
     await session.execute(
         QuestionModel.__table__.insert().values(
@@ -97,6 +105,46 @@ async def test_cdse_process_simple_flow(db_session: AsyncSession):
     assert r is not None
     assert len(r.activated_indicators) == 1
     assert len(r.activated_conditions) == 1
+    assert r.activated_conditions[0].confidence == pytest.approx(0.32)
+    assert r.confidence_score == pytest.approx(0.32)
+
+    rerun = await svc.process_assessment(s_id, "u1")
+    assert rerun["result_id"] == result["result_id"]
+    assert await session.scalar(
+        select(func.count()).select_from(AssessmentResultModel).where(
+            AssessmentResultModel.session_id == s_id
+        )
+    ) == 1
+    assert await session.scalar(
+        select(func.count()).select_from(ActivatedIndicatorModel).where(
+            ActivatedIndicatorModel.result_id == result["result_id"]
+        )
+    ) == 1
+    assert await session.scalar(
+        select(func.count()).select_from(ActivatedConditionModel).where(
+            ActivatedConditionModel.result_id == result["result_id"]
+        )
+    ) == 1
+
+    answer = await session.scalar(
+        select(AssessmentAnswerModel).where(
+            AssessmentAnswerModel.session_id == s_id
+        )
+    )
+    answer.option_id = None
+    answer.value = "No"
+    await session.flush()
+    updated = await svc.process_assessment(s_id, "u1")
+    assert updated["result_id"] == result["result_id"]
+    assert await session.scalar(
+        select(func.count()).select_from(ActivatedIndicatorModel).where(
+            ActivatedIndicatorModel.result_id == result["result_id"]
+        )
+    ) == 0
+    refreshed_result = await svc.get_result_by_session(s_id)
+    assert refreshed_result is not None
+    assert refreshed_result.activated_indicators == []
+    assert refreshed_result.activated_conditions == []
 
 
 @pytest.mark.asyncio
