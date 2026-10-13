@@ -10,7 +10,7 @@ users) on Postgres. SQLite deployments recreate the schema via ``create_all``
 (the model is already nullable), so it is a no-op there.
 
 Revision ID: 20261013_users_email_nullable
-Revises: 20261013_merge_phase11_heads
+Revises: 20261013_referral_lookup_indexes
 Create Date: 2026-10-13 00:00:01.000000
 """
 
@@ -22,7 +22,7 @@ from sqlalchemy.engine.reflection import Inspector
 from alembic import op
 
 revision = "20261013_users_email_nullable"
-down_revision = "20261013_merge_phase11_heads"
+down_revision = "20261013_referral_lookup_indexes"
 branch_labels = None
 depends_on = None
 
