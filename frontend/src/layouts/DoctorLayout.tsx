@@ -140,8 +140,6 @@ export const DoctorLayout: React.FC<DoctorLayoutProps> = ({ children }) => {
           onToggle={() => setCollapsed(!collapsed)}
           onLogout={handleLogout}
           loggingOut={loggingOut}
-          displayName={displayName}
-          initials={initials}
         />
       </aside>
 
@@ -158,8 +156,6 @@ export const DoctorLayout: React.FC<DoctorLayoutProps> = ({ children }) => {
               onToggle={() => setMobileOpen(false)}
               onLogout={handleLogout}
               loggingOut={loggingOut}
-              displayName={displayName}
-              initials={initials}
               mobile
               onCloseMobile={() => setMobileOpen(false)}
             />
@@ -221,8 +217,6 @@ interface SidebarContentProps {
   onToggle: () => void
   onLogout: () => void
   loggingOut: boolean
-  displayName: string
-  initials: string
   onCloseMobile?: () => void
 }
 
@@ -232,8 +226,6 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   onToggle,
   onLogout,
   loggingOut,
-  displayName,
-  initials,
   onCloseMobile,
 }) => {
   return (
