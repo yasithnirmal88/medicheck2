@@ -59,6 +59,8 @@ from app.infrastructure.persistence.models.decision import (
     GeneratedRecommendationModel,
 )
 from app.infrastructure.persistence.models.facility import FacilityModel
+from app.infrastructure.persistence.models.follow_up_task import FollowUpTaskModel
+from app.infrastructure.persistence.models.recommendation import RecommendationModel
 from app.infrastructure.persistence.models.referral import ReferralModel
 from app.infrastructure.persistence.models.referral_access_barrier import (
     ReferralAccessBarrierModel,
@@ -66,8 +68,6 @@ from app.infrastructure.persistence.models.referral_access_barrier import (
 from app.infrastructure.persistence.models.referral_status_event import (
     ReferralStatusEventModel,
 )
-from app.infrastructure.persistence.models.recommendation import RecommendationModel
-from app.infrastructure.persistence.models.follow_up_task import FollowUpTaskModel
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +174,7 @@ class ReferralService:
     # ── Authorization ────────────────────────────────────────────────
 
     async def _assert_can_access(
-        self, user: User, patient_user_id: str, *, manage: bool = False
+        self, user: User, patient_user_id: str, *, _manage: bool = False
     ) -> None:
         """IDOR guard. Patient = own only. CHW = assigned only. Clinician/admin
         with REFERRAL_MANAGE = any (still auditable)."""
@@ -251,7 +251,7 @@ class ReferralService:
             raise NotFoundError(detail="Assessment result not found for session")
 
         # IDOR: patient must own the session; CHW must be assigned; clinician/admin ok.
-        await self._assert_can_access(user, result.user_id, manage=True)
+        await self._assert_can_access(user, result.user_id, _manage=True)
         patient_user_id = result.user_id
 
         # If a CHW is creating on behalf of the patient, the assigned_chw_user_id
@@ -383,7 +383,10 @@ class ReferralService:
         if req.notes:
             referral.notes = (referral.notes or "") + "\n" + req.notes if referral.notes else req.notes
         await self._record_event(referral, referral.status, "scheduled", user, req.notes)
-        await self._audit(user, referral.id, "schedule", new_value={"status": "scheduled", "scheduled_for": str(req.scheduled_for)})
+        await self._audit(
+            user, referral.id, "schedule",
+            new_value={"status": "scheduled", "scheduled_for": str(req.scheduled_for)},
+        )
         await self.session.flush()
         return await self._to_response(referral)
 
@@ -528,7 +531,7 @@ class ReferralService:
         referral = await self.session.get(ReferralModel, referral_id)
         if referral is None or referral.is_deleted:
             raise NotFoundError(detail="Referral not found")
-        await self._assert_can_access(user, referral.patient_user_id, manage=manage)
+        await self._assert_can_access(user, referral.patient_user_id, _manage=manage)
         return referral
 
     async def _record_event(

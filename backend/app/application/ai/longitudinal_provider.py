@@ -146,7 +146,7 @@ class StubLongitudinalProvider:
         except ValueError:
             # Non-diagnostic guard tripped — surface as a provider error so the
             # service falls back safely.
-            raise AIProviderError("stub produced diagnostic language")
+            raise AIProviderError("stub produced diagnostic language") from None
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("stub longitudinal provider failed: %s", exc)
             raise AIProviderError("stub longitudinal provider failure") from exc
@@ -185,7 +185,7 @@ def _stable_phrase(c: dict[str, Any]) -> str:
     return f"{label} assessment findings remained stable at {curr}."
 
 
-def _summary(overall, ind, cond, rec) -> str:
+def _summary(overall, ind, cond, _rec) -> str:
     parts: list[str] = []
     if overall:
         t = overall.get("trend", "stable")

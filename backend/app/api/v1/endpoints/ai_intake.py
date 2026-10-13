@@ -28,7 +28,6 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.identity import get_current_user
 from app.application.ai.language import (
     LANGUAGE_LABELS,
     SUPPORTED_INTAKE_LANGUAGES,
@@ -44,6 +43,7 @@ from app.application.dtos.intake_dtos import IntakeResponse
 from app.application.services.ai_intake_service import AIIntakeService
 from app.core.exceptions import AIBudgetExceededError
 from app.core.logging import get_logger
+from app.identity import get_current_user
 from app.infrastructure.database import get_db
 from app.infrastructure.persistence.models.assessment_session import (
     AssessmentSessionModel,
@@ -81,6 +81,7 @@ async def extract_intake(
 ) -> IntakeResponse:
     user_id = current_user.id
     session_ref = payload.session_id or f"u:{user_id}"
+    input_type = payload.input_type if payload.input_type in ("text", "voice") else "text"
 
     # If a session id is supplied, verify it exists AND belongs to the caller.
     if payload.session_id:
@@ -117,8 +118,6 @@ async def extract_intake(
             detail="This language isn't currently supported. Please select English, Sinhala, or Tamil.",
         )
 
-    input_type = payload.input_type if payload.input_type in ("text", "voice") else "text"
-
     svc = AIIntakeService(session)
     try:
         return await svc.extract(
@@ -135,8 +134,8 @@ async def extract_intake(
     except Exception as exc:  # pragma: no cover - defensive
         # Any unexpected service error → safe fallback, never a 500 that breaks
         # the intake UX. The standard questionnaire remains available.
-        from app.application.dtos.intake_dtos import safe_intake_response
         from app.application.ai.intake_prompts import INTAKE_PROMPT_VERSION
+        from app.application.dtos.intake_dtos import safe_intake_response
 
         get_logger(__name__).warning("intake endpoint fallback: %s", exc)
         return safe_intake_response(
@@ -245,7 +244,7 @@ class LanguagesResponse(BaseModel):
 
 @router.get("/languages", response_model=LanguagesResponse)
 async def list_languages(
-    current_user=Depends(get_current_user),
+    _current_user=Depends(get_current_user),
 ) -> LanguagesResponse:
     """Phase 5 — list supported intake languages for the UI selector."""
     langs = [

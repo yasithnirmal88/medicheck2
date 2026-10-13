@@ -12,8 +12,6 @@ import Button from '@/shared/ui/Button'
 import { useTemplates, useStartSession, useSessions } from '../hooks/useQuestionnaire'
 import type { QuestionnaireTemplate, AssessmentSession } from '../types'
 
-type SessionStatus = 'available' | 'in_progress' | 'paused' | 'completed' | 'submitted'
-
 const HeroSection: React.FC<{
   templates: QuestionnaireTemplate[] | undefined
   sessions: AssessmentSession[] | undefined

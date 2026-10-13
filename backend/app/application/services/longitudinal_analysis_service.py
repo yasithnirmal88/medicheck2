@@ -27,6 +27,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dtos.longitudinal_dtos import (
+    SCORE_DELTA_THRESHOLD,
+    SEVERITY_ORDER,
     BodySystemPoint,
     ChangeEvent,
     ConditionChanges,
@@ -34,15 +36,10 @@ from app.application.dtos.longitudinal_dtos import (
     IndicatorChanges,
     LongitudinalAssessmentPoint,
     RecommendationChanges,
-    SCORE_DELTA_THRESHOLD,
-    SEVERITY_ORDER,
-    TrendLabel,
     TrajectoryComparison,
+    TrendLabel,
 )
 from app.core.logging import get_logger
-from app.infrastructure.persistence.models.assessment_session import (
-    AssessmentSessionModel,
-)
 from app.infrastructure.persistence.models.body_system import BodySystemModel
 from app.infrastructure.persistence.models.decision import AssessmentResultModel
 from app.infrastructure.persistence.models.report import HealthAssessmentModel

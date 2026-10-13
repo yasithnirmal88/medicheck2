@@ -23,7 +23,6 @@ Safety invariants (do not regress):
 
 from __future__ import annotations
 
-import json
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -36,6 +35,7 @@ from app.application.dtos.fhir_dtos import (
     ExportHistoryResponse,
     FhirBundle,
     FhirBundleEntry,
+    FhirCarePlan,
     FhirCodeableConcept,
     FhirCoding,
     FhirConsent,
@@ -46,39 +46,27 @@ from app.application.dtos.fhir_dtos import (
     FhirIdentifier,
     FhirObservation,
     FhirPatient,
-    FhirQuestionnaire,
     FhirQuestionnaireResponse,
     FhirReference,
     FhirServiceRequest,
     FhirTask,
-    FhirCarePlan,
 )
 from app.core.config import settings
-from app.core.exceptions import AuthorizationError, NotFoundError, ValidationError
+from app.core.exceptions import AuthorizationError, NotFoundError
 from app.identity import Permission, Role, User, UserSummary, check_permission, get_role_permissions, get_user_summary
-from app.infrastructure.persistence.models.assessment_answer import AssessmentAnswerModel
 from app.infrastructure.persistence.models.assessment_session import (
     AssessmentSessionModel,
 )
 from app.infrastructure.persistence.models.consent_record import ConsentRecordModel
 from app.infrastructure.persistence.models.decision import (
     AssessmentResultModel,
-    GeneratedRecommendationModel,
 )
-from app.infrastructure.persistence.models.facility import FacilityModel
 from app.infrastructure.persistence.models.follow_up_task import FollowUpTaskModel
 from app.infrastructure.persistence.models.interoperability_export import (
     InteroperabilityExportModel,
 )
-from app.infrastructure.persistence.models.personal_info import PersonalInfoModel
-from app.infrastructure.persistence.models.question import QuestionModel
-from app.infrastructure.persistence.models.questionnaire_template import (
-    QuestionnaireTemplateModel,
-)
 from app.infrastructure.persistence.models.referral import ReferralModel
 from app.infrastructure.persistence.models.report import (
-    BodySystemAssessmentModel,
-    ConditionAssessmentModel,
     HealthAssessmentModel,
 )
 from app.infrastructure.persistence.repositories.sql_profile_repository import (
@@ -472,12 +460,24 @@ class FhirExportService:
             id=consent.id,
             status="active" if consent.granted else "rejected",
             scope=FhirCodeableConcept(
-                coding=[FhirCoding(system="http://terminology.hl7.org/CodeSystem/consentscope", code="patient-privacy", display="Privacy Consent")],
+                coding=[
+                    FhirCoding(
+                        system="http://terminology.hl7.org/CodeSystem/consentscope",
+                        code="patient-privacy",
+                        display="Privacy Consent",
+                    )
+                ],
                 text="FHIR / external data sharing consent",
             ),
             category=[
                 FhirCodeableConcept(
-                    coding=[FhirCoding(system="http://terminology.hl7.org/CodeSystem/v3-ActCode", code="IDSCL", display="information disclosure")]
+                    coding=[
+                    FhirCoding(
+                        system="http://terminology.hl7.org/CodeSystem/v3-ActCode",
+                        code="IDSCL",
+                        display="information disclosure",
+                    )
+                ]
                 )
             ],
             patient=FhirReference(reference=f"Patient/{patient_user_id}"),
@@ -538,19 +538,36 @@ class FhirExportService:
                 id=bs.id,
                 status="final",
                 category=[
-                    FhirCodeableConcept(
-                        coding=[FhirCoding(system="http://terminology.hl7.org/CodeSystem/observation-category", code="survey")]
-                    )
+FhirCodeableConcept(
+                            coding=[
+                                FhirCoding(
+                                    system="http://terminology.hl7.org/CodeSystem/observation-category",
+                                    code="survey",
+                                )
+                            ]
+                        )
                 ],
                 code=FhirCodeableConcept(
-                    coding=[FhirCoding(system=_CATEGORY_SYSTEM, code=bs.body_system_id or "unknown", display=category or "body-system score")],
+                    coding=[
+                        FhirCoding(
+                            system=_CATEGORY_SYSTEM,
+                            code=bs.body_system_id or "unknown",
+                            display=category or "body-system score",
+                        )
+                    ],
                     text="MediCheck body-system risk category",
                 ),
                 subject=FhirReference(reference=f"Patient/{patient_user_id}"),
                 effectiveDateTime=_iso(report.created_at),
                 valueCodeableConcept=(
                     FhirCodeableConcept(
-                        coding=[FhirCoding(system=_CATEGORY_SYSTEM, code=(category or "unknown").replace(" ", "-").lower(), display=category)],
+                        coding=[
+                            FhirCoding(
+                                system=_CATEGORY_SYSTEM,
+                                code=(category or "unknown").replace(" ", "-").lower(),
+                                display=category,
+                            )
+                        ],
                         text=category,
                     )
                     if category
@@ -560,7 +577,13 @@ class FhirExportService:
                     [
                         {
                             "code": FhirCodeableConcept(
-                                coding=[FhirCoding(system=_CATEGORY_SYSTEM, code="risk-score", display="Body-system risk score")],
+                                coding=[
+                                    FhirCoding(
+                                        system=_CATEGORY_SYSTEM,
+                                        code="risk-score",
+                                        display="Body-system risk score",
+                                    )
+                                ],
                                 text="Body-system risk score",
                             ).model_dump(by_alias=True, exclude_none=True),
                             "valueQuantity": {"value": score, "unit": "score"},
@@ -570,7 +593,17 @@ class FhirExportService:
                     else None
                 ),
                 interpretation=(
-                    [FhirCodeableConcept(coding=[FhirCoding(system="http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation", code=_CATEGORY_INTERPRETATION.get(category or "", "N"), display=category)])]
+                    [
+                        FhirCodeableConcept(
+                            coding=[
+                                FhirCoding(
+                                    system="http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation",
+                                    code=_CATEGORY_INTERPRETATION.get(category or "", "N"),
+                                    display=category,
+                                )
+                            ]
+                        )
+                    ]
                     if category
                     else []
                 ),
@@ -594,11 +627,23 @@ class FhirExportService:
             status="final",
             category=[
                 FhirCodeableConcept(
-                    coding=[FhirCoding(system=_REPORT_TYPE_SYSTEM, code="screening", display="Screening/Risk Assessment")]
+                    coding=[
+                        FhirCoding(
+                            system=_REPORT_TYPE_SYSTEM,
+                            code="screening",
+                            display="Screening/Risk Assessment",
+                        )
+                    ]
                 )
             ],
             code=FhirCodeableConcept(
-                coding=[FhirCoding(system=_REPORT_TYPE_SYSTEM, code="clinical-report", display="MediCheck Clinical Report")],
+                coding=[
+                    FhirCoding(
+                        system=_REPORT_TYPE_SYSTEM,
+                        code="clinical-report",
+                        display="MediCheck Clinical Report",
+                    )
+                ],
                 text="MediCheck Clinical Report",
             ),
             subject=FhirReference(reference=f"Patient/{patient_user_id}"),
@@ -607,7 +652,13 @@ class FhirExportService:
             conclusion=conclusion,
             conclusionCode=[
                 FhirCodeableConcept(
-                    coding=[FhirCoding(system=_REPORT_TYPE_SYSTEM, code="possible-condition", display="Possible condition (NOT confirmed)")]
+                    coding=[
+                        FhirCoding(
+                            system=_REPORT_TYPE_SYSTEM,
+                            code="possible-condition",
+                            display="Possible condition (NOT confirmed)",
+                        )
+                    ]
                 )
             ],
             result=obs_refs,
@@ -633,11 +684,22 @@ class FhirExportService:
                     status="preliminary",  # preliminary = not confirmed
                     category=[
                         FhirCodeableConcept(
-                            coding=[FhirCoding(system="http://terminology.hl7.org/CodeSystem/observation-category", code="survey")]
+coding=[
+                        FhirCoding(
+                            system="http://terminology.hl7.org/CodeSystem/observation-category",
+                            code="survey",
+                        )
+                    ]
                         )
                     ],
                     code=FhirCodeableConcept(
-                        coding=[FhirCoding(system="https://medicheck.org/fhir/CodeSystem/possible-condition", code=cond.condition_id, display="Possible condition (screening)")]
+                        coding=[
+                            FhirCoding(
+                                system="https://medicheck.org/fhir/CodeSystem/possible-condition",
+                                code=cond.condition_id,
+                                display="Possible condition (screening)",
+                            )
+                        ]
                     ),
                     subject=FhirReference(reference=f"Patient/{patient_user_id}"),
                     effectiveDateTime=_iso(report.created_at),
@@ -646,10 +708,24 @@ class FhirExportService:
                     ),
                     interpretation=[
                         FhirCodeableConcept(
-                            coding=[FhirCoding(system="https://medicheck.org/fhir/CodeSystem/screening-verification", code="possible", display="Possible condition — NOT confirmed diagnosis")]
+                            coding=[
+                            FhirCoding(
+                                system="https://medicheck.org/fhir/CodeSystem/screening-verification",
+                                code="possible",
+                                display="Possible condition — NOT confirmed diagnosis",
+                            )
+                        ]
                         )
                     ],
-                    note=[{"text": f"Confidence: {confidence}" if confidence is not None else "Screening finding; not a diagnosis."}],
+                    note=[
+                        {
+                            "text": (
+                                f"Confidence: {confidence}"
+                                if confidence is not None
+                                else "Screening finding; not a diagnosis."
+                            )
+                        }
+                    ],
                 )
             )
         return obs

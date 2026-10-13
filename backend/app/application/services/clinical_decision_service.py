@@ -6,6 +6,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.services.answer_values import is_affirmative
 from app.infrastructure.persistence.models.assessment_session import (
     AssessmentSessionModel,
 )
@@ -40,7 +41,9 @@ class ClinicalDecisionService:
             raise ValueError("Assessment session not found")
         if user_id is not None and sess.user_id != user_id:
             raise ValueError("Assessment session not found")
-        answers = sess.answers  # loaded with selectin earlier
+        # Skipped answers carry no clinical finding and must never activate a
+        # linked indicator.
+        answers = [a for a in sess.answers if not a.is_skipped]
 
         # build answer map
         answer_map: dict[str, list] = {}
@@ -69,17 +72,32 @@ class ClinicalDecisionService:
         indicator_sources: dict[str, list] = {}
 
         for qid, ans_list in answer_map.items():
-            # question-level indicators (already batched)
-            q_indicators = q_indicators_map.get(qid, [])
-            for ind in q_indicators:
-                indicator_scores[ind.id] = indicator_scores.get(ind.id, 0.0) + 1.0
-                indicator_sources.setdefault(ind.id, []).append(
-                    {
-                        "question_id": qid,
-                        "type": "question",
-                        "value": [a.value for a in ans_list],
-                    }
+            # Question-level indicators activate ONLY on an affirmative answer
+            # ("yes", True, or a positive numeric score/value). A negative or
+            # empty answer ("no", False, 0, "") must not activate them.
+            affirmative_answers = [
+                a
+                for a in ans_list
+                if is_affirmative(
+                    score_value=a.score_value,
+                    numeric_value=a.numeric_value,
+                    value=a.value,
+                    response_value=a.response_value,
                 )
+            ]
+            if affirmative_answers:
+                q_indicators = q_indicators_map.get(qid, [])
+                for ind in q_indicators:
+                    indicator_scores[ind.id] = (
+                        indicator_scores.get(ind.id, 0.0) + 1.0
+                    )
+                    indicator_sources.setdefault(ind.id, []).append(
+                        {
+                            "question_id": qid,
+                            "type": "question",
+                            "value": [a.value for a in affirmative_answers],
+                        }
+                    )
 
             # option-level
             for a in ans_list:
@@ -192,10 +210,10 @@ class ClinicalDecisionService:
 
             # laboratory tests
             labs = labs_map.get(cid, [])
-            for l in labs:
+            for lab in labs:
                 await self.dec_repo.add_laboratory_test(
-                    result.id, l.id,
-                    reason=f"[trace:{trace_id}] Condition {cid} (score={sc}) requires lab test {l.id}",
+                    result.id, lab.id,
+                    reason=f"[trace:{trace_id}] Condition {cid} (score={sc}) requires lab test {lab.id}",
                 )
 
         # body system aggregation (collect body system ids from indicators -> conditions mapping)
@@ -240,7 +258,6 @@ class ClinicalDecisionService:
         result = await self.dec_repo.get_result_by_session(session_id)
         if result and user_id and result.user_id != user_id:
             # Check if user has elevated permissions (doctors can view patient results)
-            from app.identity import Role, has_role
             # For now, we only allow access if the user owns the result
             # In a real application, you'd check for elevated roles here
             return None

@@ -100,7 +100,8 @@ _SYNONYMS: dict[str, tuple[str, ...]] = {
         "சோர்வு", "களைப்பு", "அயர்ச்சி",
     ),
     "exertional": (
-        "exertion", "exerting", "climbing stairs", "walking upstairs", "stairs", "on exertion", "during exercise", "activity",
+        "exertion", "exerting", "climbing stairs", "walking upstairs",
+        "stairs", "on exertion", "during exercise", "activity",
         # Sinhala
         "පඩි", "පඩි නගිද්දී", "පඩි නැග්ගාම", "ව්යායාම",
         # Tamil
@@ -299,7 +300,7 @@ def _span_around(text: str, keyword: str, window: int = 12) -> str:
     idx = text.find(keyword)
     if idx < 0:
         return keyword
-    words = text.split()
+    text.split()
     # Re-derive word index approximately via character split.
     start = max(0, idx - window)
     end = min(len(text), idx + len(keyword) + window)

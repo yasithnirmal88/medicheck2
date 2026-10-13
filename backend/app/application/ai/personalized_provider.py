@@ -249,15 +249,17 @@ def _simple_summary(lang: str, n_findings: int, body_names: list[str]) -> str:
     if lang == "si":
         base = "ඔබගේ පිළවිතුරු කිහිපයක් අවධානය අවශ්‍ය විය හැකි සලකුණු පෙන්වයි. මෙයින් අදහස් වන්නේ ඔට රෝගයක් ඇති බව නොවේ."
     elif lang == "ta":
-        base = "உங்கள் பதில்கள் சில அடையாளங்களைக் காட்டுகின்றன, அவை கவனம் தேவைப்படலாம். இதன் பொருள் நீங்கள் நோயால் பாதிக்கப்பட்டுள்ளீர்கள் என்பது அல்ல."
+        base = (
+            "உங்கள் பதில்கள் சில அடையாளங்களைக் காட்டுகின்றன, அவை கவனம் தேவைப்படலாம். "
+            "இதன் பொருள் நீங்கள் நோயால் பாதிக்கப்பட்டுள்ளீர்கள் என்பது அல்ல."
+        )
     else:
         base = (
             "Your answers showed some signs that may need more attention. "
             "This does not mean you have a disease."
         )
-    if n_findings > 0 and body_names:
-        if lang == "en":
-            base += f" The assessment looked at {len(body_names)} area(s) of your health."
+    if n_findings > 0 and body_names and lang == "en":
+        base += f" The assessment looked at {len(body_names)} area(s) of your health."
     return base
 
 
@@ -394,7 +396,7 @@ def _recommendation_explanation(
 
 
 def _severity_explanation(
-    severity: str | None, lang: str, level: LiteracyLevel
+    severity: str | None, lang: str, _level: LiteracyLevel
 ) -> str:
     if not severity:
         if lang == "si":

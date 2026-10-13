@@ -22,7 +22,6 @@ import httpx
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 
-from app.identity import User, get_ai_governance_user
 from app.application.ai.provider_selection import (
     DEFAULT_OPENAI_BASE_URL,
     normalize_provider_name,
@@ -31,6 +30,7 @@ from app.application.ai.provider_selection import (
 )
 from app.core.config import settings
 from app.core.exceptions import AIConfigurationError
+from app.identity import User, get_ai_governance_user
 
 router = APIRouter(prefix="/ai", tags=["ai-health"])
 
@@ -185,7 +185,7 @@ def _queue_health() -> ProviderHealth:
 
 @router.get("/health", response_model=AIHealthResponse)
 async def get_ai_health(
-    current_user: User = Depends(get_ai_governance_user),
+    __current_user: User = Depends(get_ai_governance_user),
     probe: bool = Query(
         default=False,
         description=(

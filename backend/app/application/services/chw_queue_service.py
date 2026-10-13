@@ -16,7 +16,7 @@ output is a read-only ranking + labelled rationale.
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -32,7 +32,6 @@ from app.application.services.ai_audit_service import AIAuditService
 from app.core.config import settings
 from app.core.exceptions import AuthorizationError
 from app.identity import User
-from app.infrastructure.persistence.models.chw_assignment import ChwAssignmentModel
 from app.infrastructure.persistence.models.referral import ReferralModel
 
 logger = logging.getLogger(__name__)
@@ -47,11 +46,10 @@ class ChwQueueService:
 
     async def get_queue(self, chw_user: User) -> QueueRankingOutput:
         """Build + rank the CHW's operational follow-up queue."""
-        if "community_health_worker" not in (chw_user.roles or set()):
-            if not self._is_supervisor(chw_user):
-                raise AuthorizationError(
-                    detail="Community Health Worker access required"
-                )
+        if "community_health_worker" not in (chw_user.roles or set()) and not self._is_supervisor(chw_user):
+            raise AuthorizationError(
+                detail="Community Health Worker access required"
+            )
 
         now = datetime.now(_UTC)
         # Load referrals assigned to this CHW (bounded).
@@ -69,13 +67,20 @@ class ChwQueueService:
         tasks: list[QueueTaskInput] = []
         for ref in referrals:
             # Operational factors only — NO clinical fields.
-            age_days = (now - (ref.created_at.replace(tzinfo=_UTC) if ref.created_at.tzinfo is None else ref.created_at)).total_seconds() / 86400.0
+            age_days = (
+                (now - (ref.created_at.replace(tzinfo=_UTC) if ref.created_at.tzinfo is None else ref.created_at))
+                .total_seconds() / 86400.0
+            )
             overdue = bool(ref.due_at) and (
                 (ref.due_at.replace(tzinfo=_UTC) if ref.due_at.tzinfo is None else ref.due_at) < now
             )
             appointment_window_days = None
             if ref.scheduled_for:
-                sched = ref.scheduled_for.replace(tzinfo=_UTC) if ref.scheduled_for.tzinfo is None else ref.scheduled_for
+                sched = (
+                    ref.scheduled_for.replace(tzinfo=_UTC)
+                    if ref.scheduled_for.tzinfo is None
+                    else ref.scheduled_for
+                )
                 appointment_window_days = (sched - now).total_seconds() / 86400.0
             unresolved_admin = ref.status not in {
                 "completed", "cancelled", "declined", "expired", "lost_to_followup"
@@ -112,7 +117,7 @@ class ChwQueueService:
         )
 
     async def _audit_ranking(
-        self, user: User, data: QueueRankingInput, output: QueueRankingOutput
+        self, _user: User, data: QueueRankingInput, output: QueueRankingOutput
     ) -> None:
         try:
             input_context = {

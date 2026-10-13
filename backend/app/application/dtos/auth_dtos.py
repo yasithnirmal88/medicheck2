@@ -24,8 +24,11 @@ class RegisterRequest(BaseModel):
     firebase_token: constr(min_length=10) = Field(..., description="Firebase ID token")
     full_name: constr(min_length=1, max_length=200) = Field(..., description="Full name")
     email: EmailStr | None = Field(None, description="Email address")
-    role: Literal["patient", "doctor"] = Field("patient", description="User role: patient or doctor")
 
+    # SECURITY: `role` is intentionally NOT accepted here. Self-registration
+    # always creates a PATIENT; privileged roles are assigned only by an admin
+    # via the identity admin API. `extra="forbid"` rejects any client attempt
+    # to post a role.
     model_config = ConfigDict(extra="forbid")
 
 
@@ -87,10 +90,7 @@ class AuthenticatedUserResponse(BaseModel):
 
     @classmethod
     def from_entity(cls, user: Any) -> AuthenticatedUserResponse:
-        if hasattr(user, "to_dict"):
-            data = user.to_dict()
-        else:
-            data = user
+        data = user.to_dict() if hasattr(user, "to_dict") else user
         return cls(**data)
 
 
@@ -126,10 +126,7 @@ class UserResponse(BaseModel):
 
     @classmethod
     def from_entity(cls, user: Any) -> UserResponse:
-        if hasattr(user, "to_dict"):
-            data = user.to_dict()
-        else:
-            data = user
+        data = user.to_dict() if hasattr(user, "to_dict") else user
         return cls(**data)
 
 

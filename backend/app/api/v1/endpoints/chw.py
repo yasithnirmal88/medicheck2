@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
@@ -97,10 +97,10 @@ async def get_chw_session(
     session (metadata.chw_user_id matches)."""
     from sqlalchemy import select
 
+    from app.core.exceptions import AuthorizationError, NotFoundError
     from app.infrastructure.persistence.models.assessment_session import (
         AssessmentSessionModel,
     )
-    from app.core.exceptions import AuthorizationError, NotFoundError
 
     stmt = select(AssessmentSessionModel).where(
         AssessmentSessionModel.id == session_id,
@@ -130,7 +130,7 @@ async def get_chw_session(
 
 @router.get("/offline-content", response_model=OfflineContentListResponse)
 async def list_offline_content(
-    current_user: Annotated[User, Depends(get_chw_user)],
+    _current_user: Annotated[User, Depends(get_chw_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> OfflineContentListResponse:
     """List published/versioned questionnaires available for offline caching.
@@ -145,7 +145,7 @@ async def list_offline_content(
 )
 async def get_offline_content(
     template_id: str,
-    current_user: Annotated[User, Depends(get_chw_user)],
+    _current_user: Annotated[User, Depends(get_chw_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> OfflineContentBundleResponse:
     """Get a single versioned questionnaire bundle for offline caching. The
@@ -194,7 +194,7 @@ async def revoke_offline_device(
 
 @router.get("/devices")
 async def list_offline_devices(
-    current_user: Annotated[User, Depends(get_current_admin)],
+    __current_user: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     """List offline device registrations (admin-only)."""

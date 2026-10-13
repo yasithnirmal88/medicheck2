@@ -72,6 +72,41 @@ Full design: `MEDICHECK_AI_PHASE2_RAG_REPORT.md`. Key facts to preserve:
   datetimes -- normalise both sides to naive UTC; never use datetime.utcnow()
   -- it trips `-W error::DeprecationWarning`).
 
+## CDSE answer-aware activation (clinical correctness -- read before touching CDSE/questionnaire saving)
+Fixed a critical bug where `ClinicalDecisionService.process_assessment` activated a
+question-level indicator link for ANY answer, so "No chest pain"/"non-smoker"/skipped
+still turned on CV_CHEST_PAIN / CV_TOBACCO (and every other question-level linked
+indicator). Also: `save_answer` computed `score_value` but never persisted
+`option_id`/`value`/`numeric_value`, and YES/NO arrives from the UI as a BOOLEAN
+(`{value: true/false}`) while seeded options use canonical "yes"/"no", so the old
+`opt.value == str(option_value)` match never fired for YES/NO.
+- `app/application/services/answer_values.py` (new, pure helpers):
+  `coerce_float` (bool -> 1.0/0.0, numeric strings -> float), `match_option`
+  (matches by `value`/`code`, plus a bool->"yes"/"no" canonical mapping),
+  `is_affirmative(*, score_value, numeric_value, value, response_value)` ->
+  True only for "yes"/true/positive numeric (score>0 OR numeric>0 OR affirmative
+  string/number); False for "no"/False/0/""/None.
+- `QuestionnaireService.save_answer` + `chw_service` offline sync now persist
+  `option_id`/`value`/`numeric_value` (via `match_option`/`coerce_float`);
+  `value` stores the canonical matched option value, else `str(raw)`.
+- `process_assessment`: skipped answers are filtered OUT of `answer_map`;
+  question-level links activate ONLY when at least one non-skipped answer for the
+  question `is_affirmative(...)`. OPTION-level path is unchanged (its weight comes
+  from the option `score_value`, already value-aware) -- do NOT break it.
+- `AssessmentResult` public shape (summary keys, result fields) UNCHANGED.
+- Tests: `tests/test_cdse_answer_activation.py` (8) uses the REAL
+  `save_answer -> process_assessment` path with YES/NO booleans; covers
+  cv_chest_pain yes/no, cv_smoking yes/no, skipped, persistence of
+  option/value/numeric, and option-level linking. Verified: the 3 negative/skipped
+  tests FAIL on the old CDSE and PASS after the fix. Regression subset unaffected:
+  `tests/test_clinical_decision_service.py tests/test_report_service.py
+  tests/test_ai_explanation_phase1.py tests/test_ai_providers_http.py` -> 70 pass;
+  `tests/test_chw_phase8.py tests/test_knowledge_graph.py tests/test_uat.py` -> 35 pass.
+- Kicker: the frontend `skip('')` still sends `response_value={"value":""}` WITHOUT
+  `is_skipped:true`, so skips are persisted as non-skipped empty answers. Empty value
+  is non-affirmative so it is clinically safe, but wiring `input_type`/`is_skipped`
+  through `useQuestionnaireFlow.submitAnswer` is a known follow-up.
+
 ## Layout system (consolidated -- single RootLayout; read before touching layouts)
 ONE root layout for all authenticated routes (layout consolidation pass):
 - `layouts/RootLayout.tsx` -- the single route-level layout for EVERY
@@ -822,11 +857,15 @@ Full doc: `MEDICHECK_AI_PROVIDERS.md`.
 - Spend guardrails (`app/application/ai/ai_budget.py`): per-user hourly
   (30) + daily (200) + global daily (20000) request budgets, Redis
   (`medicheck:ai:budget:v1:*`) with process-local fallback when Redis is
-  down. Metered (real) providers only (`metered=True` on HTTP classes);
-  stubs bypass. Exceed -> `AIBudgetExceededError` (429 `ai_budget_exceeded`,
-  never stub fallback; transcribe/extract endpoints re-raise past defensive
-  handlers). Rejections audited as `BUDGET_EXCEEDED` (hashes only).
-  Settings: `ai_budget_{user_hourly,user_daily,global_daily}_requests`
+  down. NOTE: `_resolve_client` is ASYNC and awaits `get_redis_client()`
+  (it is async) -- returning the bare coroutine silently disabled the Redis
+  tier and emitted "coroutine was never awaited"; the global daily circuit
+  breaker only works cross-worker when Redis is configured (local fallback
+  remains per-worker). Metered (real) providers only (`metered=True` on HTTP
+  classes); stubs bypass. Exceed -> `AIBudgetExceededError` (429
+  `ai_budget_exceeded`, never stub fallback; transcribe/extract endpoints
+  re-raise past defensive handlers). Rejections audited as `BUDGET_EXCEEDED`
+  (hashes only). Settings: `ai_budget_{user_hourly,user_daily,global_daily}_requests`
   (`0` = tier off).
 - `.env.example` documents all AI/STT vars. Azure NATIVE endpoint shape NOT
   supported (needs api-key header + different paths) -- use a compatible
@@ -892,9 +931,13 @@ First enforced bounded-context boundary (microservices extraction path).
   (drop/detach old partitions); per-schema autovacuum/backup tuning.
 
 ## Production readiness (runbook: MEDICHECK_PRODUCTION_RUNBOOK.md)
-- `validate_production_boot()` (`app/main.py`, called in lifespan) RAISES in
-  production on: `ALLOW_MOCK_AUTH=true`, missing Firebase creds, default
-  `POSTGRES_PASSWORD`. Tests use development env -- unaffected. CORS
+- `validate_production_boot()` (`app/main.py`) RAISES when
+  `ALLOW_MOCK_AUTH=true` in STAGING **or** PRODUCTION (mock auth is local-dev
+  only), and additionally in PRODUCTION on missing Firebase creds + default
+  `POSTGRES_PASSWORD`. It is now called from `create_app()` (fail-fast at app
+  construction) in addition to `lifespan`. `firebase.verify_firebase_token`
+  independently refuses mock auth in STAGING/PRODUCTION even if the setting is
+  left on (defense in depth). Tests use development env -- unaffected. CORS
   localhost check fixed (old comparison string could never match; now warns
   when `CORS_ORIGINS` unset in prod).
 - Docs gating: `docs_enabled` setting (`None` = auto: on except production);
@@ -908,7 +951,30 @@ First enforced bounded-context boundary (microservices extraction path).
   (sentry-sdk NOT a hard dep; missing package -> warning, no crash).
 - Rate limiting is in-memory PER WORKER (4 workers ~= 4x effective limit;
   resets on recycle) -- documented, Redis-backed global is a follow-up.
+  `RateLimitMiddleware` (`app/core/security/rate_limit.py`) RETURNS a 429
+  `rate_limit_exceeded` ErrorResponse from `dispatch` (it runs OUTSIDE
+  Starlette's ExceptionMiddleware, so raising would surface as 500) with a
+  `Retry-After` header, and keys on proxy-aware client identity
+  (left-most `X-Forwarded-For` -> `X-Real-IP` -> `request.client.host`).
   CSRF middleware stays OFF (stateless Bearer API). `SECRET_KEY` is currently
   UNUSED by app code (Firebase owns auth). `VITE_API_URL` is build-time baked.
-- Tests: `tests/test_production_readiness.py` (14: boot validation, docs
-  gating, ready/health codes, JSON logs, Sentry path).
+- Tests: `tests/test_production_readiness.py` (17: boot validation incl.
+  staging mock-auth refusal + `create_app` fail-fast, docs gating, ready/health
+  codes, JSON logs, Sentry path); `tests/test_register_role_escalation.py` (4:
+  register always patient / rejects `role`, mock-auth staging guard).
+
+## Registration RBAC hardening (read before touching auth/register)
+- `RegisterRequest` (`auth_dtos.py`) NO LONGER accepts a `role` field
+  (`extra="forbid"`); posting one -> 422. `AuthService.register_user` takes no
+  role and hardcodes `Role.PATIENT.value`. Public self-registration can NEVER
+  mint a clinical/admin role (previously any unauthenticated caller could POST
+  `role:"doctor"` -> CMS access + READ_ASSESSMENTS_ALL/FHIR_EXPORT_ANY/
+  REFERRAL_MANAGE). Privileged roles are granted ONLY via the admin API
+  (`PUT /admin/users/{id}/roles`).
+- Frontend: `useRegister` no longer sends `role`; `AuthContext` no longer reads
+  `localStorage.medicheck_role` as a role source (backend `/auth/me` is
+  authoritative; no backend role -> default `patient`). `Register.tsx` provider
+  signup registers as patient and lands in `/app`; provider role requires admin
+  review. Generated `frontend/src/api/generated/model/registerRequest*.ts`
+  still carries the stale `role` field (regenerate via `export_openapi` +
+  orval when convenient; harmless -- unused).

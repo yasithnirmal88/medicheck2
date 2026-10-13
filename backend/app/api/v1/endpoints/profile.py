@@ -32,7 +32,7 @@ async def update_personal_info(
         updated = await svc.update_personal_info(current_user, payload)
         return updated
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/me/versions")
@@ -79,9 +79,9 @@ async def restore_version(
         result = await svc.restore_version(current_user, version)
         return result
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # Section endpoints (lifestyle, nutrition)

@@ -62,7 +62,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         request: Request,
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
-        req_id = getattr(request.state, "request_id", "-")
+        getattr(request.state, "request_id", "-")
         logger.info(
             "--> %s %s",
             request.method,

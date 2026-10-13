@@ -2,7 +2,7 @@
 
 OPERATIONAL ONLY. Ranks a CHW's referral follow-up tasks by non-clinical
 factors: referral age, overdue status, missing follow-up, appointment window,
-unresolved administrative status. 
+unresolved administrative status.
 
 NEVER ranks by: disease severity, probability of disease, medical urgency,
 predicted mortality, clinical risk. Clinical urgency remains deterministic
@@ -19,10 +19,9 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-from datetime import UTC, datetime
 from typing import Protocol
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 

@@ -25,7 +25,6 @@ from app.application.dtos.intake_dtos import (
     CandidateIndicatorDTO,
     IndicatorCatalog,
     ObservationDTO,
-    ProviderCandidateRaw,
     ProviderOutput,
 )
 
@@ -130,7 +129,7 @@ class CandidateValidationService:
         return trace
 
 
-def _is_eligible(entry) -> bool:
+def _is_eligible(_entry) -> bool:
     """Eligibility check for an indicator catalog entry.
 
     The catalog entries are frozen DTOs carrying only the fields needed for the

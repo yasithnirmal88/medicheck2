@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,7 +79,7 @@ class SQLAssessmentRepository:
                     option_id=option_id,
                     value=value,
                     numeric_value=numeric_value,
-                    recorded_at=datetime.now(timezone.utc),
+                    recorded_at=datetime.now(UTC),
                 )
             )
             await self.session.execute(upd)
@@ -94,7 +94,7 @@ class SQLAssessmentRepository:
             option_id=option_id,
             value=value,
             numeric_value=numeric_value,
-            recorded_at=datetime.now(timezone.utc),
+            recorded_at=datetime.now(UTC),
         )
         await self.session.execute(ins)
         q3 = select(AssessmentAnswerModel).where(

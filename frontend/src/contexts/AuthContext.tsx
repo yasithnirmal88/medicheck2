@@ -116,8 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Derive role from the query (or the direct override). role is null while
   // the user is unauthenticated OR the role has not yet resolved (loading),
   // preserving the prior `role === null` semantics that guards rely on for
-  // "role unknown". On resolution (success or error) it falls back to the
-  // stored role or 'patient' — matching prior behavior.
+  // "role unknown". On resolution (success or error) it defaults to 'patient'.
   const role: UserRole | null = roleOverride ?? (() => {
     if (!user) return null
     if (meQuery.isLoading) return null
@@ -125,9 +124,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const inferred = meQuery.data.role || meQuery.data.roles?.[0]
       if (inferred) return inferred as UserRole
     }
-    // Resolved without role data (or on error): fall back.
-    const stored = localStorage.getItem('medicheck_role') as UserRole | null
-    return stored ?? 'patient'
+    // Resolved without backend role data (or on error): default to patient.
+    // The backend is authoritative for roles; a locally-stored role must never
+    // elevate privileges (self-registration always yields a patient account).
+    return 'patient'
   })()
 
   // roleLoading: true while we have a user but role resolution is in flight

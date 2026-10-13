@@ -48,7 +48,7 @@ def _build_filters(
 ) -> AnalyticsFilters:
     # Validate language if provided.
     if language:
-        supported = [l.strip() for l in settings.supported_intake_languages.split(",")]
+        supported = [code.strip() for code in settings.supported_intake_languages.split(",")]
         if language not in supported:
             raise AuthorizationError(
                 detail=f"Unsupported language. Supported: {', '.join(supported)}"
@@ -105,7 +105,7 @@ async def get_overview(
     description="Distribution of MediCheck assessment findings (body-system categories). NOT population prevalence.",
 )
 async def get_severity(
-    user: Annotated[User, Depends(get_analytics_user)],
+    _user: Annotated[User, Depends(get_analytics_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     start_date: datetime.date | None = Query(default=None),
     end_date: datetime.date | None = Query(default=None),
@@ -125,7 +125,7 @@ async def get_severity(
     description="Assessment counts by body system (active, non-deleted only).",
 )
 async def get_body_systems(
-    user: Annotated[User, Depends(get_analytics_user)],
+    _user: Annotated[User, Depends(get_analytics_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     start_date: datetime.date | None = Query(default=None),
     end_date: datetime.date | None = Query(default=None),
@@ -141,10 +141,13 @@ async def get_body_systems(
     "/indicators",
     response_model=IndicatorsResponse,
     summary="Indicator trends",
-    description="Assessment counts activating each clinical indicator. Indicator activation is NOT confirmed diagnosis.",
+    description=(
+        "Assessment counts activating each clinical indicator. "
+        "Indicator activation is NOT confirmed diagnosis."
+    ),
 )
 async def get_indicators(
-    user: Annotated[User, Depends(get_analytics_user)],
+    _user: Annotated[User, Depends(get_analytics_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     start_date: datetime.date | None = Query(default=None),
     end_date: datetime.date | None = Query(default=None),
@@ -161,10 +164,13 @@ async def get_indicators(
     "/trajectory",
     response_model=TrajectoryResponse,
     summary="Trajectory distribution",
-    description="Distribution of Phase 4 trend classifications. A worsening trajectory is an assessment trend, not disease progression.",
+    description=(
+        "Distribution of Phase 4 trend classifications. A worsening "
+        "trajectory is an assessment trend, not disease progression."
+    ),
 )
 async def get_trajectory(
-    user: Annotated[User, Depends(get_analytics_user)],
+    _user: Annotated[User, Depends(get_analytics_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     start_date: datetime.date | None = Query(default=None),
     end_date: datetime.date | None = Query(default=None),
@@ -183,7 +189,7 @@ async def get_trajectory(
     description="Multilingual + voice accessibility metrics. Language is an interaction metric, not a demographic.",
 )
 async def get_accessibility(
-    user: Annotated[User, Depends(get_analytics_user)],
+    _user: Annotated[User, Depends(get_analytics_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     start_date: datetime.date | None = Query(default=None),
     end_date: datetime.date | None = Query(default=None),
@@ -201,7 +207,7 @@ async def get_accessibility(
     description="SDG-aligned digital health monitoring indicators. Platform-derived, not validated SDG indicators.",
 )
 async def get_sdg_dashboard(
-    user: Annotated[User, Depends(get_analytics_user)],
+    __user: Annotated[User, Depends(get_analytics_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     start_date: datetime.date | None = Query(default=None),
     end_date: datetime.date | None = Query(default=None),

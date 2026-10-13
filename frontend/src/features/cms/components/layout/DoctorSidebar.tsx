@@ -35,8 +35,6 @@ export const DoctorSidebar: React.FC<DoctorSidebarProps> = ({
   onToggle,
   onLogout,
   loggingOut,
-  displayName,
-  initials,
   onCloseMobile,
 }) => {
   return (

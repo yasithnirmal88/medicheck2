@@ -30,7 +30,7 @@ export const RequireAuth: React.FC<RequireAuthProps> = ({
   children, 
   redirectTo = '/login' 
 }) => {
-  const { user, loading, isAuthenticated } = useAuthContext()
+  const { loading, isAuthenticated } = useAuthContext()
   const location = useLocation()
 
   if (loading) {
@@ -67,7 +67,6 @@ export const RequireRole: React.FC<RequireRoleProps> = ({
   children,
   roles,
   fallbackPath = '/unauthorized',
-  showLoading = true,
 }) => {
   const { user, loading, roleLoading, role, isAuthenticated } = useAuthContext()
   const location = useLocation()
@@ -257,7 +256,7 @@ interface RedirectBasedOnRoleProps {
 export const RedirectBasedOnRole: React.FC<RedirectBasedOnRoleProps> = ({
   children,
 }) => {
-  const { isAuthenticated, isPatient, loading, role, roleLoading } = useAuthContext()
+  const { isAuthenticated, loading, role, roleLoading } = useAuthContext()
   const location = useLocation()
 
   // Wait for both auth and role to be loaded
@@ -290,10 +289,6 @@ interface GuestRouteProps {
  */
 export const GuestRoute: React.FC<GuestRouteProps> = ({ children }) => {
   const { isAuthenticated, loading, role, roleLoading } = useAuthContext()
-  const location = useLocation()
-
-  // Check where user came from
-  const from = (location.state as { from?: Location })?.from?.pathname || '/'
 
   if (loading || roleLoading) {
     return <LoadingPage />

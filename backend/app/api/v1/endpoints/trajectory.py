@@ -21,7 +21,6 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.identity import get_current_user
 from app.application.dtos.longitudinal_dtos import (
     HealthTrajectory,
     LongitudinalExplanationResponse,
@@ -33,6 +32,7 @@ from app.application.services.longitudinal_analysis_service import (
 from app.application.services.longitudinal_explanation_service import (
     LongitudinalExplanationService,
 )
+from app.identity import get_current_user
 
 router = APIRouter(prefix="/trajectory", tags=["trajectory"])
 

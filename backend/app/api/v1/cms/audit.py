@@ -15,7 +15,7 @@ router = APIRouter(prefix="/cms/audit", tags=["CMS Audit & Compliance"])
 
 @router.get("/logs")
 async def search_audit_logs(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     actor_id: str | None = Query(None),
     entity_type: str | None = Query(None),
@@ -37,7 +37,7 @@ async def search_audit_logs(
 async def get_audit_timeline(
     entity_type: str,
     entity_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CMSAuditService(session)
@@ -48,7 +48,7 @@ async def get_audit_timeline(
 async def get_audit_diffs(
     entity_type: str,
     entity_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CMSAuditService(session)
@@ -57,7 +57,7 @@ async def get_audit_diffs(
 
 @router.get("/export")
 async def export_audit(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     entity_type: str | None = Query(None),
     format: str = Query("json", pattern="^(json|csv)$"),
@@ -74,7 +74,7 @@ async def export_audit(
 
 @router.get("/stats")
 async def get_audit_stats(
-    user: Annotated[User, Depends(get_cms_user)],
+    __user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     days: int = Query(30, ge=1, le=365),
 ):

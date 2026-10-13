@@ -43,13 +43,6 @@ class Settings(BaseSettings):
     postgres_host: str = "localhost"
     postgres_port: int = 5432
 
-    @property
-    def database_url(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
-
     database_url: str | None = None
 
     @field_validator("database_url", mode="before")
@@ -77,12 +70,6 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_db: int = 0
     redis_password: str = ""
-
-    @property
-    def redis_url(self) -> str:
-        if self.redis_password:
-            return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
-        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     redis_url: str | None = None
 
@@ -314,7 +301,10 @@ class Settings(BaseSettings):
         warnings = []
         if self.environment == Environment.PRODUCTION:
             if self.postgres_password == "medicheck_secret":
-                warnings.append("SECURITY: postgres_password is using default value. Set a strong password via POSTGRES_PASSWORD env var.")
+                warnings.append(
+                    "SECURITY: postgres_password is using default value. "
+                    "Set a strong password via POSTGRES_PASSWORD env var."
+                )
             if self.secret_key in ("", "change-me-to-a-random-secret-key"):
                 warnings.append("SECURITY: secret_key is not set. Authentication tokens are not secure!")
             if self.redis_password == "":

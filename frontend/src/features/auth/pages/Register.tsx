@@ -58,9 +58,10 @@ const RegisterPage: React.FC = () => {
         role: accountType,
       })
       
-      // Navigate based on role
-      const redirectPath = accountType === 'patient' ? '/app' : '/cms/dashboard'
-      navigate(redirectPath)
+      // Self-registration always creates a patient account. A healthcare
+      // provider role must be granted by an administrator afterwards, so new
+      // users start in the patient portal.
+      navigate('/app')
     } catch {
       // Error handled by mutation state
     }
@@ -118,7 +119,7 @@ const RegisterPage: React.FC = () => {
           <p className="text-sm text-slate-500 dark:text-slate-400">
             {accountType === 'patient'
               ? 'Start your health assessment journey with Medicheck.'
-              : 'Join our clinical team and help improve patient outcomes.'}
+              : 'Request a healthcare provider account. Provider access is activated after an administrator reviews your account.'}
           </p>
         </div>
 

@@ -62,12 +62,12 @@ jobs:
         run: |
           cd backend
           pip install ruff
-          ruff check app/ --exit-zero
+          ruff check app/
 
       - name: Run backend tests
         run: |
           cd backend
-          python -m pytest --tb=short -q --cov=app --cov-report=term-missing
+          python -m pytest --tb=short -q --cov=app --cov-report=term-missing --cov-fail-under=50
         env:
           DATABASE_URL: postgresql+asyncpg://medicheck:medicheck_secret@localhost:5432/medicheck
           REDIS_URL: redis://localhost:6379/0
@@ -101,7 +101,7 @@ jobs:
       - name: Lint
         run: |
           cd frontend
-          npx eslint src/ --ext .ts,.tsx --max-warnings 100
+          npx eslint src/ --ext .ts,.tsx --max-warnings 0
 
       - name: Build
         run: |

@@ -45,7 +45,7 @@ async def update_current_user_profile(
 
 @router.get("", response_model=list[UserResponse], summary="List users")
 async def list_users(
-    admin: Annotated[User, Depends(get_current_admin)],
+    _admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=500),
@@ -57,7 +57,7 @@ async def list_users(
 
 @router.get("/count", summary="Count users")
 async def count_users(
-    admin: Annotated[User, Depends(get_current_admin)],
+    __admin: Annotated[User, Depends(get_current_admin)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> dict:
     repo = SQLUserRepository(session)

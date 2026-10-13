@@ -14,7 +14,7 @@ router = APIRouter(prefix="/cms/evidence", tags=["CMS Clinical Evidence"])
 
 @router.get("")
 async def list_evidence(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = ClinicalEvidenceService(session)
@@ -42,7 +42,7 @@ async def create_evidence(
 
 @router.get("/pubmed/lookup")
 async def lookup_pubmed(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     pmid: str = Query(...),
 ):
@@ -52,7 +52,7 @@ async def lookup_pubmed(
 
 @router.get("/doi/lookup")
 async def lookup_doi(
-    user: Annotated[User, Depends(get_cms_user)],
+    __user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     doi: str = Query(...),
 ):

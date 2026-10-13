@@ -29,7 +29,7 @@ from app.application.dtos.referral_dtos import (
     StatusUpdateRequest,
 )
 from app.application.services.referral_service import ReferralService
-from app.identity import User, get_current_user, get_referral_user
+from app.identity import User, get_referral_user
 
 logger = logging.getLogger(__name__)
 

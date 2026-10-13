@@ -232,7 +232,7 @@ class LongitudinalExplanationResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     @model_validator(mode="after")
-    def _validate_referenced_ids(self) -> "LongitudinalExplanationResponse":
+    def _validate_referenced_ids(self) -> LongitudinalExplanationResponse:
         allowed_ind = getattr(self, "_allowed_indicator_ids", None)
         allowed_cond = getattr(self, "_allowed_condition_ids", None)
         allowed_rec = getattr(self, "_allowed_recommendation_ids", None)
@@ -242,21 +242,33 @@ class LongitudinalExplanationResponse(BaseModel):
             + self.improved_findings + self.stable_findings
         )
         for f in groups:
-            if allowed_ind is not None and f.ref_type == "indicator" and f.ref_id:
-                if f.ref_id not in allowed_ind:
-                    raise ValueError(
-                        f"AI referenced unknown indicator id: {f.ref_id}"
-                    )
-            if allowed_cond is not None and f.ref_type == "condition" and f.ref_id:
-                if f.ref_id not in allowed_cond:
-                    raise ValueError(
-                        f"AI referenced unknown condition id: {f.ref_id}"
-                    )
-            if allowed_rec is not None and f.ref_type == "recommendation" and f.ref_id:
-                if f.ref_id not in allowed_rec:
-                    raise ValueError(
-                        f"AI referenced unknown recommendation id: {f.ref_id}"
-                    )
+            if (
+                allowed_ind is not None
+                and f.ref_type == "indicator"
+                and f.ref_id
+                and f.ref_id not in allowed_ind
+            ):
+                raise ValueError(
+                    f"AI referenced unknown indicator id: {f.ref_id}"
+                )
+            if (
+                allowed_cond is not None
+                and f.ref_type == "condition"
+                and f.ref_id
+                and f.ref_id not in allowed_cond
+            ):
+                raise ValueError(
+                    f"AI referenced unknown condition id: {f.ref_id}"
+                )
+            if (
+                allowed_rec is not None
+                and f.ref_type == "recommendation"
+                and f.ref_id
+                and f.ref_id not in allowed_rec
+            ):
+                raise ValueError(
+                    f"AI referenced unknown recommendation id: {f.ref_id}"
+                )
         if allowed_ev is not None:
             for f in groups:
                 bad = [e for e in f.evidence_ids if e not in allowed_ev]
@@ -278,7 +290,7 @@ class LongitudinalExplanationResponse(BaseModel):
         allowed_condition_ids: set[str],
         allowed_recommendation_ids: set[str],
         allowed_evidence_ids: set[str] | None = None,
-    ) -> "LongitudinalExplanationResponse":
+    ) -> LongitudinalExplanationResponse:
         object.__setattr__(self, "_allowed_indicator_ids", allowed_indicator_ids)
         object.__setattr__(self, "_allowed_condition_ids", allowed_condition_ids)
         object.__setattr__(self, "_allowed_recommendation_ids", allowed_recommendation_ids)

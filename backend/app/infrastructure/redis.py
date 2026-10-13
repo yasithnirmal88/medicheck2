@@ -25,7 +25,7 @@ async def create_redis_pool() -> ConnectionPool:
     # Check if using Upstash Redis
     upstash_url = os.getenv("UPSTASH_REDIS_REST_URL")
     upstash_token = os.getenv("UPSTASH_REDIS_REST_TOKEN")
-    
+
     if upstash_url and upstash_token:
         # Use Upstash - create connection pool with REST API
         _pool = ConnectionPool.from_url(
@@ -39,7 +39,7 @@ async def create_redis_pool() -> ConnectionPool:
             max_connections=20,
             decode_responses=True,
         )
-    
+
     logger.info("Redis connection pool created")
     return _pool
 

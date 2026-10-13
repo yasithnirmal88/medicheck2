@@ -113,8 +113,8 @@ class ReferralStatusEventResponse(BaseModel):
 
 class ReferralDetailResponse(ReferralResponse):
     status_events: list[ReferralStatusEventResponse] = []
-    barriers: list["BarrierResponse"] = []
-    follow_up_tasks: list["FollowUpTaskResponse"] = []
+    barriers: list[BarrierResponse] = []
+    follow_up_tasks: list[FollowUpTaskResponse] = []
 
 
 # ── Actions ────────────────────────────────────────────────────────────

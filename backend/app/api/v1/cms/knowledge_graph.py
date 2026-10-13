@@ -16,7 +16,7 @@ router = APIRouter(prefix="/cms/knowledge-graph", tags=["CMS Knowledge Graph"])
 
 @router.get("/graphs")
 async def list_graphs(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     body_system_id: str | None = Query(None),
 ):
@@ -42,7 +42,7 @@ async def create_graph(
 @router.get("/graphs/{graph_id}")
 async def get_graph(
     graph_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KnowledgeGraphEditorService(session)
@@ -63,13 +63,13 @@ async def update_graph(
     try:
         return await svc.update_graph(graph_id, payload, user.id)
     except ValueError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 @router.delete("/graphs/{graph_id}")
 async def delete_graph(
     graph_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KnowledgeGraphEditorService(session)
@@ -80,7 +80,7 @@ async def delete_graph(
 @router.post("/graphs/{graph_id}/nodes")
 async def add_node(
     graph_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -100,7 +100,7 @@ async def add_node(
 @router.put("/graphs/nodes/{node_id}")
 async def update_node(
     node_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -108,13 +108,13 @@ async def update_node(
     try:
         return await svc.update_node(node_id, payload)
     except ValueError as e:
-        raise HTTPException(404, str(e))
+        raise HTTPException(404, str(e)) from e
 
 
 @router.delete("/graphs/nodes/{node_id}")
 async def remove_node(
     node_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KnowledgeGraphEditorService(session)
@@ -125,7 +125,7 @@ async def remove_node(
 @router.post("/graphs/{graph_id}/edges")
 async def add_edge(
     graph_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -144,7 +144,7 @@ async def add_edge(
 @router.delete("/graphs/edges/{edge_id}")
 async def remove_edge(
     edge_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KnowledgeGraphEditorService(session)
@@ -155,7 +155,7 @@ async def remove_edge(
 @router.post("/graphs/{graph_id}/validate")
 async def validate_graph(
     graph_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KnowledgeGraphEditorService(session)
@@ -166,7 +166,7 @@ async def validate_graph(
 async def analyze_impact(
     entity_type: str,
     entity_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KnowledgeGraphEditorService(session)
@@ -175,7 +175,7 @@ async def analyze_impact(
 
 @router.get("/search")
 async def search_entities(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     q: str = Query("", alias="query"),
     limit: int = Query(20),
@@ -186,7 +186,7 @@ async def search_entities(
 
 @router.post("/bulk-link")
 async def bulk_link(
-    user: Annotated[User, Depends(get_cms_user)],
+    __user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):

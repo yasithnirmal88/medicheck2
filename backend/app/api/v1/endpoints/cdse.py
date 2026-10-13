@@ -4,8 +4,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
-from app.identity import get_current_user
 from app.application.services.clinical_decision_service import ClinicalDecisionService
+from app.identity import get_current_user
 
 router = APIRouter(prefix="/assessment", tags=["cdse"])
 
@@ -24,7 +24,7 @@ async def process_assessment(
         res = await svc.process_assessment(session_id, current_user.id)
         return res
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/results/{session_id}")
