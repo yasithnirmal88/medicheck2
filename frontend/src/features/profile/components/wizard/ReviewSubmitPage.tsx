@@ -90,7 +90,7 @@ function getSectionCompletion(key: SectionKey, state: WizardState): { filled: nu
 interface ReviewSubmitPageProps {
   state: WizardState
   setSection: (key: SectionKey, value: unknown) => void
-  onSubmit: () => void
+  onSubmit: () => Promise<boolean>
 }
 
 export function ReviewSubmitPage({ state, setSection, onSubmit }: ReviewSubmitPageProps) {
@@ -106,13 +106,20 @@ export function ReviewSubmitPage({ state, setSection, onSubmit }: ReviewSubmitPa
   const [expandedSections, setExpandedSections] = useState<Set<SectionKey>>(new Set(visibleSteps.map((s) => s.key)))
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [submitFailed, setSubmitFailed] = useState(false)
 
   const handleSubmit = async () => {
     setSubmitting(true)
-    await new Promise((resolve) => setTimeout(resolve, 1500))
-    setSubmitting(false)
-    setSubmitted(true)
-    onSubmit()
+    setSubmitFailed(false)
+    try {
+      const didSubmit = await onSubmit()
+      setSubmitted(didSubmit)
+      setSubmitFailed(!didSubmit)
+    } catch {
+      setSubmitFailed(true)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const toggleSection = (key: SectionKey) => {
@@ -330,6 +337,11 @@ export function ReviewSubmitPage({ state, setSection, onSubmit }: ReviewSubmitPa
         >
           Save Draft
         </button>
+        {submitFailed && (
+          <p role="alert" className="text-sm text-red-600 dark:text-red-400">
+            We couldn&apos;t submit your profile. Please try again.
+          </p>
+        )}
         <button
           type="button"
           onClick={handleSubmit}

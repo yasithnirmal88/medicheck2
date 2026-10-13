@@ -123,7 +123,17 @@ export const cmsApi = {
   lifestyleAdvice: entityApi<LifestyleAdvice>('lifestyle'),
   exercisePrograms: entityApi<ExerciseProgram>('exercise'),
   nutritionAdvice: entityApi<NutritionAdvice>('nutrition'),
-  evidenceReferences: entityApi<EvidenceReference>('evidence'),
+  evidenceReferences: {
+    list: (params?: Record<string, unknown>) =>
+      api.get<EvidenceReference[]>('/cms/evidence', { params }).then((r) => ({
+        items: r.data,
+        total: r.data.length,
+        skip: Number(params?.skip ?? 0),
+        limit: Number(params?.limit ?? r.data.length),
+      })),
+    create: (data: Partial<EvidenceReference>) =>
+      api.post<EvidenceReference>('/cms/evidence', data).then((r) => r.data),
+  },
   templates: entityApi<Template>('template'),
   clinicalGuidelines: entityApi<ClinicalGuideline>('guideline'),
   medications: entityApi<MedicationRecommendation>('medication'),

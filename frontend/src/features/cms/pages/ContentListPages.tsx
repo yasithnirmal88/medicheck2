@@ -160,8 +160,8 @@ export const NutritionAdviceListPage = makeListPage<NutritionAdvice>('nutrition'
 export const EvidenceListPage = makeListPage<EvidenceReference>('evidence', 'Evidence References', 'PubMed and clinical evidence references', [
   { key: 'title', header: 'Title', render: (e) => nameCell(e.title) },
   { key: 'evidence_level', header: 'Level', render: (e) => e.evidence_level ? <span className="text-xs font-medium text-slate-600">{e.evidence_level}</span> : <span className="text-xs text-slate-400">—</span> },
-  { key: 'pmid', header: 'PMID', render: (e) => e.pmid ? codeCell(e.pmid) : <span className="text-xs text-slate-400">—</span> },
-  { key: 'confidence_score', header: 'Confidence', render: (e) => e.confidence_score != null ? <span className="text-xs text-slate-500">{e.confidence_score}%</span> : <span className="text-xs text-slate-400">—</span> },
+  { key: 'source', header: 'Source', render: (e) => e.source ? textCell(e.source) : <span className="text-xs text-slate-400">—</span> },
+  { key: 'url', header: 'URL', render: (e) => e.url ? textCell(e.url) : <span className="text-xs text-slate-400">—</span> },
   { key: 'created_at', header: 'Created', render: (e) => dateCell(e.created_at) },
 ])
 

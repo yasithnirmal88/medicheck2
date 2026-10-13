@@ -264,7 +264,13 @@ class SQLKnowledgeGraphRepository:
                 QuestionIndicatorLinkModel,
                 QuestionIndicatorLinkModel.indicator_id == ClinicalIndicatorModel.id,
             )
-            .where(QuestionIndicatorLinkModel.question_id == question_id)
+            .where(
+                QuestionIndicatorLinkModel.question_id == question_id,
+                QuestionIndicatorLinkModel.active.is_(True),
+                QuestionIndicatorLinkModel.deleted_at.is_(None),
+                ClinicalIndicatorModel.is_active.is_(True),
+                ClinicalIndicatorModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         return r.scalars().all()
@@ -280,8 +286,11 @@ class SQLKnowledgeGraphRepository:
                 == ClinicalIndicatorModel.id,
             )
             .where(
-                QuestionOptionIndicatorLinkModel.question_option_id
-                == question_option_id
+                QuestionOptionIndicatorLinkModel.question_option_id == question_option_id,
+                QuestionOptionIndicatorLinkModel.active.is_(True),
+                QuestionOptionIndicatorLinkModel.deleted_at.is_(None),
+                ClinicalIndicatorModel.is_active.is_(True),
+                ClinicalIndicatorModel.deleted_at.is_(None),
             )
         )
         r = await self.session.execute(q)
@@ -298,7 +307,13 @@ class SQLKnowledgeGraphRepository:
                 QuestionIndicatorLinkModel,
                 QuestionIndicatorLinkModel.indicator_id == ClinicalIndicatorModel.id,
             )
-            .where(QuestionIndicatorLinkModel.question_id.in_(question_ids))
+            .where(
+                QuestionIndicatorLinkModel.question_id.in_(question_ids),
+                QuestionIndicatorLinkModel.active.is_(True),
+                QuestionIndicatorLinkModel.deleted_at.is_(None),
+                ClinicalIndicatorModel.is_active.is_(True),
+                ClinicalIndicatorModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         result: dict[str, list[ClinicalIndicatorModel]] = {}
@@ -317,7 +332,13 @@ class SQLKnowledgeGraphRepository:
                 QuestionOptionIndicatorLinkModel,
                 QuestionOptionIndicatorLinkModel.indicator_id == ClinicalIndicatorModel.id,
             )
-            .where(QuestionOptionIndicatorLinkModel.question_option_id.in_(option_ids))
+            .where(
+                QuestionOptionIndicatorLinkModel.question_option_id.in_(option_ids),
+                QuestionOptionIndicatorLinkModel.active.is_(True),
+                QuestionOptionIndicatorLinkModel.deleted_at.is_(None),
+                ClinicalIndicatorModel.is_active.is_(True),
+                ClinicalIndicatorModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         result: dict[str, list[ClinicalIndicatorModel]] = {}
@@ -336,7 +357,12 @@ class SQLKnowledgeGraphRepository:
                 IndicatorConditionLinkModel,
                 IndicatorConditionLinkModel.condition_id == PossibleConditionModel.id,
             )
-            .where(IndicatorConditionLinkModel.indicator_id.in_(indicator_ids))
+            .where(
+                IndicatorConditionLinkModel.indicator_id.in_(indicator_ids),
+                IndicatorConditionLinkModel.active.is_(True),
+                IndicatorConditionLinkModel.deleted_at.is_(None),
+                PossibleConditionModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         result: dict[str, list[PossibleConditionModel]] = {}
@@ -356,7 +382,13 @@ class SQLKnowledgeGraphRepository:
                 ConditionRecommendationLinkModel.recommendation_id
                 == RecommendationModel.id,
             )
-            .where(ConditionRecommendationLinkModel.condition_id.in_(condition_ids))
+            .where(
+                ConditionRecommendationLinkModel.condition_id.in_(condition_ids),
+                ConditionRecommendationLinkModel.active.is_(True),
+                ConditionRecommendationLinkModel.deleted_at.is_(None),
+                RecommendationModel.is_active.is_(True),
+                RecommendationModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         result: dict[str, list[RecommendationModel]] = {}
@@ -375,7 +407,12 @@ class SQLKnowledgeGraphRepository:
                 IndicatorEvidenceLinkModel,
                 IndicatorEvidenceLinkModel.evidence_id == EvidenceReferenceModel.id,
             )
-            .where(IndicatorEvidenceLinkModel.indicator_id.in_(indicator_ids))
+            .where(
+                IndicatorEvidenceLinkModel.indicator_id.in_(indicator_ids),
+                IndicatorEvidenceLinkModel.active.is_(True),
+                IndicatorEvidenceLinkModel.deleted_at.is_(None),
+                EvidenceReferenceModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         result: dict[str, list[EvidenceReferenceModel]] = {}
@@ -395,7 +432,13 @@ class SQLKnowledgeGraphRepository:
                 ConditionLaboratoryTestLinkModel.laboratory_test_id
                 == LaboratoryTestModel.id,
             )
-            .where(ConditionLaboratoryTestLinkModel.condition_id.in_(condition_ids))
+            .where(
+                ConditionLaboratoryTestLinkModel.condition_id.in_(condition_ids),
+                ConditionLaboratoryTestLinkModel.active.is_(True),
+                ConditionLaboratoryTestLinkModel.deleted_at.is_(None),
+                LaboratoryTestModel.is_active.is_(True),
+                LaboratoryTestModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         result: dict[str, list[LaboratoryTestModel]] = {}
@@ -412,7 +455,12 @@ class SQLKnowledgeGraphRepository:
                 IndicatorConditionLinkModel,
                 IndicatorConditionLinkModel.condition_id == PossibleConditionModel.id,
             )
-            .where(IndicatorConditionLinkModel.indicator_id == indicator_id)
+            .where(
+                IndicatorConditionLinkModel.indicator_id == indicator_id,
+                IndicatorConditionLinkModel.active.is_(True),
+                IndicatorConditionLinkModel.deleted_at.is_(None),
+                PossibleConditionModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         return r.scalars().all()
@@ -427,7 +475,13 @@ class SQLKnowledgeGraphRepository:
                 ConditionRecommendationLinkModel.recommendation_id
                 == RecommendationModel.id,
             )
-            .where(ConditionRecommendationLinkModel.condition_id == condition_id)
+            .where(
+                ConditionRecommendationLinkModel.condition_id == condition_id,
+                ConditionRecommendationLinkModel.active.is_(True),
+                ConditionRecommendationLinkModel.deleted_at.is_(None),
+                RecommendationModel.is_active.is_(True),
+                RecommendationModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         return r.scalars().all()
@@ -441,7 +495,12 @@ class SQLKnowledgeGraphRepository:
                 IndicatorEvidenceLinkModel,
                 IndicatorEvidenceLinkModel.evidence_id == EvidenceReferenceModel.id,
             )
-            .where(IndicatorEvidenceLinkModel.indicator_id == indicator_id)
+            .where(
+                IndicatorEvidenceLinkModel.indicator_id == indicator_id,
+                IndicatorEvidenceLinkModel.active.is_(True),
+                IndicatorEvidenceLinkModel.deleted_at.is_(None),
+                EvidenceReferenceModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         return r.scalars().all()
@@ -456,7 +515,13 @@ class SQLKnowledgeGraphRepository:
                 ConditionLaboratoryTestLinkModel.laboratory_test_id
                 == LaboratoryTestModel.id,
             )
-            .where(ConditionLaboratoryTestLinkModel.condition_id == condition_id)
+            .where(
+                ConditionLaboratoryTestLinkModel.condition_id == condition_id,
+                ConditionLaboratoryTestLinkModel.active.is_(True),
+                ConditionLaboratoryTestLinkModel.deleted_at.is_(None),
+                LaboratoryTestModel.is_active.is_(True),
+                LaboratoryTestModel.deleted_at.is_(None),
+            )
         )
         r = await self.session.execute(q)
         return r.scalars().all()

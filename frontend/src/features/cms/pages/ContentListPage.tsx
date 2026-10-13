@@ -5,6 +5,7 @@ import { useContentList, useDeleteContent } from '../hooks/useCmsQueries'
 import { Plus, Edit2, Trash2 } from 'lucide-react'
 import type { Column } from '../components/ContentLayout'
 import type { EntityType } from '../types'
+import { getContentListPath } from './contentRoutes'
 
 interface ContentListPageProps<T extends { id: string }> {
   entityType: string
@@ -22,7 +23,8 @@ export function ContentListPage<T extends { id: string }>({
   const [query, setQuery] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
   const limit = 20
-  const path = basePath || `/cms/${entityType.replace(/_/g, '-')}`
+  const path = `/cms/content/${entityType}`
+  const listPath = basePath || getContentListPath(entityType as EntityType)
 
   const { data, isLoading } = useContentList<T>(entityType as EntityType, { skip, limit, query: query || undefined })
   const deleteMutation = useDeleteContent(entityType as EntityType)
@@ -43,7 +45,7 @@ export function ContentListPage<T extends { id: string }>({
       render: (item: T) => (
         <div className="flex items-center gap-2">
           <button
-            onClick={(e: React.MouseEvent) => { e.stopPropagation(); navigate(`${path}/${item.id}`) }}
+            onClick={(e: React.MouseEvent) => { e.stopPropagation(); navigate(`${path}/${item.id}`, { state: { returnTo: listPath } }) }}
             className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
             title="Edit"
           >
@@ -67,7 +69,7 @@ export function ContentListPage<T extends { id: string }>({
       description={description}
       actions={
         <button
-          onClick={() => navigate(`${path}/new`)}
+          onClick={() => navigate(`${path}/new`, { state: { returnTo: listPath } })}
           className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition flex items-center gap-2"
         >
           <Plus className="w-4 h-4" />
@@ -80,7 +82,7 @@ export function ContentListPage<T extends { id: string }>({
         columns={allColumns}
         data={items}
         keyExtractor={(item: T) => item.id}
-        onRowClick={(item: T) => navigate(`${path}/${item.id}`)}
+        onRowClick={(item: T) => navigate(`${path}/${item.id}`, { state: { returnTo: listPath } })}
         loading={isLoading}
       />
       <Pagination skip={skip} limit={limit} total={total} onChange={setSkip} />

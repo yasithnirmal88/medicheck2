@@ -24,6 +24,7 @@ import { useHealthTips } from '../hooks/useHealthTips'
 import { useToast } from '../hooks/useToast'
 import { useValidation } from '../hooks/useValidation'
 import { normalizeUnanswered } from '../state/defaults'
+import { saveProfileData } from '../services/profileService'
 import type { WizardState, SectionKey } from '../types/wizard'
 
 const STEP_LABELS: { key: SectionKey; label: string; icon: string }[] = [
@@ -62,6 +63,7 @@ function renderSection(
   step: { key: SectionKey; label: string },
   state: WizardState,
   setSection: (key: SectionKey, value: unknown) => void,
+  onSubmit: () => Promise<boolean>,
 ) {
   const key = step.key
 
@@ -70,9 +72,7 @@ function renderSection(
       <ReviewSubmitPage
         state={state}
         setSection={setSection}
-        onSubmit={() => {
-          console.log('Profile submitted:', state)
-        }}
+        onSubmit={onSubmit}
       />
     )
   }
@@ -426,18 +426,15 @@ export default function HealthProfilePage() {
     const validation = validateSection('consents', state.consents)
     if (!validation.isValid) {
       error('Please review and accept the terms and conditions')
-      return
+      return false
     }
     try {
-      const response = await fetch('/api/profiles/me', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(normalizeUnanswered(state)),
-      })
-      if (!response.ok) throw new Error('Failed to submit')
+      await saveProfileData(normalizeUnanswered(state))
       success('Profile submitted successfully!')
+      return true
     } catch {
       error('Failed to submit profile. Please try again.')
+      return false
     }
   }
 
@@ -532,7 +529,7 @@ export default function HealthProfilePage() {
 
         <ProfileErrorBoundary>
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-800">
-            {renderSection(steps[currentStep], state, setSection)}
+            {renderSection(steps[currentStep], state, setSection, handleSubmit)}
           </div>
         </ProfileErrorBoundary>
 

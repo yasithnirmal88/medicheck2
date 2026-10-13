@@ -1,35 +1,33 @@
 import React, { useState } from 'react'
 import { BookOpen, Search, ExternalLink } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useQueryClient } from '@tanstack/react-query'
 import { ContentLayout, StatusBadge, EmptyState, TableSkeleton, FormField } from '../components/ContentLayout'
 import { useEvidenceReferences } from '../hooks/useCmsQueries'
 import { cmsApi } from '../api/cmsApi'
 import type { EvidenceReference } from '../types'
 
-const evidenceLevels = ['', 'Level I', 'Level II', 'Level III', 'Level IV', 'Level V']
+const evidenceLevels = ['', 'A', 'B', 'C', 'D', 'E']
 
 export const ClinicalEvidencePage: React.FC = () => {
+  const queryClient = useQueryClient()
   const [searchTitle, setSearchTitle] = useState('')
-  const [searchPmid, setSearchPmid] = useState('')
-  const [searchDoi, setSearchDoi] = useState('')
+  const [searchSource, setSearchSource] = useState('')
   const [searchLevel, setSearchLevel] = useState('')
   const [showCreate, setShowCreate] = useState(false)
 
   const { data: evidenceData, isLoading } = useEvidenceReferences({
     ...(searchTitle ? { title: searchTitle } : {}),
-    ...(searchPmid ? { pmid: searchPmid } : {}),
-    ...(searchDoi ? { doi: searchDoi } : {}),
+    ...(searchSource ? { source: searchSource } : {}),
     ...(searchLevel ? { evidence_level: searchLevel } : {}),
   })
 
   const evidenceList = evidenceData?.items ?? []
 
   const [formTitle, setFormTitle] = useState('')
-  const [formCitation, setFormCitation] = useState('')
-  const [formPmid, setFormPmid] = useState('')
-  const [formDoi, setFormDoi] = useState('')
-  const [formLevel, setFormLevel] = useState('Level I')
-  const [formConfidence, setFormConfidence] = useState(0)
+  const [formSource, setFormSource] = useState('')
+  const [formUrl, setFormUrl] = useState('')
+  const [formLevel, setFormLevel] = useState('C')
   const [formSummary, setFormSummary] = useState('')
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -38,21 +36,18 @@ export const ClinicalEvidencePage: React.FC = () => {
     try {
       await cmsApi.evidenceReferences.create({
         title: formTitle,
-        citation: formCitation || null,
-        pmid: formPmid || null,
-        doi: formDoi || null,
-        evidence_level: formLevel || null,
-        confidence_score: formConfidence || null,
+        source: formSource || null,
+        url: formUrl || null,
+        evidence_level: formLevel,
         summary: formSummary || null,
       } as Partial<EvidenceReference>)
       toast.success('Evidence reference created')
+      await queryClient.invalidateQueries({ queryKey: ['cms', 'evidence-references'] })
       setShowCreate(false)
       setFormTitle('')
-      setFormCitation('')
-      setFormPmid('')
-      setFormDoi('')
-      setFormLevel('Level I')
-      setFormConfidence(0)
+      setFormSource('')
+      setFormUrl('')
+      setFormLevel('C')
       setFormSummary('')
     } catch { toast.error('Failed to create evidence reference') }
   }
@@ -76,11 +71,8 @@ export const ClinicalEvidencePage: React.FC = () => {
             <FormField label="Title">
               <input type="text" value={searchTitle} onChange={(e) => setSearchTitle(e.target.value)} placeholder="Search title..." className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
             </FormField>
-            <FormField label="PMID">
-              <input type="text" value={searchPmid} onChange={(e) => setSearchPmid(e.target.value)} placeholder="PubMed ID" className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
-            </FormField>
-            <FormField label="DOI">
-              <input type="text" value={searchDoi} onChange={(e) => setSearchDoi(e.target.value)} placeholder="Digital Object Identifier" className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
+            <FormField label="Source">
+              <input type="text" value={searchSource} onChange={(e) => setSearchSource(e.target.value)} placeholder="Search source..." className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
             </FormField>
             <FormField label="Evidence Level">
               <select value={searchLevel} onChange={(e) => setSearchLevel(e.target.value)} className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white">
@@ -104,14 +96,13 @@ export const ClinicalEvidencePage: React.FC = () => {
                     <h4 className="text-sm font-medium text-slate-900 dark:text-white">{e.title}</h4>
                     <StatusBadge status={e.evidence_level ?? 'unknown'} />
                   </div>
-                  {e.citation && <p className="text-xs text-slate-500 mb-1">{e.citation}</p>}
                   <div className="flex items-center gap-3 text-xs text-slate-500">
-                    {e.pmid && (
-                      <a href={`https://pubmed.ncbi.nlm.nih.gov/${e.pmid}`} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
-                        PMID: {e.pmid} <ExternalLink className="w-3 h-3" />
+                    {e.source && <span>{e.source}</span>}
+                    {e.url && (
+                      <a href={e.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline flex items-center gap-1">
+                        View source <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
-                    {e.confidence_score !== null && <span>Confidence: {e.confidence_score}</span>}
                   </div>
                   {e.summary && <p className="text-xs text-slate-600 dark:text-slate-400 mt-2">{e.summary}</p>}
                 </div>
@@ -128,22 +119,16 @@ export const ClinicalEvidencePage: React.FC = () => {
             <FormField label="Title" required>
               <input type="text" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} placeholder="Paper title" className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
             </FormField>
-            <FormField label="Citation">
-              <input type="text" value={formCitation} onChange={(e) => setFormCitation(e.target.value)} placeholder="Full citation" className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
+            <FormField label="Source">
+              <input type="text" value={formSource} onChange={(e) => setFormSource(e.target.value)} placeholder="Journal, organization, or publisher" className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
             </FormField>
-            <FormField label="PMID">
-              <input type="text" value={formPmid} onChange={(e) => setFormPmid(e.target.value)} placeholder="PubMed ID" className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
-            </FormField>
-            <FormField label="DOI">
-              <input type="text" value={formDoi} onChange={(e) => setFormDoi(e.target.value)} placeholder="DOI" className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
+            <FormField label="URL">
+              <input type="url" value={formUrl} onChange={(e) => setFormUrl(e.target.value)} placeholder="https://..." className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
             </FormField>
             <FormField label="Evidence Level">
               <select value={formLevel} onChange={(e) => setFormLevel(e.target.value)} className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white">
                 {evidenceLevels.filter(Boolean).map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
-            </FormField>
-            <FormField label="Confidence Score">
-              <input type="number" min={0} max={100} value={formConfidence} onChange={(e) => setFormConfidence(Number(e.target.value))} className="w-full px-3 py-2 border rounded-lg border-slate-300 dark:border-slate-700 dark:bg-slate-800 text-sm text-slate-900 dark:text-white" />
             </FormField>
             <div className="md:col-span-2">
               <FormField label="Summary">

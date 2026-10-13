@@ -4,6 +4,7 @@ import logging
 from typing import Any
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.persistence.models.evidence_reference import EvidenceReferenceModel
@@ -81,51 +82,63 @@ class ClinicalEvidenceService:
     async def add_evidence_reference(
         self,
         title: str,
-        citation: str,
-        pmid: str | None = None,
-        doi: str | None = None,
-        evidence_level: str = "Level I",
-        confidence_score: float = 0.90,
+        url: str | None = None,
+        source: str | None = None,
+        evidence_level: str = "C",
         summary: str | None = None,
-        created_by: str | None = None,
+        question_id: str | None = None,
     ) -> dict[str, Any]:
         ref = EvidenceReferenceModel(
             title=title,
-            citation=citation,
-            pmid=pmid,
-            doi=doi,
+            url=url,
+            source=source,
             evidence_level=evidence_level,
-            confidence_score=confidence_score,
             summary=summary,
-            is_active=True,
-            created_by=created_by,
-            updated_by=created_by,
+            question_id=question_id,
         )
         created = await self._evidence_repo.create(ref)
+        await self._session.commit()
         return {
             "id": created.id,
             "title": created.title,
-            "citation": created.citation,
-            "pmid": created.pmid,
-            "doi": created.doi,
+            "url": created.url,
+            "source": created.source,
             "evidence_level": created.evidence_level,
-            "confidence_score": created.confidence_score,
             "summary": created.summary,
+            "question_id": created.question_id,
             "created_at": created.created_at.isoformat() if created.created_at else None,
         }
 
-    async def list_evidence_references(self) -> list[dict[str, Any]]:
-        refs = await self._evidence_repo.find_all()
+    async def list_evidence_references(
+        self,
+        *,
+        title: str | None = None,
+        source: str | None = None,
+        evidence_level: str | None = None,
+        skip: int = 0,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        stmt = select(EvidenceReferenceModel).where(
+            EvidenceReferenceModel.deleted_at.is_(None)
+        )
+        if title:
+            stmt = stmt.where(EvidenceReferenceModel.title.ilike(f"%{title}%"))
+        if source:
+            stmt = stmt.where(EvidenceReferenceModel.source.ilike(f"%{source}%"))
+        if evidence_level:
+            stmt = stmt.where(EvidenceReferenceModel.evidence_level == evidence_level)
+        stmt = stmt.order_by(EvidenceReferenceModel.created_at.desc()).offset(skip).limit(limit)
+        result = await self._session.execute(stmt)
+        refs = result.scalars().all()
         return [
             {
                 "id": r.id,
                 "title": r.title,
-                "citation": r.citation,
-                "pmid": r.pmid,
-                "doi": r.doi,
+                "url": r.url,
+                "source": r.source,
                 "evidence_level": r.evidence_level,
-                "confidence_score": r.confidence_score,
                 "summary": r.summary,
+                "question_id": r.question_id,
             }
             for r in refs
         ]

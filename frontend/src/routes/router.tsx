@@ -57,6 +57,7 @@ const UsersRolesPage = React.lazy(() => import('../features/cms/pages/UsersRoles
 const PublishingWorkflowsPage = React.lazy(() => import('../features/cms/pages/PublishingWorkflowsPage').then(m => ({ default: m.PublishingWorkflowsPage })))
 const SearchPage = React.lazy(() => import('../features/cms/pages/SearchPage').then(m => ({ default: m.SearchPage })))
 const SettingsPage = React.lazy(() => import('../features/cms/pages/SettingsPage').then(m => ({ default: m.SettingsPage })))
+const ContentEditorRoute = React.lazy(() => import('../features/cms/pages/ContentEditorRoute'))
 
 // Phase 6 — Population Health & SDG Analytics
 const AnalyticsDashboardPage = React.lazy(() => import('../features/analytics/pages/AnalyticsDashboardPage'))
@@ -351,6 +352,8 @@ export default function Router() {
             <Route path="dashboard" element={<CMSDashboardPage />} />
 
             {/* Content Management */}
+            <Route path="content/:entityType/new" element={<ContentEditorRoute />} />
+            <Route path="content/:entityType/:entityId" element={<ContentEditorRoute />} />
             <Route path="questions" element={<QuestionsListPage />} />
             <Route path="question-groups" element={<Navigate to="/cms/questions" replace />} />
             <Route path="diseases" element={<DiseasesListPage />} />
