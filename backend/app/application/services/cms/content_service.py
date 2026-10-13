@@ -270,7 +270,7 @@ class CMSContentService:
         return entity_cls(**updated.to_dict()).to_dict()
 
     async def delete_entity(
-        self, entity_type: str, entity_id: str, user_id: str
+        self, entity_type: str, entity_id: str, _user_id: str
     ) -> None:
         repo = self._get_repo(entity_type)
         await repo.soft_delete(entity_id)

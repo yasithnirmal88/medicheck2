@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronDown,
@@ -26,7 +26,6 @@ import {
   Globe,
   Briefcase,
   Plane,
-  Phone,
   CheckCircle as SubmitIcon,
   Loader,
 } from 'lucide-react'
@@ -55,7 +54,6 @@ const STEP_LABELS: { key: SectionKey; label: string; icon: React.ReactNode }[] =
   { key: 'environment', label: 'Environment', icon: <Globe className="h-4 w-4" /> },
   { key: 'occupation', label: 'Work', icon: <Briefcase className="h-4 w-4" /> },
   { key: 'travel', label: 'Travel', icon: <Plane className="h-4 w-4" /> },
-  { key: 'emergency', label: 'Emergency', icon: <Phone className="h-4 w-4" /> },
 ]
 
 function getSectionCompletion(key: SectionKey, state: WizardState): { filled: number; total: number; missing: string[] } {
@@ -96,7 +94,16 @@ interface ReviewSubmitPageProps {
 }
 
 export function ReviewSubmitPage({ state, setSection, onSubmit }: ReviewSubmitPageProps) {
-  const [expandedSections, setExpandedSections] = useState<Set<SectionKey>>(new Set(STEP_LABELS.map((s) => s.key)))
+  const visibleSteps = useMemo(
+    () =>
+      STEP_LABELS.filter((s) => {
+        if (s.key === 'women_health' && state.personal.gender !== 'female') return false
+        if (s.key === 'men_health' && state.personal.gender !== 'male') return false
+        return true
+      }),
+    [state.personal.gender],
+  )
+  const [expandedSections, setExpandedSections] = useState<Set<SectionKey>>(new Set(visibleSteps.map((s) => s.key)))
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
@@ -166,7 +173,7 @@ export function ReviewSubmitPage({ state, setSection, onSubmit }: ReviewSubmitPa
       </div>
 
       <AnimatePresence>
-        {STEP_LABELS.map((step) => {
+        {visibleSteps.map((step) => {
           const { filled, total, missing } = getSectionCompletion(step.key, state)
           const isExpanded = expandedSections.has(step.key)
           const completionPct = total > 0 ? Math.round((filled / total) * 100) : 0

@@ -24,7 +24,9 @@ export async function fetchSessions(): Promise<QuestionnaireSession[]> {
 }
 
 export async function fetchReports(limit = 25): Promise<HealthReport[]> {
-  const { data } = await api.get<HealthReport[]>('/report', { params: { limit } })
+  // Backend route is GET /report/ (trailing slash); using the exact path avoids
+  // a 307 redirect round-trip on every dashboard load.
+  const { data } = await api.get<HealthReport[]>('/report/', { params: { limit } })
   return data
 }
 

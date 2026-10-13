@@ -17,4 +17,3 @@ build/
 htmlcov/
 .github/
 scripts/
-nginx/ssl.conf

@@ -120,7 +120,15 @@ class SQLReportRepository:
         r = await self.session.execute(q)
         return r.scalars().first()
 
-    async def list_reports_by_user(self, user_id: str, limit: int = 100, offset: int = 0) -> list[HealthAssessmentModel]:
-        q = select(HealthAssessmentModel).where(HealthAssessmentModel.user_id == user_id).order_by(HealthAssessmentModel.created_at.desc()).limit(limit).offset(offset)
+    async def list_reports_by_user(
+        self, user_id: str, limit: int = 100, offset: int = 0
+    ) -> list[HealthAssessmentModel]:
+        q = (
+            select(HealthAssessmentModel)
+            .where(HealthAssessmentModel.user_id == user_id)
+            .order_by(HealthAssessmentModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         r = await self.session.execute(q)
         return r.scalars().all()

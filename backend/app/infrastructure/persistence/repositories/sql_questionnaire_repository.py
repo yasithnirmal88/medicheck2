@@ -87,7 +87,7 @@ class SQLQuestionnaireRepository(QuestionnaireRepository):
             is_active=template.is_active,
             is_template=template.is_template,
             version=template.version,
-            extra_metadata=template.metadata,
+            template_metadata=template.metadata,
             created_at=template.created_at,
             updated_at=template.updated_at,
             deleted_at=template.deleted_at,
@@ -114,7 +114,7 @@ class SQLQuestionnaireRepository(QuestionnaireRepository):
         model.is_active = template.is_active
         model.is_template = template.is_template
         model.version = template.version
-        model.extra_metadata = template.metadata
+        model.template_metadata = template.metadata
         model.updated_at = template.updated_at
         model.deleted_at = template.deleted_at
 
@@ -159,7 +159,7 @@ class SQLQuestionnaireRepository(QuestionnaireRepository):
             is_active=model.is_active,
             is_template=model.is_template,
             version=model.version,
-            metadata=model.extra_metadata or {},
+            metadata=model.template_metadata or {},
             created_at=model.created_at,
             updated_at=model.updated_at,
             deleted_at=model.deleted_at,

@@ -5,11 +5,14 @@ from datetime import datetime
 from sqlalchemy import DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.infrastructure.persistence.models.base import BaseModel
+from app.infrastructure.persistence.models.base import AUDIT_SCHEMA, BaseModel
 
 
 class AuditLogModel(BaseModel):
     __tablename__ = "audit_logs"
+    # Physical separation: see AIInteractionAuditModel (``audit`` schema on
+    # PostgreSQL, default namespace on SQLite).
+    __table_args__ = {"schema": AUDIT_SCHEMA}
 
     actor_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     actor_role: Mapped[str | None] = mapped_column(String(100), nullable=True)

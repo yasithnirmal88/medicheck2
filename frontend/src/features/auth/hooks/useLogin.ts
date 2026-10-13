@@ -60,10 +60,12 @@ export function useGoogleLogin() {
   })
 }
 
-// Registration with role
+// Registration. The role is NEVER chosen by the client: self-registration
+// always creates a patient account, and privileged roles are granted only by
+// an administrator through the backend identity admin API.
 export function useRegister() {
   return useMutation({
-    mutationFn: async ({ email, password, displayName, role = 'patient' }: RegisterFormValues) => {
+    mutationFn: async ({ email, password, displayName }: RegisterFormValues) => {
       // Ensure Firebase is initialized
       initializeFirebase()
       
@@ -77,25 +79,21 @@ export function useRegister() {
         await updateProfile(result.user, { displayName })
       }
       
-      // Register with backend to store role
+      // Register with the backend. No role is sent (or accepted).
       try {
         const token = await result.user.getIdToken()
         await api.post('/auth/register', {
           firebase_token: token,
           email,
           full_name: displayName,
-          role, // 'patient' or 'doctor'
         }, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
         })
       } catch (apiError) {
-        // Log but don't fail - Firebase user was created successfully
+        // Log but don't fail - the Firebase user was created successfully.
         console.warn('Failed to register with backend API:', apiError)
-        // Store role in localStorage as fallback
-        localStorage.setItem('medicheck_role', role)
-        localStorage.setItem('medicheck_account_type', role)
       }
       
       return result.user

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import re
+import time
+import uuid
 from typing import Any
 
 import firebase_admin
@@ -41,21 +45,86 @@ def get_firebase_app() -> firebase_admin.App | None:
     return _firebase_app
 
 
+# Short-TTL in-memory cache of verified Firebase claims, keyed by token hash.
+# A Firebase ID token is valid for 1 hour; we cache the *decoded claims* for a
+# short window so the 7 requests in a single dashboard load don't each re-run
+# the synchronous, network-fetching verify_id_token. Only positive (verified)
+# results are cached; failures are never cached. The TTL is kept well below the
+# token lifetime so revocation/expiration still take effect promptly.
+_CLAIM_CACHE: dict[str, tuple[dict[str, Any], float]] = {}
+_CLAIM_CACHE_TTL_SECONDS = 60
+_CLAIM_CACHE_MAX_ENTRIES = 512
+_cache_lock = asyncio.Lock()
+
+
+def _token_cache_key(id_token: str) -> str:
+    # Hash the raw token so we never store the bearer token itself in memory.
+    import hashlib
+
+    return hashlib.sha256(id_token.encode("utf-8")).hexdigest()
+
+
+async def _get_cached_claims(key: str) -> dict[str, Any] | None:
+    entry = _CLAIM_CACHE.get(key)
+    if entry is None:
+        return None
+    claims, expires_at = entry
+    if time.monotonic() >= expires_at:
+        _CLAIM_CACHE.pop(key, None)
+        return None
+    return claims
+
+
+async def _set_cached_claims(key: str, claims: dict[str, Any]) -> None:
+    async with _cache_lock:
+        # Bounded: drop oldest entries when over capacity.
+        if len(_CLAIM_CACHE) >= _CLAIM_CACHE_MAX_ENTRIES:
+            for old_key in list(_CLAIM_CACHE)[: _CLAIM_CACHE_MAX_ENTRIES // 4]:
+                _CLAIM_CACHE.pop(old_key, None)
+        _CLAIM_CACHE[key] = (claims, time.monotonic() + _CLAIM_CACHE_TTL_SECONDS)
+
+
+def _verify_id_token_sync(id_token: str, app: firebase_admin.App) -> dict[str, Any]:
+    # Thin sync wrapper around the Firebase Admin SDK. Preserves the exact
+    # exception types (ExpiredIdTokenError, RevokedIdTokenError,
+    # InvalidIdTokenError) so the caller can map them to auth errors.
+    return auth.verify_id_token(id_token, app=app)
+
+
 async def verify_firebase_token(id_token: str) -> dict[str, Any]:
     app = get_firebase_app()
     if app is None:
+        # SECURITY: mock auth is a LOCAL DEVELOPMENT convenience only. In a
+        # deployed environment (staging/production) we never fall back to it,
+        # even if ALLOW_MOCK_AUTH was mistakenly left enabled - a real auth
+        # backend is required.
+        if settings.environment in (Environment.STAGING, Environment.PRODUCTION):
+            raise AuthenticationError(
+                detail="Firebase is not configured - authentication is required"
+            )
         if not settings.allow_mock_auth:
-            if settings.environment in (Environment.STAGING, Environment.PRODUCTION):
-                raise AuthenticationError(detail="Firebase is not configured - authentication is required")
             raise AuthenticationError(
                 detail="Firebase is not configured. Set allow_mock_auth=True for development only."
             )
         logger.warning("SECURITY: Using mock authentication. DO NOT use in production!")
         return _mock_verify(id_token)
 
+    cache_key = _token_cache_key(id_token)
+    cached = await _get_cached_claims(cache_key)
+    if cached is not None:
+        logger.debug("Firebase token served from claim cache for uid: %s", cached.get("uid"))
+        return cached
+
     try:
-        decoded_token = auth.verify_id_token(id_token, app=app)
+        # firebase_admin.auth.verify_id_token is synchronous and performs a
+        # network fetch of Google's public keys on cache miss. Running it via
+        # asyncio.to_thread keeps the event loop responsive to concurrent
+        # requests instead of blocking them.
+        decoded_token = await asyncio.to_thread(_verify_id_token_sync, id_token, app)
         logger.debug("Firebase token verified for uid: %s", decoded_token.get("uid"))
+        # Cache only verified claims; never cache failures. TTL keeps this
+        # well below the 1 h token lifetime so revocation/expiration propagate.
+        await _set_cached_claims(cache_key, decoded_token)
         return decoded_token
     except auth.ExpiredIdTokenError:
         raise AuthenticationError(detail="Firebase token has expired") from None
@@ -68,11 +137,41 @@ async def verify_firebase_token(id_token: str) -> dict[str, Any]:
         raise AuthenticationError(detail="Failed to verify authentication token") from exc
 
 
-def _mock_verify(id_token: str) -> dict[str, Any]:
+_MOCK_EMAIL_DOMAIN = "example.com"
+_MOCK_UID_SLUG_MAX_LEN = 32
+_MOCK_EMAIL_UID_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def mock_email_for_uid(uid: str) -> str:
+    """Build a unique mock email address for a mock Firebase uid.
+
+    ``users.email`` is UNIQUE, so a single fixed mock address made the second
+    (and every subsequent) auto-created mock user collide. Each mock identity
+    therefore needs its own address.
+
+    The uuid suffix guarantees uniqueness even when two distinct uids collapse
+    to the same sanitized/truncated slug. This is safe because every consumer
+    resolves an existing user by ``firebase_uid`` *before* the email is ever
+    considered (``get_current_user``, ``AuthService.get_or_create_user``), so a
+    repeat call for the same token never re-inserts a row.
+    """
+    slug = _MOCK_EMAIL_UID_SLUG_RE.sub("-", (uid or "").lower()).strip("-")
+    slug = slug[:_MOCK_UID_SLUG_MAX_LEN].strip("-") or "uid"
+    return f"mock-{slug}-{uuid.uuid4().hex[:12]}@{_MOCK_EMAIL_DOMAIN}"
+
+
+def _mock_verify(id_token: str, *, email: str | None = None) -> dict[str, Any]:
+    """Deterministic mock claims for development/test auth.
+
+    ``email`` defaults to a unique address derived from the uid (see
+    ``mock_email_for_uid``) and may be pinned to an exact value by tests that
+    need a predictable address.
+    """
     logger.debug("Using mock Firebase verification")
+    uid = id_token or "mock-uid"
     return {
-        "uid": id_token or "mock-uid",
-        "email": "mock@example.com",
+        "uid": uid,
+        "email": email or mock_email_for_uid(uid),
         "email_verified": True,
         "name": "Mock User",
         "picture": None,

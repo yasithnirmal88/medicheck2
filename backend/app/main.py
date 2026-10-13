@@ -25,20 +25,77 @@ from app.api.middleware import (
     RequestTimingMiddleware,
     SecurityHeadersMiddleware,
 )
-from app.core.security.rate_limit import RateLimitMiddleware as AppRateLimitMiddleware
 from app.core.config import Environment, settings
 from app.core.exceptions import (
-    AppException,
+    AppError,
     AuthenticationError,
     NotFoundError,
     ValidationError,
 )
 from app.core.logging import get_logger, setup_logging
-from app.core.security.firebase import get_firebase_app
+from app.core.security.rate_limit import RateLimitMiddleware as AppRateLimitMiddleware
+from app.identity import get_firebase_app
 from app.infrastructure.database import close_db
 from app.infrastructure.redis import close_redis
 
 logger = get_logger(__name__)
+
+
+def validate_production_boot() -> None:
+    """Fail fast on misconfigurations that must never boot.
+
+    Mock authentication is refused in ANY deployed environment (staging and
+    production) - it is a local-development convenience only. Production
+    additionally refuses missing Firebase credentials and the default database
+    password. Non-deployed environments (development/CI) are unaffected.
+    """
+    if settings.allow_mock_auth and settings.environment in (
+        Environment.STAGING,
+        Environment.PRODUCTION,
+    ):
+        raise RuntimeError(
+            "SECURITY: ALLOW_MOCK_AUTH must never be enabled in "
+            f"{settings.environment.value}. It is for local development only."
+        )
+    if settings.environment != Environment.PRODUCTION:
+        return
+    if not settings.firebase_credentials:
+        raise RuntimeError(
+            "SECURITY: Firebase credentials are required in production "
+            "(FIREBASE_CREDENTIALS_JSON / PATH / explicit fields)."
+        )
+    if settings.postgres_password == "medicheck_secret":
+        raise RuntimeError(
+            "SECURITY: POSTGRES_PASSWORD is the default value; "
+            "set a strong password via the environment."
+        )
+
+
+def _init_sentry() -> bool:
+    """Initialize Sentry error tracking when SENTRY_DSN is configured.
+
+    sentry_sdk is an optional dependency: if the DSN is set but the package
+    is not installed, startup logs a warning and continues without it.
+    Returns True when Sentry was initialized.
+    """
+    dsn = (settings.sentry_dsn or "").strip()
+    if not dsn:
+        return False
+    try:
+        import sentry_sdk
+    except ImportError:
+        logger.warning(
+            "SENTRY_DSN is set but sentry-sdk is not installed; "
+            "error tracking disabled. pip install sentry-sdk to enable."
+        )
+        return False
+    sentry_sdk.init(
+        dsn=dsn,
+        environment=settings.environment.value,
+        release=f"{settings.project_name}@{settings.version}",
+    )
+    logger.info("Sentry error tracking initialized")
+    return True
 
 
 def _import_persistence_models() -> None:
@@ -74,19 +131,25 @@ def _import_persistence_models() -> None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging()
+    validate_production_boot()
+    _init_sentry()
 
-    # Security startup validation
+    # Security startup validation (warnings for softer misconfigurations).
     if not settings.secret_key or settings.secret_key == "change-me-to-a-random-secret-key":
-        logger.warning("SECURITY: SECRET_KEY is not set or is the default value. Set a strong random key in .env for production.")
+        logger.warning(
+            "SECURITY: SECRET_KEY is not set or is the default value. "
+            "Set a strong random key in .env for production."
+        )
     if settings.environment == Environment.PRODUCTION:
-        if settings.cors_origins == "http://localhost:3000,http://localhost:5173":
-            logger.warning("SECURITY: CORS origins use localhost defaults in production. Configure proper CORS_ORIGINS.")
+        if not settings.cors_origins:
+            logger.warning(
+            "SECURITY: CORS_ORIGINS is not set explicitly; falling back to "
+            "the built-in allow-list. Set explicit origins in production."
+        )
         if settings.allowed_hosts_list == ["*"]:
             logger.warning("SECURITY: ALLOWED_HOSTS is set to wildcard. Restrict to specific domains in production.")
         if settings.enable_security_headers:
             logger.info("SECURITY: Security headers enabled (CSP, HSTS, X-Frame-Options, etc.)")
-        if not settings.firebase_credentials:
-            logger.error("SECURITY: Firebase credentials not configured. Authentication will be disabled in production!")
     logger.info(
         "Starting %s v%s (%s)",
         settings.project_name,
@@ -114,15 +177,19 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def create_app() -> FastAPI:
+    # Fail fast at construction time (not just in lifespan) so a misconfigured
+    # deployment cannot even build the ASGI app.
+    validate_production_boot()
     _import_persistence_models()
 
+    docs_on = settings.docs_enabled_resolved
     app = FastAPI(
         title=settings.project_name,
         version=settings.version,
         description="Healthcare Risk Assessment Platform API",
-        docs_url=f"{settings.api_v1_prefix}/docs",
-        redoc_url=f"{settings.api_v1_prefix}/redoc",
-        openapi_url=f"{settings.api_v1_prefix}/openapi.json",
+        docs_url=f"{settings.api_v1_prefix}/docs" if docs_on else None,
+        redoc_url=f"{settings.api_v1_prefix}/redoc" if docs_on else None,
+        openapi_url=f"{settings.api_v1_prefix}/openapi.json" if docs_on else None,
         lifespan=lifespan,
     )
 
@@ -137,6 +204,7 @@ def _setup_middleware(app: FastAPI) -> None:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
+        allow_origin_regex=r"^https://(?:[a-zA-Z0-9-]+\.)*(?:vercel\.app|onrender\.com|medicheck\.app)$",
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=[
@@ -173,7 +241,7 @@ def _setup_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AuthenticationError, auth_error_handler)
     app.add_exception_handler(NotFoundError, not_found_error_handler)
     app.add_exception_handler(ValidationError, validation_error_handler)
-    app.add_exception_handler(AppException, app_exception_handler)
+    app.add_exception_handler(AppError, app_exception_handler)
     app.add_exception_handler(Exception, generic_error_handler)
 
     from fastapi.exceptions import RequestValidationError

@@ -5,7 +5,6 @@ import * as z from 'zod'
 import { useProfile } from '../hooks/useProfile'
 import { PersonalInfo } from '../types/profile'
 import debounce from 'lodash/debounce'
-import AppLayout from '@/layouts/AppLayout'
 import Card from '@/shared/ui/Card'
 import Button from '@/shared/ui/Button'
 
@@ -53,54 +52,52 @@ export default function ProfileWizard() {
   })
 
   return (
-    <AppLayout>
-      <div className="max-w-3xl mx-auto p-4">
-        <h1 className="text-2xl mb-4">Profile Wizard</h1>
-        <Card>
-          <form onSubmit={onSubmit} className="space-y-4">
+    <div className="max-w-3xl mx-auto p-4">
+      <h1 className="text-2xl mb-4">Profile Wizard</h1>
+      <Card>
+        <form onSubmit={onSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm">Full name</label>
+            <input className="mt-1 block w-full" {...form.register('full_name')} />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm">Full name</label>
-              <input className="mt-1 block w-full" {...form.register('full_name')} />
+              <label className="block text-sm">Date of Birth</label>
+              <input type="date" className="mt-1 block w-full" {...form.register('date_of_birth')} />
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm">Date of Birth</label>
-                <input type="date" className="mt-1 block w-full" {...form.register('date_of_birth')} />
-              </div>
-              <div>
-                <label className="block text-sm">Sex</label>
-                <select className="mt-1 block w-full" {...form.register('sex')}>
-                  <option value="">Select</option>
-                  <option value="female">Female</option>
-                  <option value="male">Male</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm">Height (cm)</label>
-                <input className="mt-1 block w-full" {...form.register('height_cm')} />
-              </div>
-              <div>
-                <label className="block text-sm">Weight (kg)</label>
-                <input className="mt-1 block w-full" {...form.register('weight_kg')} />
-              </div>
-            </div>
-
             <div>
-              <label className="block text-sm">Blood group</label>
-              <input className="mt-1 block w-full" {...form.register('blood_group')} />
+              <label className="block text-sm">Sex</label>
+              <select className="mt-1 block w-full" {...form.register('sex')}>
+                <option value="">Select</option>
+                <option value="female">Female</option>
+                <option value="male">Male</option>
+                <option value="other">Other</option>
+              </select>
             </div>
+          </div>
 
-            <div className="flex justify-end">
-              <Button type="submit">Save</Button>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm">Height (cm)</label>
+              <input className="mt-1 block w-full" {...form.register('height_cm')} />
             </div>
-          </form>
-        </Card>
-      </div>
-    </AppLayout>
+            <div>
+              <label className="block text-sm">Weight (kg)</label>
+              <input className="mt-1 block w-full" {...form.register('weight_kg')} />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm">Blood group</label>
+            <input className="mt-1 block w-full" {...form.register('blood_group')} />
+          </div>
+
+          <div className="flex justify-end">
+            <Button type="submit">Save</Button>
+          </div>
+        </form>
+      </Card>
+    </div>
   )
 }

@@ -101,10 +101,7 @@ class RuleEngineService:
     def evaluate_rule(
         self, rule: dict[str, Any], context: dict[str, Any]
     ) -> dict[str, Any]:
-        if condition := rule.get("condition"):
-            condition_met = self.evaluate_expression(condition, context)
-        else:
-            condition_met = True
+        condition_met = self.evaluate_expression(condition, context) if (condition := rule.get("condition")) else True
 
         if not condition_met:
             return {
@@ -275,9 +272,8 @@ class RuleEngineService:
     ) -> None:
         if not condition:
             return
-        if field := condition.get("field"):
-            if field not in refs:
-                refs.append(field)
+        if (field := condition.get("field")) and field not in refs:
+            refs.append(field)
         for sub in condition.get("conditions", []):
             self._extract_field_refs(sub, refs)
         if inner := condition.get("condition"):

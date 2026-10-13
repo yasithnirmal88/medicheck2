@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 
-class AppException(Exception):
+class AppError(Exception):
     status_code: int = 500
     detail: str = "Internal server error"
     code: str = "internal_error"
@@ -33,43 +33,70 @@ class AppException(Exception):
         }
 
 
-class AuthenticationError(AppException):
+class AuthenticationError(AppError):
     status_code = 401
     detail = "Not authenticated"
     code = "authentication_error"
 
 
-class AuthorizationError(AppException):
+class AuthorizationError(AppError):
     status_code = 403
     detail = "Not authorized"
     code = "authorization_error"
 
 
-class NotFoundError(AppException):
+class NotFoundError(AppError):
     status_code = 404
     detail = "Resource not found"
     code = "not_found"
 
 
-class ValidationError(AppException):
+class ValidationError(AppError):
     status_code = 422
     detail = "Validation failed"
     code = "validation_error"
 
 
-class ConflictError(AppException):
+class ConflictError(AppError):
     status_code = 409
     detail = "Resource already exists"
     code = "conflict"
 
 
-class RateLimitError(AppException):
+class RateLimitError(AppError):
     status_code = 429
     detail = "Too many requests"
     code = "rate_limit_exceeded"
 
 
-class InternalError(AppException):
+class AIBudgetExceededError(RateLimitError):
+    """Raised when an AI vendor spend/abuse budget is exhausted.
+
+    HTTP 429 with a distinct code so clients can tell vendor-budget
+    rejections apart from generic rate limiting. Never triggers a stub
+    fallback — the caller asked for a real provider and must get an
+    explicit rejection instead.
+    """
+
+    detail = "AI request budget exceeded"
+    code = "ai_budget_exceeded"
+
+
+class InternalError(AppError):
     status_code = 500
     detail = "Internal server error"
     code = "internal_error"
+
+
+class AIConfigurationError(AppError):
+    """Raised when an explicitly configured AI/STT provider cannot be built.
+
+    Fail-fast (never silent stub fallback): selecting a real provider name
+    without the required credentials/endpoints, or an unknown provider name,
+    raises here — at factory call time — instead of silently serving stub
+    output that an operator might mistake for the real vendor.
+    """
+
+    status_code = 500
+    detail = "AI provider is misconfigured"
+    code = "ai_provider_misconfigured"

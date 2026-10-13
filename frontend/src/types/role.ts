@@ -19,6 +19,7 @@ export type UserRole =
   | 'research_reviewer'
   | 'content_editor'
   | 'read_only_reviewer'
+  | 'community_health_worker'
 
 // Role display names for UI
 export const ROLE_DISPLAY_NAMES: Record<UserRole, string> = {
@@ -31,11 +32,13 @@ export const ROLE_DISPLAY_NAMES: Record<UserRole, string> = {
   research_reviewer: 'Research Reviewer',
   content_editor: 'Content Editor',
   read_only_reviewer: 'Read-Only Reviewer',
+  community_health_worker: 'Community Health Worker',
 }
 
 // Role hierarchy (higher number = more permissions)
 export const ROLE_HIERARCHY: Record<UserRole, number> = {
   patient: 0,
+  community_health_worker: 3,
   read_only_reviewer: 5,
   content_editor: 10,
   research_reviewer: 15,
@@ -47,7 +50,7 @@ export const ROLE_HIERARCHY: Record<UserRole, number> = {
 }
 
 // Role categories for UI grouping
-export type RoleCategory = 'patient' | 'clinical' | 'admin'
+export type RoleCategory = 'patient' | 'clinical' | 'admin' | 'chw'
 
 export const ROLE_CATEGORIES: Record<UserRole, RoleCategory> = {
   patient: 'patient',
@@ -59,6 +62,7 @@ export const ROLE_CATEGORIES: Record<UserRole, RoleCategory> = {
   research_reviewer: 'clinical',
   content_editor: 'clinical',
   read_only_reviewer: 'clinical',
+  community_health_worker: 'chw',
 }
 
 // Check if a role is a clinical/doctor role
@@ -79,6 +83,11 @@ export function canAccessCMS(role: UserRole): boolean {
 // Check if a role can access patient dashboard
 export function canAccessPatientApp(role: UserRole): boolean {
   return role === 'patient' || isAdminRole(role)
+}
+
+// Check if a role is a Community Health Worker (Phase 8)
+export function isCHWRole(role: UserRole): boolean {
+  return ROLE_CATEGORIES[role] === 'chw'
 }
 
 // Role permissions (for fine-grained access control)
@@ -190,6 +199,14 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'assessment:read',
     'profile:read',
     'cms:read',
+  ],
+  community_health_worker: [
+    'questionnaire:read',
+    'questionnaire:write',
+    'assessment:read',
+    'assessment:write',
+    'profile:read',
+    'profile:write',
   ],
 }
 

@@ -15,7 +15,7 @@ services:
     dockerfilePath: ./backend/Dockerfile
     plan: starter
     numInstances: 1
-    healthCheckPath: /api/v1/health
+    healthCheckPath: /api/v1/ready
     envVars:
       - key: ENVIRONMENT
         value: production

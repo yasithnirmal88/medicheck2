@@ -19,10 +19,6 @@ export interface PersonalData {
   preferred_language: string
   email: string
   phone: string
-  emergency_contact: string
-  emergency_phone: string
-  relationship: string
-  photo: string
 }
 
 export interface BodyMeasurement {
@@ -210,18 +206,6 @@ export interface TravelData {
   recent_travel: string
 }
 
-export interface EmergencyData {
-  primary_name: string
-  primary_phone: string
-  primary_relationship: string
-  secondary_name: string
-  secondary_phone: string
-  secondary_relationship: string
-  hospital_preference: string
-  insurance_provider: string
-  organ_donor: string
-}
-
 export interface Consents {
   terms_accepted: boolean
   ai_consent: boolean
@@ -248,7 +232,6 @@ export interface WizardState {
   environment: EnvironmentData
   occupation: OccupationData
   travel: TravelData
-  emergency: EmergencyData
   consents: Consents
 }
 

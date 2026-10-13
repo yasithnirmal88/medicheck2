@@ -24,10 +24,6 @@ export const personalSchema = z.object({
   preferred_language: optionalString,
   email: stringField.email('Invalid email').optional().or(z.literal('')),
   phone: optionalString,
-  emergency_contact: optionalString,
-  emergency_phone: optionalString,
-  relationship: optionalString,
-  photo: optionalString,
 })
 
 export const bodySchema = z.object({
@@ -227,18 +223,6 @@ export const travelSchema = z.object({
   recent_travel: optionalString,
 })
 
-export const emergencySchema = z.object({
-  primary_name: stringField.min(1, 'Name is required'),
-  primary_phone: stringField.min(1, 'Phone is required'),
-  primary_relationship: stringField.min(1, 'Relationship is required'),
-  secondary_name: optionalString,
-  secondary_phone: optionalString,
-  secondary_relationship: optionalString,
-  hospital_preference: optionalString,
-  insurance_provider: optionalString,
-  organ_donor: stringField,
-})
-
 export const consentsSchema = z.object({
   terms_accepted: z.boolean().refine((v) => v === true, 'You must accept the terms'),
   ai_consent: z.boolean(),
@@ -265,6 +249,5 @@ export const sectionSchemas: Record<string, z.ZodType> = {
   environment: environmentSchema,
   occupation: occupationSchema,
   travel: travelSchema,
-  emergency: emergencySchema,
   consents: consentsSchema,
 }

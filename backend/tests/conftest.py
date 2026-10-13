@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import tempfile
 import uuid
 from collections.abc import AsyncGenerator, Generator
 from datetime import UTC, datetime
@@ -9,6 +11,22 @@ import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+# The backend suite runs on SQLite only -- `test_settings` builds a per-session
+# SQLite file and the test engine is always created from it, never from the
+# process environment. CI, however, may export `DATABASE_URL` pointing at a
+# Postgres service; the app settings are read at import time to decide model
+# schema qualifiers (e.g. the PostgreSQL ``audit`` schema in
+# app/infrastructure/persistence/models/base.py). Leaving a Postgres URL in the
+# environment makes those models emit ``CREATE TABLE audit.*`` on the SQLite
+# test engine -> sqlite3.OperationalError "unknown database audit". Force a
+# SQLite URL for the whole test process so schema qualifiers resolve to None
+# and create_all() emits portable DDL regardless of ambient CI env.
+_TEST_DB_DIR = tempfile.mkdtemp(prefix="medicheck-pytest-")
+os.environ["DATABASE_URL"] = (
+    "sqlite+aiosqlite:///"
+    + os.path.join(_TEST_DB_DIR, "test_db.sqlite").replace(os.sep, "/")
+)
 
 import app.core.config as config_module
 import app.infrastructure.database as database_module
@@ -31,7 +49,7 @@ def get_test_settings(database_url: str) -> Settings:
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def test_settings(tmp_path_factory) -> Settings:
     tmp_dir = tmp_path_factory.mktemp("pytest-db")
     db_file = tmp_dir / "test_db.sqlite"
@@ -49,10 +67,10 @@ def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
 @pytest_asyncio.fixture
 async def db_session(test_settings: Settings) -> AsyncGenerator[AsyncSession, None]:
     """
-    Provide an isolated temporary SQLite database per test session.
+    Provide an isolated temporary SQLite database per test module.
 
-    Uses a shared test_settings fixture so the database URL is consistent
-    across the HTTP client and SQLAlchemy engine.
+    Uses a module-scoped test_settings fixture so the database URL stays
+    consistent within a module while avoiding cross-file leakage.
     """
     engine = create_async_engine(
         test_settings.database_url,

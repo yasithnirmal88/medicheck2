@@ -3,10 +3,10 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_active_user, get_db
+from app.api.deps import get_db
 from app.application.dtos.profile_dtos import HealthProfileDTO, PersonalInfoDTO
 from app.application.services.profile_service import ProfileService
-from app.domain.entities.user import User
+from app.identity import User, get_current_active_user
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -32,7 +32,7 @@ async def update_personal_info(
         updated = await svc.update_personal_info(current_user, payload)
         return updated
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/me/versions")
@@ -79,9 +79,9 @@ async def restore_version(
         result = await svc.restore_version(current_user, version)
         return result
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 # Section endpoints (lifestyle, nutrition)

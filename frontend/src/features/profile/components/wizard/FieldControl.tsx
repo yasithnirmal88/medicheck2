@@ -3,7 +3,7 @@ import { FieldError } from 'react-hook-form'
 import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type FieldKind = 'text' | 'number' | 'select' | 'radio' | 'checkbox' | 'date' | 'textarea' | 'photo' | 'slider' | 'card' | 'chip' | 'emoji' | 'rating' | 'animated'
+export type FieldKind = 'text' | 'number' | 'select' | 'radio' | 'checkbox' | 'date' | 'textarea' | 'slider' | 'card' | 'chip' | 'emoji' | 'rating' | 'animated'
 
 export interface OptionSpec {
   value: string

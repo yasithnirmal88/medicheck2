@@ -1,379 +1,444 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo, useRef } from 'react'
 import { useParams } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Award, BarChart2, FlaskConical, HeartPulse, LifeBuoy, NotebookText, Repeat, TrendingUp } from 'lucide-react'
-import AppLayout from '@/layouts/AppLayout'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  FlaskConical,
+  HeartPulse,
+  Info,
+  LifeBuoy,
+  NotebookText,
+  ShieldAlert,
+  TrendingUp,
+} from 'lucide-react'
 import Card from '@/shared/ui/Card'
 import Button from '@/shared/ui/Button'
+import Alert from '@/shared/ui/Alert'
 import { fetchReportBySession, generateReport } from '@/features/dashboard/api/patientService'
+import { DEMO_HEALTH_REPORT, isResultsDemoMode } from '../demo/resultsDemoData'
+import type {
+  ReportBodySystem,
+  ReportDetail,
+} from '../types/report'
 
-interface Report {
-  summary?: string
-  [key: string]: unknown
+// ---------------------------------------------------------------------------
+// Real-data helpers. These only FORMAT values that come from the report API;
+// they never invent clinical numbers.
+// ---------------------------------------------------------------------------
+
+const CATEGORY_ORDER = [
+  'Normal',
+  'Monitor',
+  'Needs Attention',
+  'Recommend Screening',
+  'Urgent Medical Review',
+]
+
+const CATEGORY_BADGE: Record<string, string> = {
+  normal: 'bg-emerald-100 text-emerald-700',
+  monitor: 'bg-amber-100 text-amber-700',
+  'needs attention': 'bg-orange-100 text-orange-700',
+  'recommend screening': 'bg-rose-100 text-rose-700',
+  'urgent medical review': 'bg-red-100 text-red-700',
 }
 
-interface RiskIndicator {
-  id: string
-  label: string
-  value: string
-  level: 'low' | 'moderate' | 'high'
+const ID_PREFIX = /^(bs|cond|condition|rec|recommendation|ind|indicator|q|qg)[_-]/i
+
+function humanizeId(id?: string | null): string {
+  if (!id) return 'Unknown'
+  return id
+    .replace(ID_PREFIX, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim()
 }
 
-interface BodySystemScore {
-  id: string
-  name: string
-  score: number
-  status: 'optimal' | 'good' | 'attention' | 'poor'
+function scoreText(value?: string | null): string | null {
+  if (value == null || value === '') return null
+  const n = Number(value)
+  return Number.isFinite(n)
+    ? n.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    : value
 }
 
-interface Recommendation {
-  id: string
-  category: string
-  title: string
-  description: string
-  priority: 'urgent' | 'routine' | 'preventive'
-}
-
-interface LabTest {
-  id: string
-  name: string
-  rationale: string
-}
-
-interface LifestyleTip {
-  id: string
-  category: string
-  text: string
-}
-
-const RISK_LEVEL_COLOR: Record<RiskIndicator['level'], string> = {
-  low: 'bg-emerald-500',
-  moderate: 'bg-amber-500',
-  high: 'bg-rose-500',
-}
-const RISK_LEVEL_BG: Record<RiskIndicator['level'], string> = {
-  low: 'bg-emerald-50',
-  moderate: 'bg-amber-50',
-  high: 'bg-rose-50',
-}
-
-const STATUS_COLOR: Record<BodySystemScore['status'], string> = {
-  optimal: 'text-emerald-600 bg-emerald-100',
-  good: 'text-emerald-600 bg-emerald-100',
-  attention: 'text-amber-600 bg-amber-100',
-  poor: 'text-rose-600 bg-rose-100',
-}
-
-function useHealthReport(sessionId?: string) {
-  const qc = useQueryClient()
-  const query = useQuery({
-    queryKey: ['health-report', sessionId],
-    queryFn: () => fetchReportBySession(sessionId!),
-    enabled: !!sessionId,
-    staleTime: 30_000,
-    retry: false,
-  })
-  const generate = useMutation({
-    mutationFn: (sid: string) => generateReport(sid),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['health-report', sessionId] }),
-  })
-
-  return {
-    report: query.data,
-    isLoading: query.isLoading || generate.isPending,
-    generateReport: (sid: string) => generate.mutate(sid),
-  }
-}
-
-const ScoreGauge = React.memo(function ScoreGauge({ score }: { score: number }) {
-  let color = 'text-indigo-600'
-  let label = 'Fair'
-  if (score >= 85) {
-    color = 'text-emerald-600'
-    label = 'Excellent'
-  } else if (score >= 70) {
-    color = 'text-indigo-600'
-    label = 'Good'
-  } else if (score >= 40) {
-    color = 'text-amber-600'
-    label = 'Fair'
-  } else {
-    color = 'text-rose-600'
-    label = 'Needs attention'
-  }
+function categoryBadgeClass(category?: string | null): string {
   return (
-    <div className="flex items-center gap-3">
-      <Award className={`h-6 w-6 ${color}`} />
-      <span className={`text-2xl font-bold ${color}`}>{score}/100 — {label}</span>
-    </div>
+    CATEGORY_BADGE[(category ?? '').trim().toLowerCase()] ??
+    'bg-slate-100 text-slate-600'
   )
-})
+}
 
-const BarRow = React.memo(function BarRow({ label, value, max = 100 }: { label: string; value: number; max?: number }) {
-  const pct = (value / max) * 100
-  let barColor = 'bg-amber-500'
-  if (pct >= 85) barColor = 'bg-emerald-500'
-  else if (pct < 45) barColor = 'bg-rose-500'
-  return (
-    <div className="grid grid-cols-[120px_1fr_40px] items-center gap-2 text-xs">
-      <span className="text-gray-600 dark:text-gray-300">{label}</span>
-      <div className="relative h-2 w-full overflow-hidden rounded-sm bg-gray-200 dark:bg-gray-700">
-        <div className={barColor} style={{ width: `${Math.min(100, pct)}%` }} />
+function highestCategory(systems: ReportBodySystem[]): string | null {
+  let bestIdx = -1
+  let best: string | null = null
+  for (const s of systems) {
+    const idx = CATEGORY_ORDER.findIndex(
+      (c) => c.toLowerCase() === (s.category ?? '').trim().toLowerCase(),
+    )
+    if (idx > bestIdx) {
+      bestIdx = idx
+      best = s.category ?? null
+    }
+  }
+  return best
+}
+
+function extractLifestyle(report?: ReportDetail): string | null {
+  const raw = report?.lifestyle?.[0]?.data
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>
+    const value = parsed?.lifestyle
+    if (typeof value === 'string' && value.trim() !== '') return value
+  } catch {
+    return null
+  }
+  return null
+}
+
+function httpStatus(error: unknown): number | undefined {
+  if (error && typeof error === 'object' && 'response' in error) {
+    return (error as { response?: { status?: number } }).response?.status
+  }
+  return undefined
+}
+
+// ---------------------------------------------------------------------------
+// State UI (same patterns as InteropUI / ReportExplanation).
+// ---------------------------------------------------------------------------
+
+const PageEmpty: React.FC<{ title: string; message: string }> = ({ title, message }) => (
+  <div className="flex flex-col items-center justify-center py-12 text-center">
+    <Info className="mb-2 h-6 w-6 text-slate-400" aria-hidden />
+    <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{title}</p>
+    <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">{message}</p>
+  </div>
+)
+
+const PageError: React.FC<{ onRetry: () => void }> = ({ onRetry }) => (
+  <div className="space-y-3">
+    <Alert variant="error" title="We couldn't load this report" live>
+      The assessment report could not be retrieved, so no results are shown.
+      Please try again.
+    </Alert>
+    <Button variant="ghost" onClick={onRetry}>
+      Try again
+    </Button>
+  </div>
+)
+
+const LoadingSkeleton: React.FC = () => (
+  <div className="animate-pulse space-y-4">
+    <div className="h-6 w-48 rounded bg-gray-200 dark:bg-gray-700" />
+    <Card>
+      <div className="space-y-4 p-2">
+        <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
+        <div className="h-4 w-1/2 rounded bg-gray-200 dark:bg-gray-700" />
       </div>
-      <span className="text-right text-gray-700 dark:text-gray-200">{value}</span>
-    </div>
-  )
-})
+    </Card>
+  </div>
+)
 
-function deriveScores(report: Report): { overall: number; systems: BodySystemScore[] } {
-  const raw = report?.summary ?? ''
-  const seed = raw.length > 0 ? raw.length : 72
-  const systems: BodySystemScore[] = [
-    { id: 'cardio', name: 'Cardiovascular', score: seed - 4, status: seed - 4 >= 75 ? 'optimal' : seed - 4 >= 50 ? 'good' : 'attention' },
-    { id: 'metabolic', name: 'Metabolic', score: seed - 8, status: seed - 8 >= 75 ? 'optimal' : seed - 8 >= 50 ? 'good' : 'attention' },
-    { id: 'respiratory', name: 'Respiratory', score: seed - 2, status: seed - 2 >= 75 ? 'optimal' : seed - 2 >= 50 ? 'good' : 'attention' },
-    { id: 'neurological', name: 'Neurological', score: seed, status: seed >= 75 ? 'optimal' : seed >= 50 ? 'good' : 'attention' },
-    { id: 'immune', name: 'Immune', score: seed - 10, status: seed - 10 >= 75 ? 'optimal' : seed - 10 >= 50 ? 'good' : 'attention' },
-    { id: 'digestive', name: 'Digestive', score: seed - 6, status: seed - 6 >= 75 ? 'optimal' : seed - 6 >= 50 ? 'good' : 'attention' },
-  ]
-  const overall = Math.round(systems.reduce((acc, s) => acc + s.score, 0) / systems.length)
-  return { overall, systems }
-}
+const StatTile: React.FC<{ label: string; value: number }> = ({ label, value }) => (
+  <div className="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{value}</p>
+    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{label}</p>
+  </div>
+)
 
-function deriveRisks(): RiskIndicator[] {
-  return [
-    { id: 'bp', label: 'Blood Pressure', value: '128/82 mmHg', level: 'moderate' },
-    { id: 'glucose', label: 'Fasting Glucose', value: '102 mg/dL', level: 'moderate' },
-    { id: 'liver', label: 'ALT', value: '48 U/L', level: 'low' },
-    { id: 'chol', label: 'LDL Cholesterol', value: '138 mg/dL', level: 'high' },
-  ]
-}
+const Badge: React.FC<{ category?: string | null }> = ({ category }) =>
+  category ? (
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${categoryBadgeClass(category)}`}
+    >
+      {category}
+    </span>
+  ) : null
 
-function deriveRecommendations(): Recommendation[] {
-  return [
-    {
-      id: '1',
-      category: 'Nutrition',
-      title: 'Reduce saturated fat intake',
-      description: 'Limit saturated fat to <10% of calories to support lipid profiles.',
-      priority: 'routine',
-    },
-    {
-      id: '2',
-      category: 'Activity',
-      title: 'Increase daily movement',
-      description: 'Aim for 150 min moderate aerobic activity weekly.',
-      priority: 'routine',
-    },
-    {
-      id: '3',
-      category: 'Monitoring',
-      title: 'Schedule annual lipid panel',
-      description: 'Follow-up lab work to reassess cardiovascular risk.',
-      priority: 'preventive',
-    },
-  ]
-}
-
-function deriveLabTests(): LabTest[] {
-  return [
-    { id: '1', name: 'Comprehensive Metabolic Panel', rationale: 'Baseline organ function and glucose.' },
-    { id: '2', name: 'Lipid Panel', rationale: 'Assess cardiovascular disease risk.' },
-    { id: '3', name: 'CBC with Differential', rationale: 'Screen for anemia and infection.' },
-    { id: '4', name: 'HbA1c', rationale: 'Evaluate average glucose over 3 months.' },
-  ]
-}
-
-function deriveLifestyle(): LifestyleTip[] {
-  return [
-    { id: '1', category: 'Exercise', text: 'Add 10,000 steps/day and two resistance sessions per week.' },
-    { id: '2', category: 'Sleep', text: 'Maintain 7–9 hours of consistent nightly sleep.' },
-    { id: '3', category: 'Stress', text: 'Try 5-min breathing exercises twice daily.' },
-    { id: '4', category: 'Hydration', text: 'Target 2–2.5 L of water daily.' },
-  ]
-}
-
-function computeNextAssessment(): string {
-  const d = new Date()
-  const next = new Date(d.setMonth(d.getMonth() + 3))
-  return next.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
+// ---------------------------------------------------------------------------
+// Page.
+// ---------------------------------------------------------------------------
 
 const ResultsDashboard: React.FC = () => {
   const { id } = useParams<{ id: string }>()
-  const { report, isLoading, generateReport } = useHealthReport(id)
-  const { overall, systems } = useMemo(() => deriveScores(report), [report])
-  const risks = useMemo(deriveRisks, [])
-  const recommendations = useMemo(deriveRecommendations, [])
-  const labTests = useMemo(deriveLabTests, [])
-  const lifestyle = useMemo(deriveLifestyle, [])
-  const nextAssessment = useMemo(computeNextAssessment, [])
+  const demoMode = useMemo(() => isResultsDemoMode(), [])
+  const attemptedGeneration = useRef(false)
+  const qc = useQueryClient()
 
-  // Trigger AI report generation if the downstream processing hasn't produced one yet.
-  React.useEffect(() => {
-    if (!id || report || isLoading) return
-    generateReport(id)
-  }, [id, report, isLoading, generateReport])
+  const query = useQuery<ReportDetail>({
+    queryKey: ['health-report', id],
+    queryFn: () => fetchReportBySession(id!),
+    enabled: !!id,
+    staleTime: 30_000,
+    retry: false,
+  })
 
-  if (isLoading) {
+  const generate = useMutation({
+    mutationFn: (sid: string) => generateReport(sid),
+    onSuccess: () =>
+      qc.invalidateQueries({ queryKey: ['health-report', id] }),
+  })
+  const runGenerate = generate.mutate
+
+  const report: ReportDetail | undefined =
+    query.data ?? (demoMode ? DEMO_HEALTH_REPORT : undefined)
+  const usingDemo = demoMode && query.data === undefined
+
+  const isLoading = query.isLoading || generate.isPending
+
+  const systems = useMemo(() => report?.body_systems ?? [], [report])
+  const conditions = useMemo(() => report?.conditions ?? [], [report])
+  const advices = useMemo(() => report?.advices ?? [], [report])
+  const lifestyle = useMemo(() => extractLifestyle(report), [report])
+  const overallCategory = useMemo(() => highestCategory(systems), [systems])
+  const hasFindings =
+    systems.length > 0 || conditions.length > 0 || advices.length > 0
+
+  // A report is generated on demand when the deterministic engine has not
+  // produced one yet. Never runs in demo mode (demo data must not touch the API).
+  useEffect(() => {
+    if (!id || demoMode) return
+    if (query.data !== undefined || isLoading) return
+    if (!query.isError || attemptedGeneration.current) return
+    attemptedGeneration.current = true
+    runGenerate(id)
+  }, [id, demoMode, query.data, isLoading, query.isError, runGenerate])
+
+  if (!id && !demoMode) {
     return (
-      <AppLayout>
+      <div className="mx-auto max-w-4xl p-4">
+        <PageEmpty
+          title="No assessment selected"
+          message="Open an assessment result from your history to see its report."
+        />
+      </div>
+    )
+  }
+
+  if (isLoading && !usingDemo) {
+    return (
+      <div className="mx-auto max-w-4xl p-4">
+        <LoadingSkeleton />
+      </div>
+    )
+  }
+
+  if (query.isError && !usingDemo) {
+    const status = httpStatus(query.error)
+    if (status === 404 || status === 400) {
+      return (
         <div className="mx-auto max-w-4xl p-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 w-48 rounded bg-gray-200 dark:bg-gray-700" />
-            <Card>
-              <div className="p-6 space-y-4">
-                <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
-                <div className="h-4 w-1/2 rounded bg-gray-200 dark:bg-gray-700" />
-              </div>
-            </Card>
-          </div>
+          <PageEmpty
+            title="No report available yet"
+            message="This assessment doesn't have a clinical report yet. Complete the assessment first, then return here to view your results."
+          />
         </div>
-      </AppLayout>
+      )
+    }
+    return (
+      <div className="mx-auto max-w-4xl p-4">
+        <PageError onRetry={() => query.refetch()} />
+      </div>
+    )
+  }
+
+  if (!report) {
+    return (
+      <div className="mx-auto max-w-4xl p-4">
+        <PageEmpty
+          title="No report available"
+          message="We couldn't find a clinical report for this assessment."
+        />
+      </div>
     )
   }
 
   return (
-    <AppLayout>
-      <div className="mx-auto max-w-4xl p-4 space-y-6">
-        <header className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-indigo-600" />
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Assessment Results</h1>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Generated from session <span className="font-medium">{id}</span>
-          </p>
-        </header>
+    <div className="mx-auto max-w-4xl space-y-6 p-4">
+      {usingDemo ? (
+        <Alert variant="warning" title="Demo data – not real clinical results" live>
+          This page is showing sample data for demonstration only. It is not a
+          real assessment and must not be used for any clinical decision.
+        </Alert>
+      ) : null}
 
-        {/* Overall Health Score */}
+      <header className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-indigo-600" />
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">
+            Assessment Results
+          </h1>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Generated from {usingDemo ? 'a demo session' : 'session'}{' '}
+          <span className="font-medium">{usingDemo ? 'demo-session' : id}</span>
+        </p>
+      </header>
+
+      {!hasFindings ? (
         <Card>
-          <div className="flex items-center justify-between">
-            <ScoreGauge score={overall} />
-            <div className="text-right text-xs text-gray-500 dark:text-gray-400">
-              <p>Overall Health Score</p>
-              <p>Updated just now</p>
+          <PageEmpty
+            title="No clinical findings"
+            message="The engine recorded no body-system, condition, or recommendation findings for this assessment."
+          />
+        </Card>
+      ) : (
+        <>
+          {/* Overview — counts derived from the real report only. */}
+          <Card>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                Overview
+              </h2>
+              {overallCategory ? <Badge category={overallCategory} /> : null}
             </div>
-          </div>
-        </Card>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <StatTile label="Body systems assessed" value={systems.length} />
+              <StatTile label="Possible conditions" value={conditions.length} />
+              <StatTile label="Recommendations" value={advices.length} />
+            </div>
+          </Card>
 
-        {/* Body System Scores */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <HeartPulse className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Body System Scores</h2>
-          </div>
-          <div className="space-y-4">
-            {systems.map((s) => (
-              <div key={s.id} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{s.name}</span>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[s.status]}`}>
-                    {s.score} — {s.status}
-                  </span>
-                </div>
-                <BarRow label={s.name} value={s.score} />
+          {/* Body System Assessments — real category + score. */}
+          {systems.length > 0 ? (
+            <Card>
+              <div className="mb-3 flex items-center gap-2">
+                <HeartPulse className="h-4 w-4 text-indigo-600" />
+                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                  Body System Assessments
+                </h2>
               </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Risk Indicators */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart2 className="h-4 w-4 text-rose-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Risk Indicators</h2>
-          </div>
-          <div className="space-y-3">
-            {risks.map((r) => (
-              <div key={r.id} className={`rounded-md border border-transparent p-3 ${RISK_LEVEL_BG[r.level]}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{r.label}</span>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white ${RISK_LEVEL_COLOR[r.level]}`}>
-                    {r.level}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">{r.value}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Recommendations */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <LifeBuoy className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recommendations</h2>
-          </div>
-          <div className="space-y-3">
-            {recommendations.map((r) => (
-              <div key={r.id} className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-block h-1.5 w-1.5 rounded-full ${r.priority === 'urgent' ? 'bg-rose-500' : r.priority === 'routine' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
-                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{r.category}</span>
+              <div className="space-y-3">
+                {systems.map((s) => {
+                  const score = scoreText(s.score)
+                  return (
+                    <div
+                      key={s.id}
+                      className="flex items-center justify-between gap-3 rounded-md border border-gray-200 p-3 dark:border-gray-700"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                          {humanizeId(s.body_system_id)}
+                        </p>
+                        {s.notes ? (
+                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                            {s.notes}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {score ? (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Score {score}
+                          </span>
+                        ) : null}
+                        <Badge category={s.category} />
+                      </div>
                     </div>
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-1">{r.title}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-300">{r.description}</p>
+                  )
+                })}
+              </div>
+            </Card>
+          ) : null}
+
+          {/* Condition Assessments — real condition + confidence. */}
+          {conditions.length > 0 ? (
+            <Card>
+              <div className="mb-3 flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-rose-600" />
+                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                  Possible Conditions
+                </h2>
+              </div>
+              <div className="space-y-3">
+                {conditions.map((c) => {
+                  const score = scoreText(c.score)
+                  return (
+                    <div
+                      key={c.id}
+                      className="flex items-center justify-between gap-3 rounded-md border border-gray-200 p-3 dark:border-gray-700"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                          {humanizeId(c.condition_id)}
+                        </p>
+                        {c.notes ? (
+                          <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                            {c.notes}
+                          </p>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {score ? (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            Score {score}
+                          </span>
+                        ) : null}
+                        {c.confidence ? (
+                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                            {c.confidence}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </Card>
+          ) : null}
+
+          {/* Recommendations — real generated advice. */}
+          {advices.length > 0 ? (
+            <Card>
+              <div className="mb-3 flex items-center gap-2">
+                <LifeBuoy className="h-4 w-4 text-indigo-600" />
+                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                  Recommendations
+                </h2>
+              </div>
+              <div className="space-y-3">
+                {advices.map((a) => (
+                  <div
+                    key={a.id}
+                    className="rounded-md border border-gray-200 p-3 dark:border-gray-700"
+                  >
+                    {a.category ? (
+                      <span className="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+                        {a.category}
+                      </span>
+                    ) : null}
+                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-300">
+                      {a.text ?? 'No recommendation text provided.'}
+                    </p>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </Card>
+            </Card>
+          ) : null}
 
-        {/* Suggested Laboratory Tests */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <FlaskConical className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Suggested Laboratory Tests</h2>
-          </div>
-          <ul className="list-outside list-disc space-y-1 pl-4 text-sm text-gray-700 dark:text-gray-300">
-            {labTests.map((t) => (
-              <li key={t.id}>
-                <span className="font-medium">{t.name}</span> — <span className="text-gray-500 dark:text-gray-400">{t.rationale}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        {/* Lifestyle Advice */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <NotebookText className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Lifestyle Advice</h2>
-          </div>
-          <div className="space-y-3">
-            {lifestyle.map((l) => (
-              <div key={l.id} className="flex items-start gap-2">
-                <span className="mt-0.5 inline-block h-1 w-1 shrink-0 rounded-full bg-indigo-500" />
-                <div>
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{l.category}</span>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">{l.text}</p>
-                </div>
+          {/* Lifestyle snapshot — only rendered when the real report contains one. */}
+          {lifestyle ? (
+            <Card>
+              <div className="mb-3 flex items-center gap-2">
+                <NotebookText className="h-4 w-4 text-indigo-600" />
+                <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+                  Lifestyle Snapshot
+                </h2>
               </div>
-            ))}
-          </div>
-        </Card>
+              <p className="text-sm text-gray-700 dark:text-gray-300">{lifestyle}</p>
+            </Card>
+          ) : null}
+        </>
+      )}
 
-        {/* Next Assessment Date */}
-        <Card>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <Repeat className="h-4 w-4 text-indigo-600" />
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Next recommended assessment</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{nextAssessment}</p>
-              </div>
-            </div>
-          <Button variant="primary">
-            Schedule reassessment
-          </Button>
-          </div>
-        </Card>
+      <div className="flex items-start gap-2 pt-1">
+        <FlaskConical className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden />
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          These values are produced by the deterministic MediCheck clinical
+          engine from your assessment. This is not a diagnosis. If you have
+          urgent symptoms, contact a healthcare professional.
+        </p>
       </div>
-    </AppLayout>
+    </div>
   )
 }
 

@@ -3,10 +3,13 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dtos.profile_dtos import HealthProfileDTO, PersonalInfoDTO
-from app.domain.entities.user import User
+from app.core.logging import get_logger
+from app.identity import User
 from app.infrastructure.persistence.repositories.sql_profile_repository import (
     SQLProfileRepository,
 )
+
+logger = get_logger(__name__)
 
 
 class ProfileService:
@@ -18,17 +21,17 @@ class ProfileService:
         profile = await self.repo.get_by_user_id(user.id)
         if profile is None:
             profile = await self.repo.create_for_user(user.id)
-        return HealthProfileDTO.from_orm(profile)
+        return HealthProfileDTO.model_validate(profile)
 
     async def update_personal_info(
         self, user: User, data: PersonalInfoDTO
     ) -> HealthProfileDTO:
         profile = await self.repo.get_or_create_for_user(user.id)
-        await self.repo.upsert_personal_info(profile.id, data.dict())
+        await self.repo.upsert_personal_info(profile.id, data.model_dump())
         snapshot = await self.repo.snapshot_profile(profile.id)
         await self.repo.create_version(profile.id, snapshot, created_by=user.id)
         updated = await self.repo.get_by_id(profile.id)
-        return HealthProfileDTO.from_orm(updated)
+        return HealthProfileDTO.model_validate(updated)
 
     # Lifestyle & Nutrition
     async def update_lifestyle(self, user: User, data: dict) -> HealthProfileDTO:
@@ -37,7 +40,7 @@ class ProfileService:
         snapshot = await self.repo.snapshot_profile(profile.id)
         await self.repo.create_version(profile.id, snapshot, created_by=user.id)
         updated = await self.repo.get_by_id(profile.id)
-        return HealthProfileDTO.from_orm(updated)
+        return HealthProfileDTO.model_validate(updated)
 
     async def update_nutrition(self, user: User, data: dict) -> HealthProfileDTO:
         profile = await self.repo.get_or_create_for_user(user.id)
@@ -45,7 +48,7 @@ class ProfileService:
         snapshot = await self.repo.snapshot_profile(profile.id)
         await self.repo.create_version(profile.id, snapshot, created_by=user.id)
         updated = await self.repo.get_by_id(profile.id)
-        return HealthProfileDTO.from_orm(updated)
+        return HealthProfileDTO.model_validate(updated)
 
     # Repeatable sections add/list
     async def add_medical_history(self, user: User, data: dict):
@@ -138,7 +141,7 @@ class ProfileService:
 
     async def get_profile(self, user: User) -> HealthProfileDTO:
         profile = await self.repo.get_or_create_for_user(user.id)
-        return HealthProfileDTO.from_orm(profile)
+        return HealthProfileDTO.model_validate(profile)
 
     # Completion calculation
     async def compute_completion(self, user: User) -> dict:
@@ -189,7 +192,9 @@ class ProfileService:
             await self.repo.upsert_lifestyle(profile.id, snapshot["lifestyle"])
         if snapshot.get("nutrition"):
             await self.repo.upsert_nutrition(profile.id, snapshot["nutrition"])
-        # Note: restoring list-based sections (medical_histories etc) requires more sophisticated merging. For now, create new records from snapshot lists if present.
+        # Note: restoring list-based sections (medical_histories etc) requires
+        # more sophisticated merging. For now, create new records from snapshot
+        # lists if present.
         for key, add_fn in (
             ("medical_history", self.repo.add_medical_history),
             ("medical_histories", self.repo.add_medical_history),
@@ -213,4 +218,4 @@ class ProfileService:
         new_snapshot = await self.repo.snapshot_profile(profile.id)
         await self.repo.create_version(profile.id, new_snapshot, created_by=user.id)
         updated = await self.repo.get_by_id(profile.id)
-        return HealthProfileDTO.from_orm(updated)
+        return HealthProfileDTO.model_validate(updated)

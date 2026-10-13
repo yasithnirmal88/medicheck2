@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select, update as sql_update
+from sqlalchemy import select
+from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.application.services.answer_values import coerce_float, match_option
 from app.core.exceptions import NotFoundError, ValidationError
 from app.domain.entities.assessment_answer import AssessmentAnswer
 from app.domain.entities.assessment_session import AssessmentSession, SessionStatus
@@ -165,16 +167,31 @@ class QuestionnaireService:
             if errors:
                 raise ValidationError(detail="; ".join(errors))
 
-        # Calculate score
+        # Resolve the selected option (if any) and the values stored alongside
+        # the raw response so the deterministic engine can reason about the
+        # actual answer (e.g. "no" vs "yes"), not merely its presence.
         score_value = 0.0
+        option_id: str | None = None
+        stored_value: str | None = None
+        numeric_value: float | None = None
         if not is_skipped:
-            option_value = response_value.get("value")
-            if option_value:
+            raw_value = (
+                response_value.get("value")
+                if isinstance(response_value, dict)
+                else None
+            )
+            if raw_value is not None and raw_value != "":
                 options = await self._option_repo.find_by_question(question_id)
-                for opt in options:
-                    if opt.value == str(option_value) or opt.code == str(option_value):
-                        score_value = opt.score_value
-                        break
+                matched = match_option(options, raw_value)
+                if matched is not None:
+                    score_value = matched.score_value or 0.0
+                    option_id = matched.id
+                    stored_value = (
+                        matched.value if matched.value is not None else str(raw_value)
+                    )
+                else:
+                    stored_value = str(raw_value)
+                numeric_value = coerce_float(raw_value)
 
         answer = AssessmentAnswer.create(
             session_id=session_id,
@@ -201,6 +218,9 @@ class QuestionnaireService:
             question_id=answer.question_id,
             question_version=answer.question_version,
             question_code=answer.question_code,
+            option_id=option_id,
+            value=stored_value,
+            numeric_value=numeric_value,
             response_value=answer.response_value,
             score_value=answer.score_value,
             is_skipped=answer.is_skipped,

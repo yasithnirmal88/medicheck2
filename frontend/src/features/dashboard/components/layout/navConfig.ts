@@ -24,9 +24,8 @@ export interface NavItem {
   section?: string
 }
 
-// NOTE: This file is kept for backwards compatibility.
-// Patient navigation is now defined in PatientLayout.tsx
-// Doctor/CMS navigation is defined in DoctorLayout.tsx
+// Patient navigation consumed by Sidebar (rendered by DashboardLayout, the
+// sole patient chrome). Doctor/CMS navigation is defined in DoctorLayout.tsx.
 // This ensures complete separation of patient and doctor portals.
 
 export const primaryNav: NavItem[] = [

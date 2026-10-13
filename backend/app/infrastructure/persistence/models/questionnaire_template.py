@@ -26,4 +26,4 @@ class QuestionnaireTemplateModel(BaseModel):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     is_template: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    extra_metadata: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True, default=dict)
+    template_metadata: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=dict)

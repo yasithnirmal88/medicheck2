@@ -1,0 +1,980 @@
+# Medicheck -- Agent Memory
+
+Persistent context for the Medicheck healthcare SaaS audit. Update after each work pass.
+
+## Project layout
+- Backend: `backend/` (FastAPI + SQLAlchemy 2.0 async + Pydantic v2). Run tests with
+  `ALLOW_MOCK_AUTH=true` (P0/P3 tests use `Bearer mock-firebase-id-token`).
+  `DATABASE_URL=sqlite+aiosqlite:///./test.db`, `ENVIRONMENT=development`.
+  No venv committed; install with `pip install -e .` + `pytest pytest-asyncio pytest-cov aiosqlite httpx`.
+- Frontend: `frontend/` (Vite + React + TS + Tailwind v4 + TanStack Query).
+  Scripts: `npm run typecheck|build|test|lint`. Tests use vitest + jsdom.
+
+## Test commands (verified)
+- Backend: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/ -q -W error::DeprecationWarning` -> 217 pass.
+- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 33 pass, typecheck clean, build OK.
+
+## AI Explanation layer (Phase 1 -- AI-Assisted Report Explanation)
+An additive AI explanation layer on top of the deterministic CDSE reports. The
+clinical engine, schemas, and existing flows are NOT modified. Full design:
+`MEDICHECK_AI_PHASE1_REPORT.md`, baseline: `MEDICHECK_AI_BASELINE.md`.
+
+## Evidence-grounded RAG (Phase 2 -- built ON TOP of Phase 1)
+Evidence-grounded retrieval over MediCheck's approved evidence repository.
+Deterministic CDSE/scoring/schemas/Phase-1 provider abstraction UNCHANGED.
+Full design: `MEDICHECK_AI_PHASE2_RAG_REPORT.md`. Key facts to preserve:
+- Actual evidence architecture (verified against source, NOT the baseline's
+  conceptual `indicator_sources`/`MedicalEvidence`): the seeded, approved
+  evidence is `EvidenceReferenceModel` (evidence_references: id, question_id,
+  title, url, source, evidence_level, summary, + SoftDeleteMixin). It has NO
+  status/is_active column -> eligibility = `deleted_at IS NULL` + active link.
+  `MedicalEvidenceModel` (medical_evidence) has a draft/published lifecycle
+  but is NOT seeded and NOT wired into the indicator->evidence link graph;
+  `ClinicalEvidenceService` references nonexistent fields on EvidenceReferenceModel
+  (dead/broken) -- NOT used for retrieval. Do not "fix" by pointing retrieval at
+  MedicalEvidenceModel without first wiring link tables + fixing that service.
+- Knowledge-graph edges (links.py): `IndicatorEvidenceLinkModel` (indicator<->
+  evidence, `active`) is the PRIMARY grounding edge. NO direct condition<->evidence
+  or recommendation<->evidence link tables -- they reach evidence TRANSITIVELY via
+  their linked indicators (`IndicatorConditionLinkModel`,
+  `IndicatorRecommendationLinkModel`, `ConditionRecommendationLinkModel`).
+- `EvidenceRetrievalService` (app/application/services/evidence_retrieval_service.py):
+  batched retrieval (in_() per id set, no N+1), 3 tiers (indicator-direct=0.9 >
+  condition-transitive=0.7 > recommendation-transitive=0.6), dedup by evidence
+  id (keep best), deterministic ranking (tier 60% + evidence_level 25% + recency
+  <=5% via created_at + text-overlap 10%), per-entity cap (default 2) + global
+  limit (default 5). Config via constructor overrides OR
+  settings.ai_rag_{evidence_limit,per_entity_cap,excerpt_max_chars}. The LLM
+  NEVER decides relevance.
+- Citation anti-hallucination: `KeyFinding.evidence_ids` +
+  `RecommendationExplanation.evidence_ids`; `AIExplanationResponse.bind_context`
+  now takes `allowed_evidence_ids` (the retrieved set) and the validator REJECTS
+  any cited evidence id not retrieved (-> UNAVAILABLE_FALLBACK). Structurally
+  enforced, not just prompt. Phase-1 indicator/rec id validators still run.
+- Prompt bumped to `PROMPT_VERSION="2.0"` (V1_SYSTEM_PROMPT preserved). v2.0
+  grounds in supplied evidence, forbids inventing citations/evidence ids,
+  requires stating insufficiency. Cache key (trace_id,prompt_version) auto-
+  invalidates v1.0 entries.
+- `AIExplanationService` now composes `EvidenceRetrievalService` + provider
+  (abstraction intact). Response adds `retrieved_evidence` +
+  `evidence_available` for traceability/transparency. Retrieval failure ->
+  explain with no evidence + state none available (never breaks report).
+- No DB migration; read-only over existing evidence/link tables. Reuses trace_id.
+- Frontend: same `ReportExplanation.tsx` extended -- dedicated visually-distinct
+  Evidence section (FileText icon, white card) + per-finding citation markers
+  `[n]` linking only to retrieved ids (fabricated id -> no marker). No-evidence
+  state shows "No supporting evidence was available...". No fake links.
+- Tests: backend `tests/test_ai_rag_phase2.py` (15: retrieval 8 + AI validation
+  4 + security 2 + integrity 1); frontend 3 new. Test seeding uses UNIQUE
+  body-system/question/indicator keys per call (uuid suffix) to avoid UNIQUE
+  collisions on the shared test DB; do NOT use fixed codes across tests.
+  `EvidenceRetrievalService` ranking must be timezone-safe (SQLite stores naive
+  datetimes -- normalise both sides to naive UTC; never use datetime.utcnow()
+  -- it trips `-W error::DeprecationWarning`).
+
+## CDSE answer-aware activation (clinical correctness -- read before touching CDSE/questionnaire saving)
+Fixed a critical bug where `ClinicalDecisionService.process_assessment` activated a
+question-level indicator link for ANY answer, so "No chest pain"/"non-smoker"/skipped
+still turned on CV_CHEST_PAIN / CV_TOBACCO (and every other question-level linked
+indicator). Also: `save_answer` computed `score_value` but never persisted
+`option_id`/`value`/`numeric_value`, and YES/NO arrives from the UI as a BOOLEAN
+(`{value: true/false}`) while seeded options use canonical "yes"/"no", so the old
+`opt.value == str(option_value)` match never fired for YES/NO.
+- `app/application/services/answer_values.py` (new, pure helpers):
+  `coerce_float` (bool -> 1.0/0.0, numeric strings -> float), `match_option`
+  (matches by `value`/`code`, plus a bool->"yes"/"no" canonical mapping),
+  `is_affirmative(*, score_value, numeric_value, value, response_value)` ->
+  True only for "yes"/true/positive numeric (score>0 OR numeric>0 OR affirmative
+  string/number); False for "no"/False/0/""/None.
+- `QuestionnaireService.save_answer` + `chw_service` offline sync now persist
+  `option_id`/`value`/`numeric_value` (via `match_option`/`coerce_float`);
+  `value` stores the canonical matched option value, else `str(raw)`.
+- `process_assessment`: skipped answers are filtered OUT of `answer_map`;
+  question-level links activate ONLY when at least one non-skipped answer for the
+  question `is_affirmative(...)`. OPTION-level path is unchanged (its weight comes
+  from the option `score_value`, already value-aware) -- do NOT break it.
+- `AssessmentResult` public shape (summary keys, result fields) UNCHANGED.
+- Tests: `tests/test_cdse_answer_activation.py` (8) uses the REAL
+  `save_answer -> process_assessment` path with YES/NO booleans; covers
+  cv_chest_pain yes/no, cv_smoking yes/no, skipped, persistence of
+  option/value/numeric, and option-level linking. Verified: the 3 negative/skipped
+  tests FAIL on the old CDSE and PASS after the fix. Regression subset unaffected:
+  `tests/test_clinical_decision_service.py tests/test_report_service.py
+  tests/test_ai_explanation_phase1.py tests/test_ai_providers_http.py` -> 70 pass;
+  `tests/test_chw_phase8.py tests/test_knowledge_graph.py tests/test_uat.py` -> 35 pass.
+- Kicker: the frontend `skip('')` still sends `response_value={"value":""}` WITHOUT
+  `is_skipped:true`, so skips are persisted as non-skipped empty answers. Empty value
+  is non-affirmative so it is clinically safe, but wiring `input_type`/`is_skipped`
+  through `useQuestionnaireFlow.submitAnswer` is a known follow-up.
+
+## Layout system (consolidated -- single RootLayout; read before touching layouts)
+ONE root layout for all authenticated routes (layout consolidation pass):
+- `layouts/RootLayout.tsx` -- the single route-level layout for EVERY
+  authenticated route (patient + /cms). Mounted once, never unmounts on
+  normal navigation. Reads `canAccessCMS` from `useAuthContext()` and
+  renders the role-appropriate chrome with `<Outlet/>`:
+  - Patient chrome (ex-DashboardLayout): patient `Sidebar` + persisted
+    collapse toggle + mobile drawer portal + `TopBar` + max-w-[1400px]
+    content container + footer + `MobileBottomNav`.
+  - Doctor/CMS chrome (ex-DoctorLayout): `DoctorSidebar` + mobile drawer +
+    CMS header (hamburger + "Doctor CMS · name" + initials avatar) +
+    `main.p-4 lg:p-6` + footer.
+- Role-specific nav components: patient nav lives in
+  `features/dashboard/components/layout/navConfig.ts` (consumed by
+  `Sidebar.tsx`); CMS nav lives in
+  `features/cms/components/layout/doctorNavConfig.ts` (consumed by
+  `DoctorSidebar.tsx`, extracted from the old DoctorLayout).
+- Sidebar collapse state: `features/dashboard/components/layout/
+  sidebarCollapseStore.ts` is now a `createCollapseStore(key)` factory
+  with TWO persisted localStorage keys -- `medicheck_sidebar_collapsed`
+  (patient, unchanged key) and `medicheck_doctor_sidebar_collapsed`
+  (doctor, new). Both consumed via `useSyncExternalStore`; doctor
+  collapse is now persisted (previously local useState).
+- `layouts/LayoutChromeContext.tsx` -- pages publish TopBar data
+  (`notifications`, `userName`, `userEmail`) to the route-level
+  TopBar via `useLayoutChrome().setChrome(...)`. `Dashboard.tsx`
+  publishes its notifications/userName (previously DashboardLayout
+  props) in an effect with cleanup on unmount.
+- Router (`routes/router.tsx`): all patient + /cms routes are children
+  of one `<Route element={<RequireAuth><RootLayout/></RequireAuth>}>`.
+  Per-route guards (RequirePatient/RequireDoctor) still wrap each page
+  element (RBAC unchanged); `/cms` uses
+  `<RequireDoctor><Outlet/></RequireDoctor>` as its layout element.
+  Public/auth routes (/, /login, /register) stay outside RootLayout.
+  `PatientLayoutWithContent` wrapper REMOVED.
+- REMOVED in the consolidation: `layouts/DashboardLayout.tsx`,
+  `layouts/DoctorLayout.tsx`, `layouts/AppLayout.tsx` (passthrough
+  stripped from 18 page components), and `PatientLayout.tsx` (P3-4).
+  `features/dashboard/pages/Dashboard.tsx` and
+  `features/profile/pages/HealthProfilePage.tsx` no longer render
+  their own layout -- they render content directly inside RootLayout.
+- `shared/ui/TopNav.tsx` is dead code (no importers).
+- Tests: `layouts/__tests__/layout-outlet.test.tsx` rewritten for
+  RootLayout (outlet rendering, role-based chrome switching, single
+  aside, patient + doctor collapse persistence across remounts).
+
+## Pydantic v2 (P3-1)
+- `HealthProfileDTO` has `model_config = ConfigDict(from_attributes=True)` + a
+  `validation_alias=AliasChoices("profile_metadata", "metadata")` because the ORM column
+  is `profile_metadata` (the model attr `metadata` is SQLAlchemy's MetaData object).
+- `PersonalInfoDTO` ALSO has `from_attributes=True` (added P3-2): without it,
+  `HealthProfileDTO.personal_info` could never be populated from the ORM (the nested
+  PersonalInfoModel wasn't coercible). This was latent -- existing tests only had
+  personal_info=None.
+- Use `HealthProfileDTO.model_validate(orm_obj)` (NOT `from_orm`) and `dto.model_dump()`
+  (NOT `.dict()`). Backend tests run with `-W error::DeprecationWarning` to enforce.
+
+## emergency_contact (P3-2 -- RESOLVED)
+- `PersonalInfoModel.emergency_contact` is now `Mapped[dict | None] = mapped_column(JSON,
+  nullable=True)` (was `Text` -- writing a dict raised on SQLite / stored a repr elsewhere).
+- Migration `20260808_emergency_contact_json` (TEXT->JSON alter, safe: no legacy non-NULL
+  data existed). Idempotent (skips if already JSON / table absent).
+- Two enabling bug fixes in the same read path: `snapshot_profile` referenced
+  `profile.extra_metadata` (typo -> `profile.profile_metadata`); `PersonalInfoDTO` lacked
+  `from_attributes=True`. Without these, emergency_contact (and all personal_info) could
+  never serialize via /profiles/me.
+- Regression tests: `backend/tests/test_emergency_contact_p3.py` (5 tests: populated dict
+  round-trip, NULL, snapshot dict-not-repr, /profiles/me populated object, /profiles/me null).
+
+## Known pre-existing issues (not yet addressed -- deferred)
+- `UserResponse` DTO role literal only allows `patient|doctor|researcher|administrator`
+  but `Role` enum has more -- schema mismatch.
+- Frontend wizard sends `emergency_contact` as a STRING vs backend dict (profileService.ts/
+  profileApi.ts/defaults.ts/fieldSpecs.ts) -- would 422 on submit. Backend now stores dict
+  correctly; frontend type alignment is a separate frontend-schema item (not touched in P3-2).
+
+## Workflow rules
+- Do NOT commit/stage until the whole P0--ÜíP3 series is done + final audit clean.
+- Preserve RBAC; don't expose user data during loading. Preserve UI/functionality.
+- Backend deps NOT preinstalled in sandbox -- must `pip install` before running tests.
+
+## Phase 5 -- Multilingual + Voice AI Clinical Intake (feat/multilingual-voice-intake-phase5, PR #15)
+- **Architectural invariant:** language is an INTERFACE layer ONLY. Sinhala/Tamil/English
+  descriptions of the same clinical concept resolve to the SAME canonical indicator ID. The
+  knowledge graph is NEVER fragmented by language. Voice is another input channel: audio ->
+  STT -> transcript -> patient reviews/edits -> existing Phase 3 intake pipeline.
+- `app/application/ai/language.py` -- normalize/detect/resolve. Unicode-script detection
+  (Sinhala U+0D80-0DFF, Tamil U+0B80-0BFF), >=25% threshold, English never "detected" (default
+  fallback). `resolve_language(text, selected)` -> detected if confident, else selected/default.
+- `app/application/ai/stt_provider.py` -- `SpeechToTextProvider` Protocol +
+  `StubSpeechToTextProvider` (deterministic, returns English placeholder). Audio is transient
+  in-memory, NEVER stored/logged. `MAX_AUDIO_BYTES=10MB`. `get_stt_provider()` via
+  `settings.stt_provider`.
+- `app/application/ai/multilingual_prompts.py` -- version `1.1-multilingual` (extends Phase 3's 1.0).
+- `intake_dtos.py` -- `IntakeLanguage=Literal["en","si","ta"]`, `IntakeInputType=Literal["text","voice"]`.
+  Added `language`/`input_type`/`detected_language` to `IntakeRequestContext` + `IntakeResponse`.
+  `safe_intake_response()` now accepts language/input_type kwargs (backward compat: all optional).
+  `_coerce_language()` is local (not importing ai.language) to avoid circular import.
+- `intake_provider.py` -- `_SYNONYMS` now has Sinhala/Tamil entries mapping to SAME canonical
+  keyword. `_NEGATION_CUES`/`_UNCERTAINTY_CUES`/`_HISTORICAL_CUES`/`_RECENT_CUES`/`_RECURRING_CUES`
+  all have Sinhala/Tamil cues. `_localized_clarification(language)` returns localized
+  informational (non-diagnostic) clarification.
+- `ai_intake_service.py` -- `extract(text, *, session_ref, language=None, input_type="text")`.
+  `transcribe_audio(audio_bytes, *, language, content_type)`. `IntakeTrace` has
+  language/input_type/detected_language (logged, NO raw text/audio logged). `__init__` takes
+  optional `stt_provider`.
+- `ai_intake.py` -- `POST /extract` (language validation -> 422 if unsupported), `POST /transcribe`
+  (multipart audio, transient, 422/413 on failure -> "type instead"), `GET /languages`
+  (en/si/ta + labels). Error responses use `error.message` (custom ErrorResponse handler), NOT `detail`.
+- `config.py` -- `supported_intake_languages="en,si,ta"`, `stt_provider="stub"`, `stt_model=""`,
+  `stt_request_timeout_seconds=20.0`.
+- Frontend: `intakeService.ts` has `transcribeAudio` (FormData multipart) + `fetchLanguages`.
+  `useVoiceRecorder.ts` (MediaRecorder hook, isSupported check, in-memory Blob). `IntakePage.tsx`
+  has language selector + mic button (hidden if !isSupported) + transcript review banner.
+- **AssessmentSessionModel** field is `questionnaire_template_id` (NOT `template_id`).
+- **Async inspection:** `inspect(db_session.bind)` fails on AsyncEngine; use
+  `PRAGMA table_info(table)` via `text()` for SQLite schema checks in tests.
+- No DB migrations, no schema changes. CDSE/domain/ORM models/migrations unchanged (verified).
+- Tests: 50 backend Phase 5 (test_intake_phase5.py) + 3 frontend. 336 backend total / 62 frontend.
+  Run: `cd backend && ALLOW_MOCK_AUTH=true ... python -m pytest tests/test_intake_phase5.py -q`.
+
+## Assessments pages (two distinct routes -- keep straight)
+- `/assessments` --Üí `features/questionnaire/pages/AssessmentSelectionPage.tsx`. The REAL
+  working flow: uses `useNavigate` + `useStartSession` (TanStack mutation) to call the
+  backend `startSession(templateId)` and navigate to `/questionnaires/:sessionId`.
+  Backed by `features/questionnaire/data/assessments.ts` catalog + `useTemplates()`.
+- `/assessments/dashboard` --Üí `features/dashboard/pages/Assessments.tsx`. A mock-data
+  dashboard view (uses `features/dashboard/assessments/mockData.ts`, NOT backend). Was
+  shipped with stub handlers that only `console.log` (handlePrimary/handleEdit/
+  handleDiscard + AssessmentHistoryTable onView/onRetake/onDownload/onCompare), so every
+  "Start Assessment"/"Resume"/"Review Report" button did nothing. Fixed by wiring
+  `useNavigate`: completed --Üí `/assessments/:slug` (ReportViewer), requires_profile --Üí
+  `/profile`, locked --Üí no-op, everything else (not_started/recommended/in_progress/
+  expired/needs_review) --Üí `/assessments` (the real selection page). When adding new
+  buttons on this page, route via navigate -- do NOT reintroduce console.log stubs.
+- Routes that matter for navigation: `/assessments/:id`=ReportViewer,
+  `/assessments/:id/results`=ResultsDashboard, `/questionnaires/:id`=session,
+  `/timeline/compare`=ComparePage, `/profile`=HealthProfilePage.
+
+## Doctor CMS recovery (P0-P3 series -- read before touching the CMS)
+The Doctor CMS appeared to be a "shell" after modularization. Forensic + repair work
+found it was DISCONNECTED + API-BROKEN + one critical RBAC serialization bug, not deleted.
+Full findings: `CMS_CONTENT_FORENSIC_REPORT.md`. Key facts to preserve:
+
+### Frontend CMS architecture
+- `frontend/src/features/cms/` is the (only) live CMS module. Two API layers:
+  - `cmsApi.ts` `contentApi` -- generic CRUD. `DEDICATED_ENDPOINTS` map routes 4 entity
+    types to dedicated routers (`question`->`/cms/questions`, `question_group`->
+    `/cms/question-groups`, `body_system`->`/cms/body-systems`, `template`->`/cms/templates`)
+    which return BARE ARRAYS, wrapped client-side into `{items,total,skip,limit}`. All
+    other entity types hit the generic `/cms/content/{entity}` (paginated). DO NOT route
+    `template` through the generic content endpoint -- it 500s on the `metadata` column
+    collision (see below); the dedicated `/cms/templates` endpoint is correct.
+  - `cmsApi.ts` `builder`/`dashboard`/`admin`/`roles`/`users` -- dedicated endpoints.
+- All CMS API paths are prefixed via the axios `api` client baseURL (`/api/v1`); endpoint
+  strings must NOT repeat `/api/v1` (was a P0 bug: double `/api/v1/api/v1/cms/...`).
+- `useCmsQueries.ts` is the canonical hook layer. `useContentList(entityType)` indexes the
+  paginated response via `.items` (NOT the bare array). Dedicated-list hooks
+  (`useQuestions` etc.) consume the bare array directly.
+- Router (`routes/router.tsx`): `/cms/*` is a layout route using `DoctorLayout` + `<Outlet/>`.
+  Each content-list route (`/cms/diseases`, `/cms/symptoms`, ...) must point at its matching
+  `features/cms/pages/*ListPage.tsx`. A P1 bug had several list routes pointing at a wrong
+  generic page -> wrong entity fetched -> empty grid.
+
+### Backend CMS architecture
+- Generic content router: `app/api/v1/cms/content.py` -- `ENTITY_ALIASES`,
+  `_READ_PERM_MAP`, `_WRITE_PERM_MAP`, dispatches to `content_service.ENTITY_REGISTRY`
+  (entity<->model pairs) + `SqlGenericCmsRepository`. Aliases map abbreviated frontend names
+  (`disease`, `symptom`, `template`...) to canonical model keys. Permission deps via
+  `Permission` enum (`CMS_READ_*` / `CMS_WRITE_*`).
+- Dedicated routers: `cms/questions.py` (questions/groups/body-systems/templates -- seeded
+  data, bare arrays), `cms/rules.py` (rule-set CRUD + evaluate/simulate/validate), and
+  `cms/dashboard.py` (overview/recent-activity/workflow-summary).
+- Admin router: `app/api/v1/endpoints/admin.py` -- body-systems/indicators/evidence/
+  recommendations CRUD, `GET /admin/users` (paginated `{items,total,skip,limit}`),
+  `GET/PUT /admin/users/{id}/roles` (body field is `{"roles": [...]}` -- NOT `role_codes`),
+  `POST /admin/users/{id}/toggle-active`, `GET /admin/roles` (bare array).
+- All CMS GET endpoints depend on `get_cms_user`; admin write depends on
+  `get_current_admin`. `has_role` uses `_ROLE_HIERARCHY` (>=), so `get_cms_user`
+  (`has_role(roles, READ_ONLY_REVIEWER)`=level 5) admits ANY CMS role (level>=5), denying
+  only patients/roleless users. This is CORRECT -- do not "fix" it by auto-granting roles.
+
+### Critical bug fixed: /auth/me 500 for CMS roles (P3, ROOT CAUSE of shell look)
+- `UserResponse.roles` (and `AuthenticatedUserResponse.roles`) was
+  `list[Literal["patient","doctor","researcher","administrator"]]`. The Role enum
+  (`app/core/security/rbac.py`) is patient, doctor, super_admin, medical_director,
+  specialist_doctor, general_physician, research_reviewer, content_editor,
+  read_only_reviewer. So ANY user with a real CMS role made `UserResponse.from_entity`
+  raise Pydantic ValidationError -> /auth/me returned 500 -> the frontend `meQuery` failed
+  -> `AuthContext.role` fell back to localStorage/`'patient'` -> `checkCanAccessCMS=false`
+  -> CMS nav hidden / pages rendered with no resolved role -> looked like an empty shell.
+- Fix: `roles: list[str] = []` in both DTOs (`auth_dtos.py`). Serialization-only; RBAC
+  still uses DB roles via `get_cms_user`. Regression: `tests/test_user_response_roles.py`
+  (all 9 roles serialize; /auth/me returns 200 with `["medical_director"]`).
+
+### `metadata` column collision (NOT fixed -- known landmine, avoided)
+- `QuestionnaireTemplateModel` stores its JSON in a DB column named `metadata` but exposes
+  it via Python attr `extra_metadata` (because `metadata` is reserved by SQLAlchemy's
+  `MetaData`). `BaseModel.to_dict()` does `getattr(self, "metadata")` -> returns the
+  SQLAlchemy `MetaData` object, NOT the column value. The generic content router would
+  500 if `questionnaire_template` were registered there. This is why templates MUST use
+  the dedicated `/cms/templates` endpoint (which maps via `extra_metadata` correctly),
+  NOT the generic `/cms/content/template` path. Do NOT register `questionnaire_template`
+  in `ENTITY_REGISTRY` without first fixing `to_dict()` for that model.
+- `SQLQuestionnaireRepository._to_entity()` correctly maps `extra_metadata`->entity field;
+  that is the working pattern.
+
+### CMS access in dev (mock auth)
+- Mock auth (`ALLOW_MOCK_AUTH=true`, token `mock-firebase-id-token`) auto-creates a user
+  with NO roles (`User.create` takes no roles). So a fresh dev user has `roles=set()` ->
+  `get_cms_user` 403s on every CMS endpoint AND /auth/me returns `roles:[]` -> frontend
+  sees `patient`. CMS access requires an admin to assign a CMS role via
+  `PUT /admin/users/{id}/roles` (now implemented). This is correct security posture; do
+  NOT auto-grant CMS roles on signup.
+
+### Test commands (verified)
+- Backend: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/ -q -W error::DeprecationWarning` -> 252 pass.
+- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 43 pass, typecheck clean.
+
+## Phase 7 — AI-Powered Personalized Risk Communication, Transparency & AI Governance (read before touching AI layer)
+
+### Core invariant (NEVER violate)
+The AI is an EXPLANATION layer ONLY. It must NEVER: diagnose a disease,
+calculate a clinical score, determine severity, create recommendations,
+invent evidence, or modify the deterministic assessment. Translation
+(EN/SI/TA) must NEVER upgrade certainty (possible != confirmed, monitor !=
+urgent, risk != diagnosis). The deterministic Clinical Decision Service (CDSE)
+is the clinical authority; AI only explains its output.
+
+### New files (Phase 7)
+- `backend/app/application/ai/personalized_provider.py` - `PersonalizedExplanationProvider`
+  (deterministic local provider, name="personalized-stub"). Multilingual (EN/SI/TA)
+  phrase tables + literacy-adapted text generators (simple/standard/detailed).
+  Select via `AI_PROVIDER=personalized-stub`. Default remains "stub".
+- `backend/app/application/ai/phase7_prompts.py` - `PHASE7_PROMPT_VERSION`="3.0-personalized",
+  `AI_TRANSPARENCY_NOTICE`, `SDG_3_4_DISCLAIMER`.
+- `backend/app/application/services/ai_audit_service.py` - `AIAuditService`. Records
+  metadata (NOT PHI) about every AI explanation. `record()` writes hashes + ids only.
+  `get_governance_summary()` returns aggregate counts for the CMS dashboard.
+- `backend/app/application/services/question_explanation_service.py` -
+  `QuestionExplanationService.explain_question()` - "Why was I asked this?" Uses
+  EXISTING knowledge-graph links (question->indicator->condition, question->evidence).
+  Never invents relationships. Ownership: caller must own the session.
+- `backend/app/infrastructure/persistence/models/ai_interaction_audit.py` -
+  `AIInteractionAuditModel` (additive table). Stores trace_id, session_id,
+  request_type, provider, model, prompt_version, language, literacy_level,
+  input_context_hash, output_hash, status, status_reason. NO raw PHI columns.
+- `backend/alembic/versions/20260810_ai_interaction_audits.py` - migration
+  (additive, idempotent). down_revision=20260808_emergency_contact_json.
+- `backend/app/api/v1/endpoints/ai_governance.py` - `GET /api/v1/ai-governance/summary`
+  (RBAC: RESEARCH_REVIEWER+, returns de-identified aggregate metrics only).
+- `backend/tests/test_ai_phase7.py` - 29 tests covering all Phase 7 features.
+- `frontend/.../ReportExplanation.tsx` - updated with language/literacy selectors,
+  source breakdown section, transparency notice, quality status badge.
+- `frontend/.../__tests__/ReportExplanationPhase7.test.tsx` - 11 frontend tests.
+
+### Modified files (Phase 7)
+- `ai_dtos.py` - added `language`, `literacy_level`, `quality_status`,
+  `source_breakdown`, `transparency_notice`, `provider`, `model` to
+  `AIExplanationResponse`. Added `LiteracyLevel` enum (simple/standard/detailed),
+  `AIQualityStatus` enum (valid/fallback/validation_failed/provider_unavailable/
+  evidence_unavailable), `SourceBreakdownItem` model. `UNAVAILABLE_FALLBACK`
+  now sets quality_status + transparency_notice.
+- `ai_explanation_service.py` - `explain_report()` now accepts `language` +
+  `literacy_level` kwargs. Writes audit records on every outcome (success,
+  provider_unavailable, validation_failed). Builds `source_breakdown` +
+  sets `transparency_notice` + `quality_status`. Cache key includes lang+level.
+- `provider.py` - split `AIProviderError` (provider DOWN) from
+  `AIValidationFailure` (output INVALID). `get_explanation_provider()` supports
+  "personalized-stub". StubExplanationProvider unchanged.
+- `report.py` endpoint - `POST /{session_id}/explanation` accepts `language` +
+  `literacy_level` query params. Added `GET /{session_id}/question-explanation`.
+- `rbac.py` - added `Permission.AI_VIEW_GOVERNANCE`. Granted to
+  RESEARCH_REVIEWER, MEDICAL_DIRECTOR, SUPER_ADMIN.
+- `deps.py` - added `get_ai_governance_user` dependency (RBAC: RESEARCH_REVIEWER+).
+- `config.py` - added `ai_audit_enabled`, `ai_default_language`,
+  `ai_default_literacy_level` settings.
+- `router.py` - registered `ai_governance_router`.
+- `patientService.ts` - `AIExplanation` interface extended with Phase 7 fields.
+  `fetchReportExplanation()` now accepts `{language, literacy_level}` params.
+  Added `fetchQuestionExplanation()`, `QuestionExplanation` interface,
+  `AISourceBreakdownItem`, `AIQualityStatus`, `LiteracyLevel` types.
+
+### AI audit trail (governance)
+- Every `explain_report()` call writes an `AIInteractionAuditModel` record.
+- Stores ONLY: trace_id, session_id, request_type, provider, model,
+  prompt_version, language, literacy_level, input_context_hash (SHA-256 of
+  entity-id dict), output_hash (SHA-256 of AI output), status, status_reason.
+- NO raw patient text, NO clinical content, NO free-text PHI.
+- `get_governance_summary()` aggregates: total_requests, fallback_rate_pct,
+  validation_failure_rate_pct, by_status, by_language, by_provider, by_prompt_version.
+- `GET /api/v1/ai-governance/summary` requires `AI_VIEW_GOVERNANCE` permission.
+  Individual audit records are NEVER exposed through the API (only aggregates).
+
+### Test commands (Phase 7 verified)
+- Backend Phase 7: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/test_ai_phase7.py -q -W error::DeprecationWarning` -> 29 pass.
+- Full backend suite passes in batches (238 total tests). Run in groups if timeout.
+- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 80 pass (11 new). Build OK.
+
+## Phase 3 -- AI Clinical Intake + Candidate Indicator Extraction (ADDITIVE)
+AI-assisted conversational intake is an INPUT INTERPRETATION layer ONLY. It feeds INTO
+the untouched deterministic CDSE; it never diagnoses/scores/sets severity/activates
+indicators/creates content. Patient text -> AI extraction -> structured observations ->
+validated candidate indicators -> existing questions -> existing branching -> CDSE.
+Full design: `MEDICHECK_AI_PHASE3_INTAKE_REPORT.md`.
+
+### Backend intake architecture
+- DTOs: `app/application/dtos/intake_dtos.py` -- `ObservationDTO` (negation/temporality/
+  certainty preserved), `CandidateIndicatorDTO`, `CandidateQuestionDTO`,
+  `CandidateQuestionGroupDTO`, `ClarificationDTO`, `IntakeResponse`, bounded
+  `IndicatorCatalog`/`IndicatorCatalogEntry`. `IntakeResponse` validator rejects candidate
+  `reason` text reading as a diagnosis. `safe_intake_response()` is the fallback.
+- Provider: `app/application/ai/intake_provider.py` -- `AIClinicalIntakeProvider` Protocol
+  + deterministic `StubClinicalIntakeProvider` (keyword + bounded synonym map, negation/
+  uncertainty/temporality/duration/frequency detection, no network/API key).
+  `get_intake_provider()` selects via `settings.ai_provider`. `AIIntakeProviderError` ->
+  safe fallback. Prompt: `intake_prompts.py` (`INTAKE_PROMPT_VERSION="1.0"`).
+- Services:
+  - `ai_intake_service.py` `AIIntakeService` (orchestrator): bounded catalog (active +
+    non-deleted indicators, limit 60) -> provider -> parse -> observations ->
+    validation -> question discovery -> `IntakeResponse`. `IntakeTrace` records safe
+    metrics; raw patient text is NOT logged.
+  - `intake_validation_service.py` `CandidateValidationService`: DB is authoritative.
+    Rejects unknown/inactive/deleted indicator IDs (allow-list, never creates/inserts),
+    invalid confidence, orphan observations. `ValidationTrace` for observability.
+  - `intake_question_service.py` `AIIntakeQuestionService`: validated candidate indicator
+    IDs -> batched `QuestionIndicatorLinkModel` (active) -> `QuestionModel`
+    (status=active, deleted_at IS NULL) -> `QuestionGroupModel` (is_active, deleted_at
+    IS NULL). No N+1. Deterministic ranking (group display_order, then question
+    order_index). Dedup. Template scope respected. `source="cms"` only.
+- Endpoint: `app/api/v1/endpoints/ai_intake.py` -- `POST /api/v1/ai/intake/extract`.
+  Reuses `get_current_user`; verifies session ownership (other user -> 404). Scoped to
+  caller; no cross-patient intake. Registered in `router.py` as `ai_intake_router`.
+
+### Persistence (NONE)
+Phase 3 is session-scoped/in-memory. No new tables, no migrations, no schema changes.
+Intake is read-only w.r.t. the clinical schema. trace_id returned for client correlation;
+observability via structured logs. If replay is later needed, add additive
+`ai_intake_*` tables WITHOUT touching CDSE tables.
+
+### Frontend intake architecture
+- API: `features/questionnaire/api/intakeService.ts` -- `extractIntake`, typed
+  `IntakeResponse`/`IntakeObservation`/etc. Never throws on AI unavailability.
+- Page: `features/questionnaire/pages/IntakePage.tsx` -- OPTIONAL assisted entry point
+  at `/assessments/intake`. Textarea -> observations (with negated/uncertain/temporality
+  badges) + candidate indicators + clarifications + recommended existing question groups.
+  User can edit/reject/skip/continue. Non-diagnostic language. Starts a NORMAL
+  questionnaire session (`useStartSession`) -> existing branching -> existing CDSE.
+- Entry point: "Try AI intake" banner on `AssessmentSelectionPage.tsx`.
+- Route: `/assessments/intake` in `routes/router.tsx`. Standard `/assessments` unchanged.
+
+### Phase 3 test commands (verified)
+- Backend: `... python -m pytest tests/test_ai_intake_phase3.py -q` -> 35 pass.
+- Frontend: `CI=true npx vitest run src/features/questionnaire/pages/__tests__/IntakePage.test.tsx` -> 10 pass.
+- Full suites: backend 252 pass, frontend 43 pass, typecheck clean, build OK.
+
+### Phase 3 safety invariants (do NOT regress)
+- AI may ONLY cite `indicator_id` values in the bounded catalog (active + non-deleted).
+  Unknown/inactive/deleted/hallucinated IDs are REJECTED, never created/inserted.
+- `IntakeResponse` validator rejects diagnostic language in candidate reasons.
+- AI failure -> `available=false` safe fallback; standard questionnaire always works.
+- Intake is read-only w.r.t. CDSE/questionnaire/branching/CMS. RBAC + session ownership
+  preserved. No cross-patient intake.
+
+## Phase 4 -- Longitudinal Risk Trajectory + AI Change Explanation (ADDITIVE)
+Full report: `MEDICHECK_AI_PHASE4_LONGITUDINAL_REPORT.md`. Builds on Phases 1-3.
+The trajectory is computed READ-ONLY from existing immutable, timestamped,
+trace-ID-bearing deterministic assessment results/reports. **No new tables, no
+migrations, no schema changes.** The deterministic CDSE remains the clinical
+source of truth; AI explains observed changes only (never decides them).
+
+### Phase 4 architecture (key files -- read before touching)
+- DTOs: `backend/app/application/dtos/longitudinal_dtos.py` -- the deterministic
+  longitudinal data contract (LongitudinalAssessmentPoint, TrajectoryComparison,
+  ChangeEvent, HealthTrajectory) + AI contract (LongitudinalExplanationContext
+  with computed `allowed_*_ids` allow-lists, LongitudinalExplanationResponse with
+  `bind_context()` allow-list validation that REJECTS hallucinated
+  indicator/condition/recommendation/evidence ids -- same pattern as Phase 1/2).
+  TrendLabel (improving/stable/worsening/new/removed/persistent/insufficient_data)
+  is deterministic; the LLM never chooses these. SEVERITY_ORDER is the existing
+  CDSE body-system category ordering (Normal<Monitor<Needs Attention<Recommend
+  Screening<Urgent Medical Review); SCORE_DELTA_THRESHOLD=1.0.
+- Deterministic engine: `backend/app/application/services/longitudinal_analysis_service.py`
+  (`LongitudinalAnalysisService`) -- INDEPENDENT of any LLM. Loads the caller's
+  most-recent N reports (bounded 1-100, default 20), re-orders oldest->newest,
+  batch-loads body-system names, builds points from report (body-system
+  category/score) + CDSE result (indicators/conditions/recommendations), compares
+  adjacent points. `compare_specific(user_id, prev, curr)` for arbitrary owned
+  pairs (ownership-verified; cross-user -> None -> 404). `_extract_trace_id()`
+  reuses the Phase 1 pattern (trace_id is in `assessment_results.summary`).
+- AI explanation: `backend/app/application/services/longitudinal_explanation_service.py`
+  (`LongitudinalExplanationService`) -- reuses Phase 2 `EvidenceRetrievalService`
+  (deterministic; AI never chooses evidence) + Phase 1 provider/allow-list
+  pattern. Versioned prompt: `backend/app/application/ai/longitudinal_prompts.py`
+  (`LONGITUDINAL_PROMPT_VERSION="1.0"`, binds AI to EXPLAINING only -- no
+  diagnose/predict/score/alter/invent). Provider Protocol + stub:
+  `backend/app/application/ai/longitudinal_provider.py` (StubLongitudinalProvider
+  builds valid JSON strictly from context; `assert_non_diagnostic` rejects
+  diagnostic/predictive language). AI failure/validation failure ->
+  `trajectory_unavailable_fallback` (available=False); trajectory stays available.
+  Insufficient data (<2 assessments) -> AI NOT called (provider.calls==0).
+- API: `backend/app/api/v1/endpoints/trajectory.py` (prefix `/trajectory`, tag
+  `trajectory`) -- `GET /trajectory?limit=N`, `GET
+  /trajectory/compare/{prev}/{curr}`, `POST /trajectory/explanation` (body
+  `{previous_session_id?, current_session_id?}`, defaults to latest two). All
+  enforce `get_current_user` + caller-scoped ownership. Registered in
+  `app/api/v1/router.py`.
+- Frontend: `frontend/src/features/health-timeline/api/trajectoryService.ts`
+  (typed client + types), `hooks/useTrajectory.ts` (TanStack hooks),
+  `pages/TrajectoryPage.tsx` (timeline + recharts trend chart + body-system
+  cards + finding changes + AI explanation clearly separated/labelled +
+  disclaimer + empty states). Route `/timeline/trajectory` in router.tsx.
+  `frontend/src/test/setup.ts` now has a ResizeObserver stub (recharts needs it;
+  jsdom doesn't implement it) -- affects ALL chart tests.
+
+### Phase 4 score semantics (from CDSE + ReportService -- do not invent)
+- Indicator score = sum of option weights; activated if >= 1.0.
+- Condition score = sum of contributing indicator scores; confidence = score/
+  max_possible in [0,1].
+- Body-system score (report) = sum of activated indicator scores -> mapped to a
+  category label via severity thresholds (the SEVERITY_ORDER above). Stored as
+  String(50) but is a float string -> `_safe_float()` parses it.
+- overall_severity = the highest-severity body-system category (READ-ONLY, a
+  categorical label, NEVER an invented numeric "health score").
+
+### Phase 4 test commands (verified)
+- Backend: `... python -m pytest tests/test_longitudinal_phase4.py -q` -> 34 pass.
+- Frontend: `CI=true npx vitest run src/features/health-timeline/pages/__tests__/TrajectoryPage.test.tsx` -> 16 pass.
+- Full suites: backend 286 pass, frontend 59 pass, typecheck clean, build OK.
+
+### Phase 4 safety invariants (do NOT regress)
+- Trajectory is READ-ONLY w.r.t. CDSE/Phase 1/2/3/CMS/RBAC/questionnaire
+  branching. No DB writes, no schema changes. CDSE/Phase 1/2/3 services
+  unchanged (verified by `git diff` -- only router.py + new files).
+- AI may ONLY reference indicator/condition/recommendation/evidence ids present
+  in the deterministic trajectory context. Hallucinated ids are REJECTED ->
+  `available=false` fallback. No PHI in context (only trace_ids, dates, change
+  dicts, allow-listed evidence).
+- Deterministic trajectory remains available when AI is unavailable. AI is NOT
+  called for insufficient data (<2 assessments) or unauthorized requests.
+- Possible conditions are NEVER upgraded to diagnoses. No disease
+  progression/resolution claims. No predictions. The stub's
+  `assert_non_diagnostic` enforces this.
+- Patient ownership: trajectory scoped to caller; cross-user specific-compare
+  -> 404.
+
+## Phase 6: Population Health + SDG Analytics (COMPLETE)
+- Added `Permission.ANALYTICS_READ_POPULATION` to rbac.py; granted to RESEARCH_REVIEWER (level 5), MEDICAL_DIRECTOR (30), SUPER_ADMIN (40). Denied to patient/doctor/roleless. Dependency `get_analytics_user` in deps.py.
+- New service `population_analytics_service.py` (SQL-level aggregation only - GROUP BY/COUNT/SUM, no N+1). Small-cell suppression k=10 (configurable). De-identified: no user_id/email/session_id in ANY response.
+- New router `app/api/v1/endpoints/analytics.py` (7 routes: overview, severity, body-systems, indicators, trajectory, accessibility, sdg). All under `/api/v1/analytics/*`. Registered in `app/api/v1/router.py`.
+- Phase 5 integration: `ai_intake.py` persists `language`+`input_type` to `session.extra_metadata` (existing JSON column - NO migration). Accessibility endpoint reads via SQL JSON extraction.
+- Phase 4 integration: trajectory endpoint reuses TrendLabel enum.
+- Disclaimers on EVERY response (not prevalence / not diagnosis / not progression / not demographics / not SDG achievement).
+- IMPORTANT: use `case(...)` from sqlalchemy, NOT `func.case(...)` - `func.case` does not accept `else_` kwarg (TypeError).
+- Frontend: `features/analytics/` module. Route `/cms/analytics` under DoctorLayout. Nav item "Population Analytics" (BarChart3 icon).
+- Test commands: backend `python -m pytest tests/test_population_analytics_phase6.py -q` -> 22 pass. Frontend `CI=true npx vitest run src/features/analytics` -> 7 pass.
+- Constraints honored: NO clinical decision engine changes, NO schema migrations, NO LLM APIs. AI is explanation/extraction layer only.
+
+## Phase 10 — Interoperability, Health-System Integration & Outcome Feedback (COMPLETE)
+**Invariant (NEVER violate):** The CDSE decides. AI explains/extracts/translates/
+summarizes/assists operationally ONLY. Phase 10 adds NO second clinical calculation
+engine. FHIR/SDG/trajectory outputs are generated READ-ONLY from existing
+deterministic data. Outcome data NEVER feeds back into CDSE scoring/severity/
+probability/recommendations. Full report: `MEDICHECK_PHASE10_REPORT.md`; baseline:
+`MEDICHECK_PHASE10_BASELINE.md`; FHIR mappings: `MEDICHECK_FHIR_MAPPING.md`; SDG
+mappings: `MEDICHECK_SDG_INDICATOR_MAPPING.md`.
+
+### Backend (additive)
+- **New models** (`app/infrastructure/persistence/models/`): `facility.py`
+  (FacilityModel + FacilityServiceModel), `referral.py` EXTENDED (additive cols
+  facility_id, receiving_status, scheduled_for, completed_at — NO existing col
+  altered), `referral_status_event.py` (append-only transition audit),
+  `referral_access_barrier.py` (Phase 9 reuse), `care_outcome.py`
+  (CareOutcomeModel — operational funnel states), `interoperability_export.py`
+  (export audit metadata — NO PHI payloads).
+- **Migration** `alembic/versions/20260811_interop_phase10.py` — additive,
+  idempotent. Creates facilities, facility_services, care_outcomes,
+  interoperability_exports + referral additive columns. No clinical table altered.
+- **New services** (`app/application/services/`): `fhir_export_service.py`
+  (FhirExportService — FHIR R4 Bundle gen, IDOR+consent-guarded, batched no N+1,
+  records InteroperabilityExportModel audit row; AI interpretations NEVER clinical
+  Observations; possible condition NEVER confirmed diagnosis),
+  `sdg_export_service.py` (composes Phase 6 analytics + Phase 10 care-continuity
+  into SDG-aligned rows, k-suppressed per metric/stage, JSON+CSV; ALL metrics are
+  "medicheck-aligned-proxy" — none claimed official UN), `care_continuity_service.py`
+  (funnel + metrics, SQL aggregation, de-identified, k-suppressed),
+  `facility_service.py` (facility CRUD, admin-gated), `referral_service.py`
+  EXTENDED (lifecycle transitions deterministic+auditable via
+  ReferralStatusEventModel, facility feedback, outcome recording, task completion),
+  `chw_queue_service.py` (AI-assisted operational queue ranking — operational
+  factors ONLY: referral age/overdue/missing-follow-up/geographic/appointment
+  window; NEVER severity/probability/urgency/mortality; AIInteractionAuditModel
+  governance record).
+- **Referral status enum** (`referral_dtos.py` ReferralStatus): pending,
+  acknowledged, scheduled, attended, completed, declined, unable_to_access,
+  cancelled, + Phase 10 facility handoff: sent, received, accepted, + terminal
+  operational: expired, lost_to_followup. Receiving-side/authorized CHW provides
+  status explicitly (NEVER inferred from timestamp). Every transition audited.
+- **New/extended endpoints**: `interoperability.py` (prefix /interoperability:
+  GET fhir/patient/{id}, GET fhir/session/{id}, GET exports, GET sdg, GET sdg/csv,
+  GET care-continuity), `facilities.py` (prefix /facilities: list/get/create),
+  `referrals.py` EXTENDED (lifecycle + PATCH /{id}/feedback + outcomes +
+  barriers + tasks), `chw.py` EXTENDED (GET /chw/queue). All registered in
+  `app/api/v1/router.py`.
+- **RBAC**: added Permission.FHIR_EXPORT_OWN, FHIR_EXPORT_ANY, SDG_EXPORT,
+  INTEROP_MANAGE, FACILITY_MANAGE. Deps: get_interop_user, get_sdg_export_user,
+  get_referral_user (all depend on get_current_active_user -> get_current_user).
+  Patients denied admin/research endpoints. IDOR: patient = own data only;
+  FHIR_EXPORT_ANY = any patient (audited). Consent-gated: absent consent -> 403.
+- **k-anonymity**: k=10 (settings.analytics_min_group_size). Per-metric +
+  per-funnel-stage suppression; suppressed -> value/numerator/denominator null,
+  suppression_status="suppressed". Cannot bypass via filters/narrow ranges/
+  individual dims/endpoint combination. No user_id/email/session_id in ANY
+  SDG/care-continuity response.
+
+### Frontend (additive)
+- New `features/interop/` module: api/interopService.ts (typed client),
+  hooks/useInteropQueries.ts (TanStack), components/InteropUI.tsx (PrivacyBadge,
+  SuppressedBadge, TransparencyNotice, MetricCard, error/loading/empty states),
+  pages: InteroperabilityDashboardPage (FHIR export + history),
+  SdgDashboardPage (indicators + privacy badges + CSV download),
+  CareContinuityPage (funnel + metrics), FacilitiesPage (registry + referral
+  status + feedback), ChwQueuePage (AI operational queue).
+- Routes under `/cms/interop/*` (DoctorLayout, doctor/admin gated). Nav section
+  "Interoperability" added to DoctorLayout.tsx. Patients do NOT see admin/research.
+- **React Query v5 gotcha:** use `isLoading` (not `isPending`) for the FHIR
+  export button disabled state — `isPending` is true even when a query is
+  `enabled:false` (no data yet); `isLoading` == isPending && isFetching so it is
+  false for disabled queries. Test matchers for interpolated text (e.g.
+  "{total} export(s)", "Provider: {provider}") must use function matchers or
+  getAllByText because the value is a separate text node.
+
+### Test commands (verified)
+- Backend Phase 10: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/test_interoperability_phase10.py -q -W error::DeprecationWarning` -> 50 pass.
+- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run src/features/interop` -> 16 pass; full suite 100 pass, typecheck clean, build OK.
+- Regression (run in batches — full suite times out at 300s): auth/RBAC/profile/emergency, CHW Phase 8, population Phase 6, AI Phase 7, AI RAG Phase 2, longitudinal Phase 4, intake Phase 5, AI intake Phase 3, CMS recovery, report service — ALL pass.
+- Combined Phase 10 + FHIR validation: `python -m pytest tests/test_interoperability_phase10.py tests/test_fhir_r4_validation.py -q -W error::DeprecationWarning` -> 69 pass (50 + 19).
+
+### FHIR R4 validation (COMPLETE — read before touching FHIR export)
+- Targets FHIR R4 (`settings.fhir_version="4.0.1"`). Exported bundle resources:
+  Patient, Consent, QuestionnaireResponse, Observation, DiagnosticReport,
+  ServiceRequest, Task, CarePlan (Bundle type=collection). `FhirQuestionnaire`
+  DTO exists but no Questionnaire resource is emitted (canonical
+  `Questionnaire/{template_id}` reference only).
+- New `app/application/services/fhir_validation.py` — deterministic,
+  dependency-free R4 structural validator (`validate_fhir_resource` /
+  `validate_fhir_bundle` / `validate_fhir_payload`): whitelist, forbidden
+  `Condition`, per-resource required elements, enum value sets, Observation
+  single value[x], Reference/CodeableConcept/Identifier formats,
+  id/date/dateTime/uri formats, namespaced extensions only
+  (`https://medicheck.org/fhir/StructureDefinition/`), Consent.provision 0..1
+  single object (permit|deny).
+- New `backend/tests/test_fhir_r4_validation.py` (19: structural, clinical
+  mapping, safety invariants). Reuses Phase 10 seeders; seeds a real
+  AssessmentAnswerModel row to exercise QuestionnaireResponse.item mapping.
+- Official R4 check: isolated venv with `fhir.resources==6.5.0` (+pydantic v1);
+  generated patient (9 entries) + session (6 entries) bundles = 0 errors.
+  Main-env `fhir.resources` 8.x models **R5** — its Consent complaints
+  (scope/patient removed, provision-as-list) are R4/R5 differences, NOT R4 bugs.
+- Fixes made: Observation dual value[x] -> valueCodeableConcept + component;
+  fake LOINC `testing` -> MediCheck report-type coding; text-only
+  ServiceRequest.code/Task.code -> MediCheck-namespaced codings
+  (referral-type/task-type systems); DiagnosticReport trace extension now
+  actually attached (was dead code — DTO lacked `extension`); 
+  `export_session_bundle` loads via `select(...)` not `session.get()` (avoids
+  MissingGreenlet on unloaded selectin `answers`).
+- Care-continuity robustness fix (found via flaky `test_median_time_to_care`):
+  sub-second negative time-to-care deltas (SQLite CURRENT_TIMESTAMP
+  second-granularity vs caller-provided microsecond recorded_at) are clamped
+  to 0; materially negative deltas still discarded.
+
+### Phase 10 safety invariants (do NOT regress)
+- No Phase 10 feature can alter a previously generated deterministic clinical result.
+- FHIR export is read-only, consent-gated, IDOR-guarded, audited. AI interpretations
+  are NEVER clinical Observations. Possible conditions are NEVER confirmed diagnoses.
+- SDG/care-continuity outputs are de-identified + k-anonymity-suppressed; no
+  patient identifiers; suppression unbypassable.
+- Outcome data NEVER modifies CDSE score/severity/probability/recommendations.
+- AI CHW queue ranking uses operational factors ONLY (never clinical urgency).
+- Referral status transitions are deterministic + auditable; status provided
+  explicitly, never inferred from timestamps.
+- No real hospital/government integrations built (standards-compatible interfaces
+  + documented integration points; mock/demo adapters where real systems absent).
+
+## Phase 11 — Governed AI Care Coordination & Equity Intelligence (feat/governed-ai-care-coordination-phase11)
+Full report: `MEDICHECK_PHASE11_REPORT.md`. Baseline: `MEDICHECK_PHASE11_BASELINE.md`.
+Builds additively on Phases 1–10 (merged to main at c03cfa3). NO clinical
+tables / CDSE / scoring / report / referral-clinical-priority modified.
+
+### Core invariant (NEVER violate)
+AI is an operational/explanation layer ONLY. It NEVER diagnoses, scores, sets
+severity, determines clinical probability/urgency, ranks by disease
+severity/probability/mortality, infers disease prevalence/causation from
+aggregates, self-publishes, or identifies individuals. The CDSE remains the
+ONLY clinical authority. Every AI insight follows:
+`AI suggestion → validated structured data → human review → existing workflow`.
+
+### Backend architecture (key files — read before touching)
+- RBAC (`app/core/security/rbac.py`, additive): 3 new permissions —
+  `AI_VIEW_OPERATIONAL_SUGGESTIONS` (CHW/MEDICAL_DIRECTOR/SUPER_ADMIN; CHW
+  sees OWN suggestions only), `AI_VIEW_POPULATION_INSIGHTS`
+  (RESEARCH_REVIEWER/MEDICAL_DIRECTOR/SUPER_ADMIN),
+  `AI_REVIEW_INSIGHTS` (RESEARCH_REVIEWER/MEDICAL_DIRECTOR/SUPER_ADMIN).
+  Mock-auth users (no roles) denied all three.
+- Config (`app/core/config.py`, additive): Phase 11 settings.
+- Deps (`app/api/deps.py`, additive): `get_operational_suggestions_user`,
+  `get_population_insights_user`, `get_insight_review_user`.
+- Models (NEW, additive tables):
+  - `ai_operational_suggestion.py` `AiOperationalSuggestionModel` — id,
+    chw_user_id, task_id, operational_reason_codes (JSON), explanation,
+    operational_priority_score, requires_human_review, provider, model,
+    prompt_version, quality_status, quality_reason, review_status,
+    reviewer_id, reviewer_comment, edited_output, approved_at, created_at.
+  - `ai_population_insight.py` `AiPopulationInsightModel` — id, insight_type
+    (equity|sdg_narrative), target, period_start/end, narrative,
+    observed_findings/possible_interpretations (JSON), limitations,
+    requires_human_review, provider/model/prompt_version, quality_status/
+    reason, review_status, reviewer fields, edited_output, approved_at,
+    created_at.
+- Migration `alembic/versions/20260812_ai_insights_phase11.py` — additive +
+  idempotent; down_revision=20260810_ai_interaction_audits. NO existing
+  table altered.
+- DTOs `app/application/dtos/ai_governance_dtos.py` —
+  OperationalQueueContext/Suggestion, EquityInsightContext/Output/Finding/
+  Interpretation/MetricContext, SdgNarrativeContext/Output, ReviewRequest
+  (action=approve|reject|edit), InsightReviewResponse. Allow-list validators
+  reject hallucinated/clinical content.
+- Providers (deterministic stubs, NO external API):
+  - `operational_suggestion_provider.py` — StubOperationalSuggestionProvider
+    (name="operational-stub"). OPERATIONAL_REASON_CODES fixed allow-list
+    (overdue/missing_follow_up/aged_referral/appointment_window/unresolved_admin/
+    unsuccessful_contact/facility_unresponsive/offline_pending_sync/
+    no_outstanding_flags). `assert_non_clinical()` rejects clinical terms.
+  - `equity_intelligence_provider.py` — StubEquityIntelligenceProvider
+    (name="equity-stub"). `assert_non_causal()` rejects prevalence/causation/
+    individual-identification claims.
+  - `population_narrative_provider.py` — StubPopulationNarrativeProvider
+    (name="sdg-narrative-stub"). `assert_narrative_safe()` rejects "has been
+    achieved"/"official UN indicator" claims.
+- Services:
+  - `ai_operational_suggestion_service.py` — own-only (chw_user_id==caller),
+    reads referral operational state READ-ONLY, generates + persists
+    suggestions. Never reads/writes clinical priority.
+  - `equity_intelligence_service.py` — consumes Phase 6 ALREADY-DE-IDENTIFIED
+    + k-suppressed aggregates (AI never sees raw patient data). Service-level
+    `_validate_output()` = defense-in-depth against lying providers.
+  - `population_narrative_service.py` — SDG narratives over pre-suppressed
+    aggregates; service-level validation.
+  - `ai_insight_review_service.py` — deterministic review state machine:
+    generated→pending_review→approved→published; ↘rejected (terminal);
+    ↘edited→published. `AI_REVIEW_INSIGHTS` required. Invalid transitions
+    raise ValueError. `edited_output` required for edit action.
+    `_REVIEW_TRANSITIONS` pins the allowed edges.
+- Endpoints: `ai_care_coordination.py` (POST/GET suggestions, own-only),
+  `ai_equity_intelligence.py` (equity-insight, sdg-narratives, review/
+  publish for operational + population). Registered in `router.py`. 7 routes
+  confirmed via openapi.
+- Prompt versions: 1.0-operational-phase11, 1.0-equity-phase11,
+  1.0-sdg-narrative-phase11.
+
+### Frontend architecture
+- `features/ai-governance/` module (mirrors Phase 10 interop patterns):
+  `api/aiGovernanceService.ts`, `hooks/useAiGovernanceQueries.ts`,
+  `components/AiGovernanceUI.tsx` (SectionCard, PrivacyBadge, TransparencyNotice,
+  QualityBadge, ReviewStatusBadge, Error/Loading/EmptyState), 3 pages.
+- Routes (CMS/DoctorLayout): `/cms/ai-governance/chw-suggestions`,
+  `/cms/ai-governance/equity`, `/cms/ai-governance/sdg-narratives`.
+- Nav: "AI Governance" group in DoctorLayout (Sparkles/Scale/Globe2 icons).
+  (After the RootLayout consolidation this group lives in
+  `doctorNavConfig.ts`, see the Layout system section.)
+- Review queue UI: approve/reject/edit actions; publish only after
+  approved/edited; no actions for published/rejected. edit requires text.
+
+### Phase 11 safety invariants (do NOT regress)
+- AI NEVER self-publishes — every insight requires explicit human review
+  (approve/reject/edit) before publish. State machine enforced in
+  `AiInsightReviewService`, not just UI.
+- Operational suggestions use ONLY operational factors; `assert_non_clinical`
+  rejects clinical language. CHW sees OWN queue only (IDOR-proof).
+- Equity/SDG outputs consume ALREADY-suppressed de-identified aggregates;
+  AI never sees raw patient data; k-anonymity unbypassable (inherited Phase 6).
+- `assert_non_causal` / `assert_narrative_safe` + service-level validation =
+  defense in depth. SDG narratives are MediCheck proxies, NEVER official UN
+  indicators, NEVER claim a target "has been achieved".
+- No clinical tables/CDSE/scoring/report/referral-clinical-priority touched.
+  `git diff --stat`: only rbac/config/deps/router modified, all additive
+  (122 insertions, 0 deletions).
+- Every AI call + review transition audited (Phase 7 pattern: hashes + ids,
+  no raw PHI).
+
+### Test commands (verified)
+- Backend Phase 11: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/test_ai_care_coordination_phase11.py -q -W error::DeprecationWarning` -> 51 pass.
+- Full backend regression (run in batches — full suite times out at 600s):
+  511 total pass, 0 fail (126 P6-P10+roles + 147 AI P1-P5+longitudinal +
+  38 clinical/CMS/profile + 149 unit/integration + 51 P11).
+- Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run src/features/ai-governance` -> 18 pass; full suite 118 pass, typecheck clean, build OK.
+
+## Real AI providers (OpenAI-compatible HTTP -- read before touching ai/ providers)
+Stubs are the default, but REAL vendors are now implemented (not just planned).
+Full doc: `MEDICHECK_AI_PROVIDERS.md`.
+- `app/application/ai/http_chat_provider.py` -- `OpenAICompatibleChatProvider`
+  implements ALL THREE LLM Protocols (`explain` / `extract_candidates` /
+  `explain_trajectory`). `POST {base}/chat/completions`, temperature=0,
+  `response_format: json_object`, reuses versioned system prompts verbatim.
+  Returns raw JSON (services parse+validate). Failures raise the CALLER's own
+  error type (provider.AIProviderError / AIIntakeProviderError /
+  longitudinal.AIProviderError). `http_client` ctor arg takes
+  `httpx.MockTransport` in tests (no new test deps).
+- `app/application/ai/http_stt_provider.py` -- `OpenAICompatibleSTTProvider`
+  (`POST {base}/audio/transcriptions` multipart). Audio transient, never
+  logged. Failures -> `SpeechToTextError`.
+- `app/application/ai/provider_selection.py` -- single source of truth for
+  names + fail-fast: stub names / `LLM_HTTP_NAMES={"openai","openai-compatible"}`
+  / `STT_HTTP_NAMES={"openai","whisper","openai-compatible"}`.
+  `resolve_llm_config`/`resolve_stt_config` raise `AIConfigurationError`
+  (new in `app/core/exceptions.py`, code `ai_provider_misconfigured`) on
+  unknown names or missing creds. NEVER silently falls back to stub.
+- Factories read `settings.ai_provider` (drives explanation+intake+
+  longitudinal), `settings.stt_provider`, `settings.chw_queue_provider`
+  (stub-only; non-stub raises). `personalized-stub` maps to Personalized
+  explanation + stub intake/longitudinal. New settings: `ai_base_url`
+  (default `https://api.openai.com/v1`), `ai_max_retries=1` (429/5xx/network
+  only, never auth), `stt_api_key`, `stt_base_url`. `ai_model` REQUIRED for
+  real LLM (no silent default); `stt_model` defaults to `whisper-1`.
+  Timeouts (`ai/stt_request_timeout_seconds`) are now ENFORCED via
+  `httpx.Timeout` (previously dead config).
+- `screen_diagnostic_claims()` (`ai_dtos.py`, negation-aware, English-only)
+  runs in `AIExplanationService._parse_and_validate` on summary + finding +
+  severity text -> `AIValidationFailure` -> safe fallback. Negations pass
+  ("does not mean you have...") -- do NOT "simplify" to a bare substring
+  match or the personalized stub breaks. Longitudinal keeps its OWN guard
+  (`assert_non_diagnostic` in longitudinal_dtos); intake keeps its DTO
+  diagnostic validator.
+- `GET /api/v1/ai/health` (`ai_health.py`, `get_ai_governance_user`
+  RESEARCH_REVIEWER+): per-consumer impl + credential presence (NEVER
+  values) + `?probe=true` live `GET /models` check (5s, no PHI/tokens).
+  Misconfig reported in body (200), never raised. Registered in router.py;
+  regenerate `frontend/openapi.json` via `backend/scripts/export_openapi.py`
+  when routes change.
+- Tests: `tests/test_ai_providers_http.py` (53: selection 14 + chat 10 + STT 6
+  + screen 2 + multilingual screen 7 + e2e 8 + health 6). Reuses `_seed_assessment`
+  (test_ai_rag_phase2) + `_seed_graph` (test_ai_intake_phase3). Audit no-PHI
+  enforced structurally (no free-text PHI columns on AIInteractionAuditModel).
+- Multilingual screen (`ai_dtos.py`): EN (legacy prefix-only) + SI/TA
+  subject+verb claim patterns with 80+80 bidirectional negation windows
+  (SOV negators follow the claim). Narrow by design; corpus sweep test runs
+  every patient-facing AI string. Romanized SI/TA NOT covered (documented).
+- Spend guardrails (`app/application/ai/ai_budget.py`): per-user hourly
+  (30) + daily (200) + global daily (20000) request budgets, Redis
+  (`medicheck:ai:budget:v1:*`) with process-local fallback when Redis is
+  down. NOTE: `_resolve_client` is ASYNC and awaits `get_redis_client()`
+  (it is async) -- returning the bare coroutine silently disabled the Redis
+  tier and emitted "coroutine was never awaited"; the global daily circuit
+  breaker only works cross-worker when Redis is configured (local fallback
+  remains per-worker). Metered (real) providers only (`metered=True` on HTTP
+  classes); stubs bypass. Exceed -> `AIBudgetExceededError` (429
+  `ai_budget_exceeded`, never stub fallback; transcribe/extract endpoints
+  re-raise past defensive handlers). Rejections audited as `BUDGET_EXCEEDED`
+  (hashes only). Settings: `ai_budget_{user_hourly,user_daily,global_daily}_requests`
+  (`0` = tier off).
+- `.env.example` documents all AI/STT vars. Azure NATIVE endpoint shape NOT
+  supported (needs api-key header + different paths) -- use a compatible
+  gateway.
+
+## Identity boundary (app/identity -- read before importing auth code)
+First enforced bounded-context boundary (microservices extraction path).
+- `app/identity/__init__.py` is the ONLY public entry point other modules may
+  use: `User`, `Role`, `Permission`, `has_role`/`check_permission`/
+  `get_role_permissions`, `AuthService`, `UserRepository`, `verify_firebase_token`,
+  `mock_email_for_uid`, all `get_*_user` FastAPI deps, auth DTOs, plus
+  `get_user_permissions(session, user_id)` (`app/identity/permissions.py` --
+  canonical role->permission resolution; replaced the duplicated private SQL in
+  cms/content.py + cms/builder.py, which are now deleted).
+- `app/identity/queries.py` -- identity-owned read API (plain-Python
+  signatures, extraction-ready): `UserSummary` (id/full_name/email/is_active/
+  is_deleted, frozen Pydantic), `get_user_summary(session, id)`,
+  `get_user_summaries(session, ids)` (one batched SELECT, session.get parity:
+  deleted/inactive INCLUDED, callers filter via flags), `get_user_ids(session,
+  *, active_only=True)` (non-deleted ids; `active_only=False` preserves the
+  legacy deleted-only semantics of severity/body/indicator/trajectory
+  analytics -- canonical cohort filter uses both flags). Replaced ALL
+  SQL-level `UserModel` joins outside Identity (population ~15 joins/9 methods
+  via `_base_session_filter(start, end, user_ids, ...)` + `false()` on empty
+  sets; care_continuity screened; FHIR 2x session.get + `_build_patient`
+  retargeted to `UserSummary`; CHW assignment/session listings restructured to
+  batch lookups). Boundary test has ZERO exemptions now.
+- `app/api/v1/endpoints/identity_admin.py` -- user/role admin split OUT of
+  `admin.py` (same `/admin` prefix + tags + function names -> identical paths
+  + operation IDs; registered right after admin_router). `admin.py` is now
+  clinical-only and OFF the identity-owned list (passes the boundary clean).
+- DELETED (were 0-importer dead code): `app/infrastructure/auth/
+  firebase_provider.py` (+ removed the now-empty `auth/` dir),
+  `app/domain/entities/role.py` catalog dataclass.
+- RULE: app code outside the identity-owned files (listed in
+  `app/identity/__init__.py` docstring) must NEVER import
+  `app.core.security.{firebase,rbac}`, `app.domain.entities.user`,
+  `app.application.services.auth_service`, identity ORM/repos, or identity dep
+  names from `app.api.deps` directly. `get_db`/`get_redis` stay in
+  `app.api.deps` (not identity). Enforced by `tests/test_identity_boundary.py`
+  (AST scan -- fails on violations). Tests are EXEMPT (may probe internals).
+  No grandfathered exemptions remain.
+
+## Audit schema separation (PG `audit` schema -- read before touching audit tables)
+- `ai_interaction_audits` + `audit_logs` live in the dedicated PostgreSQL
+  `audit` schema (migration `20260812_audit_schema`, down_revision
+  `5037a1e583da`). Models carry `__table_args__ = {"schema": AUDIT_SCHEMA}`.
+- `AUDIT_SCHEMA` / `resolve_audit_schema(url)` in
+  `models/base.py`: `"audit"` on PostgreSQL, `None` on SQLite (no schemas --
+  tests/`create_all` behave exactly as before). Pure function -- unit-tested.
+- BOTH tables are FK-free with only soft id refs (verified structurally by
+  `tests/test_audit_schema_separation.py`, which also asserts nothing else
+  holds an FK into them). All reads are aggregate/admin-only through the
+  models (SQLAlchemy qualifies the schema automatically) -- zero service
+  changes were needed. Raw SQL must qualify `audit.<table>`.
+- Migration is PG-guarded + idempotent (SQLite no-op verified both
+  directions); downgrade moves tables back to `public` (schema kept).
+  `alembic heads` == single head `20260812_audit_schema`.
+- Deliberately NOT moved (FK-bound or workflow-read): referral_status_events
+  (hard FK to referrals), explanation/sync/version records, interop exports,
+  notifications, publishing jobs.
+- Follow-ups: native range partitioning on `created_at` + retention job
+  (drop/detach old partitions); per-schema autovacuum/backup tuning.
+
+## Production readiness (runbook: MEDICHECK_PRODUCTION_RUNBOOK.md)
+- `validate_production_boot()` (`app/main.py`) RAISES when
+  `ALLOW_MOCK_AUTH=true` in STAGING **or** PRODUCTION (mock auth is local-dev
+  only), and additionally in PRODUCTION on missing Firebase creds + default
+  `POSTGRES_PASSWORD`. It is now called from `create_app()` (fail-fast at app
+  construction) in addition to `lifespan`. `firebase.verify_firebase_token`
+  independently refuses mock auth in STAGING/PRODUCTION even if the setting is
+  left on (defense in depth). Tests use development env -- unaffected. CORS
+  localhost check fixed (old comparison string could never match; now warns
+  when `CORS_ORIGINS` unset in prod).
+- Docs gating: `docs_enabled` setting (`None` = auto: on except production);
+  `create_app` sets docs/redoc/openapi urls to None when off. `export_openapi`
+  script calls `app.openapi()` directly -- unaffected.
+- `/api/v1/ready` (health.py, 200 only when DB+Redis healthy else 503) is the
+  readiness gate; `/api/v1/health` stays 200-always for liveness compat
+  (docker/render healthchecks hit it). Shared `_db_status`/`_redis_status`.
+- `LOG_FORMAT=json|text` (default text) via `JsonFormatter` (timestamp, level,
+  logger, request_id, message). Sentry: `SENTRY_DSN` + import-guarded init
+  (sentry-sdk NOT a hard dep; missing package -> warning, no crash).
+- Rate limiting is in-memory PER WORKER (4 workers ~= 4x effective limit;
+  resets on recycle) -- documented, Redis-backed global is a follow-up.
+  `RateLimitMiddleware` (`app/core/security/rate_limit.py`) RETURNS a 429
+  `rate_limit_exceeded` ErrorResponse from `dispatch` (it runs OUTSIDE
+  Starlette's ExceptionMiddleware, so raising would surface as 500) with a
+  `Retry-After` header, and keys on proxy-aware client identity
+  (left-most `X-Forwarded-For` -> `X-Real-IP` -> `request.client.host`).
+  CSRF middleware stays OFF (stateless Bearer API). `SECRET_KEY` is currently
+  UNUSED by app code (Firebase owns auth). `VITE_API_URL` is build-time baked.
+- Tests: `tests/test_production_readiness.py` (17: boot validation incl.
+  staging mock-auth refusal + `create_app` fail-fast, docs gating, ready/health
+  codes, JSON logs, Sentry path); `tests/test_register_role_escalation.py` (4:
+  register always patient / rejects `role`, mock-auth staging guard).
+
+## Registration RBAC hardening (read before touching auth/register)
+- `RegisterRequest` (`auth_dtos.py`) NO LONGER accepts a `role` field
+  (`extra="forbid"`); posting one -> 422. `AuthService.register_user` takes no
+  role and hardcodes `Role.PATIENT.value`. Public self-registration can NEVER
+  mint a clinical/admin role (previously any unauthenticated caller could POST
+  `role:"doctor"` -> CMS access + READ_ASSESSMENTS_ALL/FHIR_EXPORT_ANY/
+  REFERRAL_MANAGE). Privileged roles are granted ONLY via the admin API
+  (`PUT /admin/users/{id}/roles`).
+- Frontend: `useRegister` no longer sends `role`; `AuthContext` no longer reads
+  `localStorage.medicheck_role` as a role source (backend `/auth/me` is
+  authoritative; no backend role -> default `patient`). `Register.tsx` provider
+  signup registers as patient and lands in `/app`; provider role requires admin
+  review. Generated `frontend/src/api/generated/model/registerRequest*.ts`
+  still carries the stale `role` field (regenerate via `export_openapi` +
+  orval when convenient; harmless -- unused).

@@ -10,7 +10,6 @@ import { useNavigate } from 'react-router-dom'
 import { ShieldPlus, Stethoscope, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import AuthLayout from '../components/AuthLayout'
-import Button from '@/shared/ui/Button'
 
 type AccountType = 'patient' | 'doctor'
 
@@ -50,7 +49,7 @@ const LandingPage: React.FC = () => {
               Choose your account type
             </h2>
             <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-              Select how you'll be using Medicheck
+              Select how you&rsquo;ll be using Medicheck
             </p>
           </div>
 

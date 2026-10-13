@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.application.dtos.common import ErrorBody, ErrorResponse
-from app.core.exceptions import AppException
+from app.core.exceptions import AppError
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -16,8 +16,27 @@ logger = get_logger(__name__)
 
 async def validation_error_handler(
     request: Request,
-    exc: RequestValidationError,
+    exc: RequestValidationError | AppError,
 ) -> JSONResponse:
+    # Handles both Pydantic RequestValidationError (request-body validation)
+    # and our AppError-based ValidationError (service-layer validation).
+    if isinstance(exc, AppError):
+        logger.warning(
+            "Validation error for %s %s: %s",
+            request.method,
+            request.url.path,
+            exc.detail,
+        )
+        body = ErrorResponse(
+            success=False,
+            error=ErrorBody(
+                code=exc.code or "validation_error",
+                message=exc.detail or "Validation failed",
+                details=[],
+            ),
+        ).model_dump()
+        return JSONResponse(status_code=exc.status_code, content=body)
+
     errors: list[dict[str, Any]] = []
     for error in exc.errors():
         errors.append(
@@ -49,7 +68,7 @@ async def validation_error_handler(
 
 async def auth_error_handler(
     request: Request,
-    exc: AppException,
+    exc: AppError,
 ) -> JSONResponse:
     logger.warning(
         "Auth error for %s %s: %s",
@@ -66,7 +85,7 @@ async def auth_error_handler(
 
 async def not_found_error_handler(
     request: Request,
-    exc: AppException,
+    exc: AppError,
 ) -> JSONResponse:
     logger.info(
         "Not found: %s %s",
@@ -100,7 +119,7 @@ async def http_exception_handler(
 
 async def app_exception_handler(
     request: Request,
-    exc: AppException,
+    exc: AppError,
 ) -> JSONResponse:
     if exc.status_code >= 500:
         logger.error(

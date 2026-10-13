@@ -82,6 +82,48 @@ class Permission(str, Enum):
     CMS_WRITE_NOTIFICATION = "cms:write:notification"
     CMS_READ_LIBRARY = "cms:read:library"
     CMS_WRITE_LIBRARY = "cms:write:library"
+    # Phase 6 — Population health + SDG analytics. Grants read access to
+    # de-identified, aggregated population metrics. Never grants individual
+    # patient data access.
+    ANALYTICS_VIEW_POPULATION = "analytics:view:population"
+    # Phase 7 — AI governance. Grants read access to aggregate AI quality
+    # metrics (fallback rate, validation failures, language distribution).
+    # Never grants access to patient PHI or individual AI audit records.
+    AI_VIEW_GOVERNANCE = "ai:view:governance"
+    # Phase 8 — Community Health Worker. Scoped patient-assist capabilities.
+    # CHW may create/continue assessments for assigned patients and record
+    # consent, but never gains unrestricted patient access or CMS control.
+    CHW_CREATE_ASSESSMENT = "chw:create:assessment"
+    CHW_READ_ASSIGNED = "chw:read:assigned"
+    CHW_RECORD_CONSENT = "chw:record:consent"
+    CHW_SYNC_OFFLINE = "chw:sync:offline"
+    # Phase 10 — Interoperability, health-system integration & outcomes.
+    # FHIR export of a patient's OWN bundle (patient self-export, still
+    # consent-guarded). FHIR_EXPORT_ANY allows a clinician/admin to export a
+    # patient's bundle (IDOR-guarded + consent-guarded at the service layer).
+    FHIR_EXPORT_OWN = "fhir:export:own"
+    FHIR_EXPORT_ANY = "fhir:export:any"
+    # Manage interoperability config / facility metadata.
+    INTEROP_MANAGE = "interop:manage"
+    # Manage referrals for assigned patients (CHW) or any (clinician/admin).
+    # Patient gets REFERRAL_READ_OWN only.
+    REFERRAL_READ_OWN = "referral:read:own"
+    REFERRAL_MANAGE = "referral:manage"
+    # SDG / population export (research/public-health). Reuses the
+    # analytics gating philosophy: de-identified aggregates only.
+    SDG_EXPORT = "sdg:export"
+    # Phase 11 — Governed AI care coordination & equity intelligence.
+    # AI_VIEW_OPERATIONAL_SUGGESTIONS: CHW may view AI operational suggestions
+    # for their OWN assigned referrals (assignment-verified per-operation). The
+    # suggestions are operational/administrative assistance ONLY — they never
+    # determine clinical priority, severity, or urgency.
+    AI_VIEW_OPERATIONAL_SUGGESTIONS = "ai:view:operational_suggestions"
+    # AI_VIEW_POPULATION_INSIGHTS: view de-identified AI population/equity/SDG
+    # insights (aggregated only, never individual patients).
+    AI_VIEW_POPULATION_INSIGHTS = "ai:view:population_insights"
+    # AI_REVIEW_INSIGHTS: approve/reject/edit AI-generated operational or
+    # population insights before publication. AI never self-publishes.
+    AI_REVIEW_INSIGHTS = "ai:review:insights"
 
 
 class Role(str, Enum):
@@ -94,6 +136,7 @@ class Role(str, Enum):
     RESEARCH_REVIEWER = "research_reviewer"
     CONTENT_EDITOR = "content_editor"
     READ_ONLY_REVIEWER = "read_only_reviewer"
+    COMMUNITY_HEALTH_WORKER = "community_health_worker"
 
     @property
     def permissions(self) -> set[Permission]:
@@ -114,6 +157,7 @@ _ROLE_DISPLAY_NAMES: dict[Role, str] = {
     Role.CONTENT_EDITOR: "Content Editor",
     Role.READ_ONLY_REVIEWER: "Read-Only Reviewer",
     Role.SUPER_ADMIN: "Super Admin",
+    Role.COMMUNITY_HEALTH_WORKER: "Community Health Worker",
 }
 
 
@@ -196,6 +240,35 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.READ_ASSESSMENTS,
         Permission.CREATE_ASSESSMENTS,
         Permission.READ_HEALTH,
+        # Phase 10 — patient may export own FHIR bundle (consent-guarded) and
+        # read own referrals. Cannot manage referrals/facilities or export
+        # other patients' data.
+        Permission.FHIR_EXPORT_OWN,
+        Permission.REFERRAL_READ_OWN,
+    },
+    # Phase 8 — Community Health Worker. Least-privilege: may create
+    # assessments for explicitly assigned patients, record consent, and sync
+    # offline sessions. Explicitly does NOT receive any CMS_* or
+    # READ_ASSESSMENTS_ALL permission, so CHWs cannot manage clinical content
+    # or browse arbitrary patient records. Placed at hierarchy level 3 (below
+    # READ_ONLY_REVIEWER=5) so get_cms_user (>=5) correctly denies CHWs.
+    Role.COMMUNITY_HEALTH_WORKER: {
+        Permission.READ_USER,
+        Permission.UPDATE_USER,
+        Permission.READ_ASSESSMENTS,
+        Permission.READ_HEALTH,
+        Permission.CHW_CREATE_ASSESSMENT,
+        Permission.CHW_READ_ASSIGNED,
+        Permission.CHW_RECORD_CONSENT,
+        Permission.CHW_SYNC_OFFLINE,
+        # Phase 10 — CHW may manage referrals + record care outcomes for
+        # assigned patients (assignment verified per-operation). No FHIR_EXPORT_ANY,
+        # no INTEROP_MANAGE, no SDG_EXPORT.
+        Permission.REFERRAL_MANAGE,
+        # Phase 11 — CHW may view AI operational suggestions for their OWN
+        # assigned work (operational/administrative only; never clinical
+        # priority). Per-operation assignment still enforced (IDOR).
+        Permission.AI_VIEW_OPERATIONAL_SUGGESTIONS,
     },
     Role.DOCTOR: {
         Permission.READ_USER,
@@ -204,6 +277,10 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.CREATE_ASSESSMENTS,
         Permission.READ_ASSESSMENTS_ALL,
         Permission.READ_HEALTH,
+        # Phase 10 — clinicians may export patient FHIR bundles and manage
+        # referrals (IDOR + consent still enforced at the service layer).
+        Permission.FHIR_EXPORT_ANY,
+        Permission.REFERRAL_MANAGE,
     },
     Role.READ_ONLY_REVIEWER: {
         Permission.READ_USER,
@@ -241,6 +318,9 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.CMS_WRITE_RECOMMENDATION,
         Permission.CMS_WRITE_LIFESTYLE,
         Permission.CMS_READ_VERSION_HISTORY,
+        # Phase 10
+        Permission.FHIR_EXPORT_ANY,
+        Permission.REFERRAL_MANAGE,
     } | _READ_ALL,
     Role.SPECIALIST_DOCTOR: {
         Permission.READ_USER,
@@ -262,6 +342,9 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.CMS_WRITE_KNOWLEDGE_GRAPH,
         Permission.CMS_READ_VERSION_HISTORY,
         Permission.CMS_WRITE_PUBLISH,
+        # Phase 10
+        Permission.FHIR_EXPORT_ANY,
+        Permission.REFERRAL_MANAGE,
     } | _READ_ALL,
     Role.RESEARCH_REVIEWER: {
         Permission.READ_USER,
@@ -272,6 +355,16 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.CMS_WRITE_KNOWLEDGE_GRAPH,
         Permission.CMS_READ_VERSION_HISTORY,
         Permission.CMS_APPROVE_CONTENT,
+        Permission.ANALYTICS_VIEW_POPULATION,
+        Permission.AI_VIEW_GOVERNANCE,
+        # Phase 10 — research reviewers may export de-identified SDG aggregates.
+        # No patient-level FHIR_EXPORT_ANY, no INTEROP_MANAGE.
+        Permission.SDG_EXPORT,
+        # Phase 11 — research reviewers may view + review de-identified AI
+        # population/equity/SDG insights. They do NOT get operational
+        # suggestion access (that is CHW/clinician/admin scoped).
+        Permission.AI_VIEW_POPULATION_INSIGHTS,
+        Permission.AI_REVIEW_INSIGHTS,
     } | _READ_ALL,
     Role.MEDICAL_DIRECTOR: {
         Permission.READ_USER,
@@ -285,6 +378,18 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.CMS_READ_VERSION_HISTORY,
         Permission.CMS_APPROVE_CONTENT,
         Permission.CMS_WRITE_PUBLISH,
+        Permission.ANALYTICS_VIEW_POPULATION,
+        Permission.AI_VIEW_GOVERNANCE,
+        # Phase 10 — full interoperability authority.
+        Permission.FHIR_EXPORT_ANY,
+        Permission.INTEROP_MANAGE,
+        Permission.REFERRAL_MANAGE,
+        Permission.SDG_EXPORT,
+        # Phase 11 — full governed-AI authority: operational suggestions,
+        # population insights, and review/publish control.
+        Permission.AI_VIEW_OPERATIONAL_SUGGESTIONS,
+        Permission.AI_VIEW_POPULATION_INSIGHTS,
+        Permission.AI_REVIEW_INSIGHTS,
     } | _READ_ALL | _WRITE_ALL,
     Role.SUPER_ADMIN: {
         Permission.READ_USER,
@@ -301,11 +406,23 @@ _ROLE_PERMISSIONS_MAP: dict[Role, set[Permission]] = {
         Permission.CMS_READ_VERSION_HISTORY,
         Permission.CMS_APPROVE_CONTENT,
         Permission.CMS_WRITE_PUBLISH,
+        Permission.ANALYTICS_VIEW_POPULATION,
+        Permission.AI_VIEW_GOVERNANCE,
+        # Phase 10 — full interoperability authority.
+        Permission.FHIR_EXPORT_ANY,
+        Permission.INTEROP_MANAGE,
+        Permission.REFERRAL_MANAGE,
+        Permission.SDG_EXPORT,
+        # Phase 11 — full governed-AI authority.
+        Permission.AI_VIEW_OPERATIONAL_SUGGESTIONS,
+        Permission.AI_VIEW_POPULATION_INSIGHTS,
+        Permission.AI_REVIEW_INSIGHTS,
     } | _READ_ALL | _WRITE_ALL,
 }
 
 _ROLE_HIERARCHY: dict[Role, int] = {
     Role.PATIENT: 0,
+    Role.COMMUNITY_HEALTH_WORKER: 3,
     Role.READ_ONLY_REVIEWER: 5,
     Role.GENERAL_PHYSICIAN: 10,
     Role.DOCTOR: 10,

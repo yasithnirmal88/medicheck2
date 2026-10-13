@@ -24,6 +24,14 @@ class Settings(BaseSettings):
 
     environment: Environment = Environment.DEVELOPMENT
     log_level: str = "DEBUG"
+    # Log format: "text" (default, human-readable) or "json" (log aggregation).
+    log_format: str = "text"
+    # API docs (/docs, /redoc, /openapi.json). None = auto: enabled unless
+    # production. Explicit True/False always wins.
+    docs_enabled: bool | None = None
+    # Sentry error tracking. Empty = disabled. When set, sentry_sdk must be
+    # installed (optional dependency); otherwise startup logs a warning.
+    sentry_dsn: str = ""
     secret_key: str = ""  # MUST be set via .env in production
     project_name: str = "MediCheck"
     version: str = "0.1.0"
@@ -34,13 +42,6 @@ class Settings(BaseSettings):
     postgres_db: str = "medicheck"
     postgres_host: str = "localhost"
     postgres_port: int = 5432
-
-    @property
-    def database_url(self) -> str:
-        return (
-            f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
-            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
-        )
 
     database_url: str | None = None
 
@@ -69,12 +70,6 @@ class Settings(BaseSettings):
     redis_port: int = 6379
     redis_db: int = 0
     redis_password: str = ""
-
-    @property
-    def redis_url(self) -> str:
-        if self.redis_password:
-            return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
-        return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
     redis_url: str | None = None
 
@@ -160,6 +155,111 @@ class Settings(BaseSettings):
     celery_broker_url: str = ""
     celery_result_backend: str = ""
 
+    # ── AI Explanation (Phase 1) ───────────────────────────────────────
+    # Provider selection. "stub" (default) uses a deterministic local
+    # provider that requires no external API and never breaks the clinical
+    # report. A real vendor provider may be plugged in via the provider
+    # abstraction without changing the service layer.
+    ai_provider: str = "stub"
+    ai_model: str = ""
+    ai_api_key: str = ""
+    # Base URL for OpenAI-compatible chat APIs (e.g. https://api.openai.com/v1).
+    # Empty means "use the OpenAI default". Any OpenAI-compatible endpoint that
+    # accepts Bearer auth + POST /chat/completions works (Azure native endpoint
+    # shape is NOT supported — use an OpenAI-compatible gateway instead).
+    ai_base_url: str = ""
+    # Retries after the first attempt for transient vendor failures (HTTP
+    # 429/5xx, network errors). Auth errors (other 4xx) never retry.
+    ai_max_retries: int = 1
+    # ── AI vendor spend / abuse guardrails ──────────────────────────
+    # Per-user + global request budgets for METERED (real-vendor) AI calls.
+    # Stubs bypass budgets entirely (no vendor cost). 0 disables a tier.
+    # Hourly/daily windows are UTC calendar windows.
+    ai_budget_user_hourly_requests: int = 30
+    ai_budget_user_daily_requests: int = 200
+    ai_budget_global_daily_requests: int = 20000
+    # Hard timeout (seconds) for an AI explanation request. A timeout is
+    # treated as an AI failure, never a clinical-report failure.
+    ai_request_timeout_seconds: float = 20.0
+    # ── Phase 2: Evidence-Grounded RAG ────────────────────────────────
+    # Structured retrieval over MediCheck's approved evidence repository
+    # (EvidenceReferenceModel + indicator_evidence_links). No vector DB.
+    # Maximum number of evidence records supplied to the AI per explanation.
+    ai_rag_evidence_limit: int = 5
+    # Per-linked-entity cap so a single indicator cannot monopolise the
+    # evidence budget. Kept small for auditability.
+    ai_rag_per_entity_cap: int = 2
+    # Maximum excerpt length (chars) sent to the AI. Evidence summaries are
+    # already short Text fields; this is a hard safety bound.
+    ai_rag_excerpt_max_chars: int = 500
+
+    # ── Phase 5: Multilingual + Voice AI Clinical Intake ─────────────
+    # Supported intake languages (en/si/ta). The language layer is an INTERFACE
+    # layer only — localized input resolves to the SAME canonical indicator IDs.
+    supported_intake_languages: str = "en,si,ta"
+    # Speech-to-text provider. Default stub works without external credentials.
+    stt_provider: str = "stub"
+    stt_model: str = ""
+    # API key for the STT vendor. Required for any non-stub STT provider.
+    stt_api_key: str = ""
+    # Base URL for OpenAI-compatible transcription APIs
+    # (POST /audio/transcriptions). Empty means "use the OpenAI default".
+    stt_base_url: str = ""
+    # Hard timeout (seconds) for a speech-to-text request. A timeout is treated
+    # as a voice failure, never an assessment failure (patient can type instead).
+    stt_request_timeout_seconds: float = 20.0
+
+    # ── Phase 6: Population Health + SDG Analytics ────────────────────
+    # Small-cell suppression threshold (k-anonymity). Population segments
+    # smaller than this are reported as "Suppressed" to prevent re-identification.
+    analytics_min_group_size: int = 10
+    # Analytics cache TTL (seconds). 0 disables caching.
+    analytics_cache_ttl_seconds: int = 300
+    # Maximum date range (days) a single analytics query can span. Prevents
+    # expensive full-history scans.
+    analytics_max_date_range_days: int = 365
+
+    # ── Phase 7: AI Governance + Personalized Communication ───────────
+    # When true, AI interaction audit records are persisted (hashes only, no PHI).
+    ai_audit_enabled: bool = True
+    # Default explanation language (en/si/ta). The language layer is INTERFACE
+    # only — same canonical indicator IDs across all languages.
+    ai_default_language: str = "en"
+    # Default health-literacy level for patient explanations.
+    ai_default_literacy_level: str = "standard"
+
+    # ── Phase 10: Interoperability, Health-System Integration ─────────
+    # FHIR R4 version string included in every export manifest.
+    fhir_version: str = "4.0.1"
+    # Whether a granted ``fhir_export`` consent is REQUIRED before producing a
+    # patient FHIR bundle. When true, export is denied without consent.
+    fhir_consent_required: bool = True
+    # consent_type value used to gate FHIR/external sharing (ConsentRecordModel).
+    fhir_consent_type: str = "fhir_export"
+    # Default k-anonymity threshold reused by SDG/care-continuity exports
+    # (mirrors analytics_min_group_size; separate knob for explicitness).
+    sdg_export_min_group_size: int = 10
+    # Maximum number of referrals loaded into a CHW operational queue.
+    chw_queue_max_size: int = 100
+    # AI queue-ranking provider. "stub" = deterministic local ranking
+    # (operational factors only, never clinical urgency). No external API.
+    chw_queue_provider: str = "stub"
+    # Maximum FHIR bundle resource count per export (bounded query protection).
+    fhir_max_resources_per_export: int = 500
+
+    # ── Phase 11: Governed AI Care Coordination & Equity Intelligence ──
+    # AI operational-suggestion provider. "stub" = deterministic local
+    # provider (operational factors only, never clinical urgency). No external API.
+    ai_operational_provider: str = "stub"
+    # AI equity-intelligence provider (operates on de-identified aggregates only).
+    ai_equity_provider: str = "stub"
+    # AI SDG/population-narrative provider (operates on de-identified aggregates only).
+    ai_population_narrative_provider: str = "stub"
+    # Maximum operational tasks considered per CHW suggestion batch (bounded).
+    ai_operational_max_tasks: int = 100
+    # Maximum population insight/narrative records returned per request.
+    ai_insight_max_results: int = 50
+
     @field_validator("celery_broker_url", mode="before")
     @classmethod
     def validate_celery_broker_url(cls, v: str | None, info: dict) -> str:
@@ -181,6 +281,14 @@ class Settings(BaseSettings):
         return f"redis://{host}:{port}/1"
 
     @property
+    def docs_enabled_resolved(self) -> bool:
+        """Whether API docs are served. Explicit setting always wins;
+        otherwise docs are on except in production."""
+        if self.docs_enabled is not None:
+            return self.docs_enabled
+        return self.environment != Environment.PRODUCTION
+
+    @property
     def is_development(self) -> bool:
         return self.environment == Environment.DEVELOPMENT
 
@@ -193,7 +301,10 @@ class Settings(BaseSettings):
         warnings = []
         if self.environment == Environment.PRODUCTION:
             if self.postgres_password == "medicheck_secret":
-                warnings.append("SECURITY: postgres_password is using default value. Set a strong password via POSTGRES_PASSWORD env var.")
+                warnings.append(
+                    "SECURITY: postgres_password is using default value. "
+                    "Set a strong password via POSTGRES_PASSWORD env var."
+                )
             if self.secret_key in ("", "change-me-to-a-random-secret-key"):
                 warnings.append("SECURITY: secret_key is not set. Authentication tokens are not secure!")
             if self.redis_password == "":

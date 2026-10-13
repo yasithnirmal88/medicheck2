@@ -28,20 +28,6 @@ import {
   updateProfile,
   Auth,
 } from 'firebase/auth'
-import {
-  getFirestore,
-  Firestore,
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  Timestamp,
-} from 'firebase/firestore'
 
 // Firebase configuration interface
 interface FirebaseConfig {
@@ -74,37 +60,14 @@ const getFirebaseConfig = (): FirebaseConfig => {
   return config
 }
 
-// Validate Firebase configuration
-const validateConfig = (config: FirebaseConfig): void => {
-  const requiredFields = [
-    'apiKey',
-    'authDomain',
-    'projectId',
-    'storageBucket',
-    'messagingSenderId',
-    'appId',
-  ] as const
-
-  const missingFields = requiredFields.filter((field) => !config[field])
-
-  if (missingFields.length > 0) {
-    console.error(
-      `Firebase configuration error: Missing required environment variables:\n` +
-        missingFields.map((f) => `  - ${f}`).join('\n') +
-        `\n\nPlease add these to your .env file.`
-    )
-  }
-}
-
 // Initialize Firebase App (singleton pattern)
 let app: FirebaseApp | null = null
 let auth: Auth | null = null
-let db: Firestore | null = null
 
-export const initializeFirebase = (): { app: FirebaseApp; auth: Auth; db: Firestore } => {
+export const initializeFirebase = (): { app: FirebaseApp; auth: Auth } => {
   // Return existing instance if already initialized
-  if (app && auth && db) {
-    return { app, auth, db }
+  if (app && auth) {
+    return { app, auth }
   }
 
   const config = getFirebaseConfig()
@@ -127,14 +90,7 @@ export const initializeFirebase = (): { app: FirebaseApp; auth: Auth; db: Firest
   // Initialize Auth
   auth = getAuth(app)
 
-  // Initialize Firestore (optional, only if project uses it)
-  try {
-    db = getFirestore(app)
-  } catch (error) {
-    console.warn('Firebase: Firestore initialization skipped:', error)
-  }
-
-  return { app: app!, auth: auth!, db: db! }
+  return { app: app!, auth: auth! }
 }
 
 // Export initialized instances
@@ -154,18 +110,6 @@ export const getFirebaseAuth = (): Auth => {
   return auth
 }
 
-export const getFirebaseDb = (): Firestore | null => {
-  if (!db) {
-    try {
-      const { db: firebaseDb } = initializeFirebase()
-      return firebaseDb
-    } catch {
-      return null
-    }
-  }
-  return db
-}
-
 // Export Firebase services for convenience
 export { auth as firebaseAuth }
 
@@ -179,16 +123,6 @@ export {
   GoogleAuthProvider,
   signInWithPopup,
   sendPasswordResetEmail,
-  collection,
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  Timestamp,
   type User,
 }
 

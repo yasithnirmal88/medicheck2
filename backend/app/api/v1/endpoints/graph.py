@@ -3,8 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Body, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_admin, get_db
+from app.api.deps import get_db
 from app.application.services.knowledge_graph_service import KnowledgeGraphService
+from app.identity import get_current_admin
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 

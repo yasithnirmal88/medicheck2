@@ -1,6 +1,32 @@
-import type { WizardState } from '../types/wizard'
+import type { WizardState, SectionKey } from '../types/wizard'
+import { fieldSpecs } from '../wizard/fieldSpecs'
 
 export const emptyString = ''
+
+const NONE_REGEX = /^(no|none|never|not[-\s]?applicable|not-available|n\/a)$/i
+const OPTION_KINDS = new Set(['card', 'chip', 'emoji', 'radio', 'select'])
+
+export function normalizeUnanswered(state: WizardState): WizardState {
+  const next = JSON.parse(JSON.stringify(state)) as WizardState
+  for (const sectionKey of Object.keys(fieldSpecs) as SectionKey[]) {
+    const section = next[sectionKey]
+    if (section == null || Array.isArray(section)) continue
+    const record = section as unknown as Record<string, unknown>
+    for (const spec of fieldSpecs[sectionKey]) {
+      if (!OPTION_KINDS.has(spec.kind)) continue
+      const current = record[spec.name]
+      const isUnanswered =
+        current === undefined || current === null || current === '' ||
+        (Array.isArray(current) && current.length === 0) ||
+        (typeof current === 'boolean' && current === false)
+      if (isUnanswered) {
+        const noneOption = spec.options?.find((o) => NONE_REGEX.test(o.value))
+        if (noneOption) record[spec.name] = noneOption.value
+      }
+    }
+  }
+  return next
+}
 
 export function createDefaultState(): WizardState {
   return {
@@ -23,10 +49,6 @@ export function createDefaultState(): WizardState {
       preferred_language: '',
       email: '',
       phone: '',
-      emergency_contact: '',
-      emergency_phone: '',
-      relationship: '',
-      photo: '',
     },
     body: {
       height_cm: '',
@@ -147,17 +169,6 @@ export function createDefaultState(): WizardState {
       tropical_regions: [],
       vaccinations_required: '',
       recent_travel: '',
-    },
-    emergency: {
-      primary_name: '',
-      primary_phone: '',
-      primary_relationship: '',
-      secondary_name: '',
-      secondary_phone: '',
-      secondary_relationship: '',
-      hospital_preference: '',
-      insurance_provider: '',
-      organ_donor: '',
     },
     consents: {
       terms_accepted: false,

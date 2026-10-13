@@ -223,7 +223,7 @@ class ReportService:
             raise ValueError('One or both reports not found')
 
         # simple diff: compare body_systems, conditions, advices by ids
-        def extract_ids(items, key='id'):
+        def extract_ids(items, _key='id'):
             return {i.id for i in items} if items else set()
 
         bs1 = extract_ids(r1.body_systems)

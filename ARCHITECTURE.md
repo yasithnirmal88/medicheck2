@@ -163,6 +163,38 @@ Bounded Context Communication:
   - Integration: Anti-corruption layer between contexts
 ```
 
+### 1.3.1 Identity boundary (implemented)
+
+The Identity context is the first with an enforced boundary. Its public
+interface is the `app.identity` package (facade over the existing DDD
+layers — no logic was moved). Other bounded contexts must import identity
+names only from `app.identity`:
+
+```python
+from app.identity import (
+    User, Role, Permission,           # domain vocabulary
+    has_role, check_permission,       # RBAC helpers
+    get_current_user, get_cms_user,   # FastAPI auth dependencies
+    AuthService,                      # application service
+    get_user_permissions,             # canonical role→permission resolution
+)
+```
+
+Rules: no imports from `app.core.security.*`, `app.domain.entities.user`,
+`app.application.services.auth_service`, or identity ORM/repositories
+outside the identity-owned files (see `app/identity/__init__.py` for the
+owned-file list). Enforced by `tests/test_identity_boundary.py` (AST scan;
+fails on direct internal imports). Known residual coupling, grandfathered
+in that test: SQL-level `UserModel` joins in care-continuity, FHIR export,
+CHW, and population-analytics services (follow-up: identity-owned query
+API). `get_db`/`get_redis` stay in `app.api.deps` (not identity concerns).
+Tests are exempt (they may probe internals such as mock-auth helpers).
+
+Extraction path: lifting Identity to a service later means moving the
+implementations behind this same `app.identity` interface and replacing
+in-process calls with HTTP — consumers already depend only on the
+interface, so call sites do not change shape.
+
 ## 1.4 Evolution: Modular Monolith → Microservices
 
 ```
@@ -1629,6 +1661,26 @@ Indexing:
   - Partial indexes for active records (WHERE is_active = true)
   - GIN indexes on JSONB columns for rule conditions
   - Exclusion constraints for content locking
+
+Audit Schema Separation:
+  - High-volume, FK-free audit tables (`ai_interaction_audits`,
+    `audit_logs`) live in the dedicated PostgreSQL `audit` schema
+    (migration `20260812_audit_schema`; models carry
+    `__table_args__ = {"schema": AUDIT_SCHEMA}`).
+  - Both tables use soft id references only (no FKs, no relationships),
+    so no clinical query can ever need to join them; all reads are
+    aggregate/admin-only through their models (schema-qualified
+    automatically by SQLAlchemy).
+  - SQLite (tests/local dev) has no schemas: `AUDIT_SCHEMA` resolves to
+    `None` there and `create_all` behaves exactly as before.
+  - Querying: use the ORM models as usual; raw SQL must qualify
+    `audit.<table>`.
+  - Future (recommended, not yet built): native range partitioning on
+    `created_at` + a retention job (e.g. drop/ detach partitions older
+    than N months); per-schema autovacuum/backup tuning. Tables left in
+    `public` deliberately: everything FK-bound or workflow-read
+    (`referral_status_events`, explanation/sync/version records,
+    interop exports, notifications).
 ```
 
 ---

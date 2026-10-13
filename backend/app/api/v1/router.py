@@ -12,15 +12,31 @@ from app.api.v1.cms.publishing import router as cms_publishing_router
 from app.api.v1.cms.questions import router as cms_router
 from app.api.v1.cms.rules import router as cms_rules_router
 from app.api.v1.endpoints.admin import router as admin_router
+from app.api.v1.endpoints.ai_care_coordination import (
+    router as ai_care_coordination_router,
+)
+from app.api.v1.endpoints.ai_equity_intelligence import (
+    router as ai_equity_intelligence_router,
+)
+from app.api.v1.endpoints.ai_governance import router as ai_governance_router
+from app.api.v1.endpoints.ai_health import router as ai_health_router
+from app.api.v1.endpoints.ai_intake import router as ai_intake_router
+from app.api.v1.endpoints.analytics import router as analytics_router
 from app.api.v1.endpoints.assessments import router as assessments_router
 from app.api.v1.endpoints.auth import router as auth_router
 from app.api.v1.endpoints.cdse import router as cdse_router
+from app.api.v1.endpoints.chw import router as chw_router
+from app.api.v1.endpoints.facilities import router as facilities_router
 from app.api.v1.endpoints.graph import router as graph_router
 from app.api.v1.endpoints.health import router as health_router
+from app.api.v1.endpoints.identity_admin import router as identity_admin_router
+from app.api.v1.endpoints.interoperability import router as interoperability_router
 from app.api.v1.endpoints.profile import router as profile_router
 from app.api.v1.endpoints.questionnaires import router as questionnaires_router
 from app.api.v1.endpoints.questions import router as questions_router
+from app.api.v1.endpoints.referrals import router as referrals_router
 from app.api.v1.endpoints.report import router as report_router
+from app.api.v1.endpoints.trajectory import router as trajectory_router
 from app.api.v1.endpoints.users import router as users_router
 
 router = APIRouter()
@@ -31,11 +47,18 @@ router.include_router(users_router)
 router.include_router(profile_router)
 router.include_router(questionnaires_router)
 router.include_router(admin_router)
+router.include_router(identity_admin_router)
 router.include_router(graph_router)
 router.include_router(cdse_router)
 router.include_router(report_router)
+router.include_router(trajectory_router)
 router.include_router(questions_router)
 router.include_router(assessments_router)
+router.include_router(ai_intake_router)
+router.include_router(analytics_router)
+router.include_router(ai_governance_router)
+router.include_router(ai_health_router)
+router.include_router(chw_router)
 router.include_router(cms_router)
 router.include_router(cms_content_router)
 router.include_router(cms_builder_router)
@@ -45,3 +68,10 @@ router.include_router(cms_publishing_router)
 router.include_router(cms_evidence_router)
 router.include_router(cms_audit_router)
 router.include_router(cms_dashboard_router)
+# Phase 10 — interoperability, referrals, facilities (CHW queue is on chw_router).
+router.include_router(interoperability_router)
+router.include_router(referrals_router)
+router.include_router(facilities_router)
+# Phase 11 — governed AI care coordination & equity intelligence.
+router.include_router(ai_care_coordination_router)
+router.include_router(ai_equity_intelligence_router)

@@ -5,9 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_active_user, get_db
+from app.api.deps import get_db
 from app.application.dtos.questionnaire_dtos import QuestionResponse
-from app.domain.entities.user import User
+from app.identity import User, get_current_active_user
 from app.infrastructure.persistence.repositories.sql_question_option_repository import (
     SQLQuestionOptionRepository,
 )
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/questions", tags=["Questions"])
 
 @router.get("", response_model=list[QuestionResponse])
 async def list_questions(
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    _current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     body_system: str | None = Query(None),
     group: str | None = Query(None),
@@ -45,7 +45,7 @@ async def list_questions(
 @router.get("/{id}", response_model=QuestionResponse)
 async def get_question_detail(
     id: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    _current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLQuestionRepository(session)
@@ -62,7 +62,7 @@ async def get_question_detail(
 @router.get("/by-body-system/{code}", response_model=list[QuestionResponse])
 async def get_questions_by_body_system(
     code: str,
-    current_user: Annotated[User, Depends(get_current_active_user)],
+    __current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     repo = SQLQuestionRepository(session)

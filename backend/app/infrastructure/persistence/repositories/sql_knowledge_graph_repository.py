@@ -461,7 +461,8 @@ class SQLKnowledgeGraphRepository:
         r = await self.session.execute(q)
         return r.scalars().all()
 
-    # Graph search/traverse returning structured graph starting from question -> indicators -> conditions -> recommendations -> evidence
+    # Graph search/traverse returning structured graph starting from
+    # question -> indicators -> conditions -> recommendations -> evidence
     async def build_graph_from_question(self, question_id: str) -> dict[str, Any]:
         indicators = await self.get_indicators_by_question(question_id)
         if not indicators:

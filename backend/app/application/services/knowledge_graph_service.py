@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -210,7 +210,7 @@ class KnowledgeGraphService:
             "entity_type": entity_type,
             "entity_id": entity_id,
             "action": action,
-            "changed_at": datetime.now(timezone.utc),
+            "changed_at": datetime.now(UTC),
             "old_value": str(old_value) if old_value is not None else None,
             "new_value": str(new_value) if new_value is not None else None,
             "reason": reason,

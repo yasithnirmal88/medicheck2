@@ -11,7 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.core.logging import get_logger
 from app.core.security.firebase import verify_firebase_token
-from app.core.security.rbac import Role, has_role
+from app.core.security.rbac import (
+    Permission,
+    Role,
+    check_permission,
+    get_role_permissions,
+    has_role,
+)
 from app.domain.entities.user import User
 from app.infrastructure.database import get_db as _get_db
 from app.infrastructure.persistence.repositories.sql_user_repository import (
@@ -75,7 +81,7 @@ async def get_current_user(
         raise
     except Exception as exc:
         logger.error("Token verification failed: %s", exc)
-        raise AuthenticationError(detail="Invalid authentication token")
+        raise AuthenticationError(detail="Invalid authentication token") from exc
 
     repo = SQLUserRepository(session)
     user = await repo.find_by_firebase_uid(firebase_uid)
@@ -98,7 +104,13 @@ async def get_current_user(
     if not user.is_active:
         raise AuthenticationError(detail="Account is deactivated")
 
-    await _populate_user_roles(user, session)
+    # Roles are already eagerly loaded by SQLUserRepository.find_by_firebase_uid
+    # (via _base_query's selectinload(UserModel.roles)) and mapped in _to_entity.
+    # The previous _populate_user_roles call here issued a redundant second query
+    # fetching the same role codes; it is only needed as a fallback if a caller
+    # ever produces a User whose roles were not loaded.
+    if getattr(user, "roles", None) is None:
+        await _populate_user_roles(user, session)
     return user
 
 
@@ -136,10 +148,197 @@ async def get_current_super_admin(
 
 async def get_cms_user(
     current_user: Annotated[User, Depends(get_current_active_user)],
-    session: Annotated[AsyncSession, Depends(get_db)],
+    _session: Annotated[AsyncSession, Depends(get_db)],
 ) -> User:
     if not current_user.roles:
         raise AuthorizationError(detail="CMS access required")
     if not has_role(current_user.roles, Role.READ_ONLY_REVIEWER):
         raise AuthorizationError(detail="CMS access required")
+    return current_user
+
+
+async def get_analytics_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    _session: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """Population analytics access (Phase 6).
+
+    Requires a role with ANALYTICS_VIEW_POPULATION permission. This is granted
+    to RESEARCH_REVIEWER, MEDICAL_DIRECTOR, and SUPER_ADMIN (level >=25).
+    Population analytics never grants individual patient data access — only
+    de-identified, aggregated metrics.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="Analytics access required")
+    if not has_role(current_user.roles, Role.RESEARCH_REVIEWER):
+        raise AuthorizationError(detail="Analytics access required")
+    return current_user
+
+
+async def get_ai_governance_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    __session: Annotated[AsyncSession, Depends(get_db)],
+) -> User:
+    """AI governance access (Phase 7).
+
+    Requires a role with AI_VIEW_GOVERNANCE permission. Granted to
+    RESEARCH_REVIEWER, MEDICAL_DIRECTOR, and SUPER_ADMIN (level >=25).
+    Returns aggregate AI quality metrics only — never individual patient PHI
+    or individual AI audit records.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="AI governance access required")
+    if not has_role(current_user.roles, Role.RESEARCH_REVIEWER):
+        raise AuthorizationError(detail="AI governance access required")
+    return current_user
+
+
+async def get_chw_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """Community Health Worker access (Phase 8).
+
+    Requires the COMMUNITY_HEALTH_WORKER role (level 3). Admits CHWs to the
+    scoped CHW workflow only. Because CHW is below READ_ONLY_REVIEWER (level 5),
+    ``get_cms_user`` (>=5) correctly denies CHWs all CMS access — so a CHW can
+    never reach clinical-content management endpoints. Least-privilege by
+    construction: no CMS_* and no READ_ASSESSMENTS_ALL permission is granted.
+    """
+    if (Role.COMMUNITY_HEALTH_WORKER not in current_user.roles
+        and not has_role(current_user.roles, Role.MEDICAL_DIRECTOR)):
+        # Ordinary patients and CMS-only roles are denied; the CHW role or a
+        # hierarchy level high enough to supervise the workflow is required.
+        raise AuthorizationError(detail="Community Health Worker access required")
+    return current_user
+
+
+async def get_interop_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """Interoperability admin access (Phase 10).
+
+    Requires the INTEROP_MANAGE permission (facility/interop config management).
+    Granted to MEDICAL_DIRECTOR and SUPER_ADMIN. Patient/CHW/research roles
+    are denied — they may consume interoperability outputs but not manage
+    facility metadata.
+    """
+
+    if not current_user.roles:
+        raise AuthorizationError(detail="Interoperability admin access required")
+    all_perms: set[Permission] = set()
+    for r in current_user.roles:
+        try:
+            all_perms |= get_role_permissions(Role(r))
+        except ValueError:
+            continue
+    if not check_permission(all_perms, Permission.INTEROP_MANAGE):
+        raise AuthorizationError(detail="Interoperability admin access required")
+    return current_user
+
+
+async def get_referral_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """Referral management access (Phase 10).
+
+    Admits patients (own referrals), CHWs (assigned-patient referrals),
+    and clinicians/admins (REFERRAL_MANAGE). Per-operation ownership/assignment
+    is still enforced at the service layer (IDOR protection). This dependency
+    only confirms the caller has SOME referral access.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="Referral access required")
+    return current_user
+
+
+async def get_sdg_export_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """SDG / population export access (Phase 10).
+
+    Requires SDG_EXPORT permission (de-identified aggregate exports only).
+    Granted to RESEARCH_REVIEWER, MEDICAL_DIRECTOR, SUPER_ADMIN. Never grants
+    patient-level data access.
+    """
+
+    if not current_user.roles:
+        raise AuthorizationError(detail="SDG export access required")
+    all_perms: set[Permission] = set()
+    for r in current_user.roles:
+        try:
+            all_perms |= get_role_permissions(Role(r))
+        except ValueError:
+            continue
+    if not check_permission(all_perms, Permission.SDG_EXPORT):
+        raise AuthorizationError(detail="SDG export access required")
+    return current_user
+
+
+def _user_permissions(user: User) -> set[Permission]:
+    perms: set[Permission] = set()
+    for r in user.roles or set():
+        try:
+            perms |= get_role_permissions(Role(r))
+        except ValueError:
+            continue
+    return perms
+
+
+async def get_chw_operational_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """CHW operational AI suggestion access (Phase 11).
+
+    Admits CHWs (own assigned work only — per-operation assignment is verified
+    at the service layer, IDOR protection) and senior staff (medical director /
+    super admin) for supervision. Patients and CMS-only roles are denied.
+    The suggestions are operational/administrative assistance ONLY — they never
+    determine clinical priority, severity, or urgency.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="Operational AI access required")
+    if not check_permission(
+        _user_permissions(current_user),
+        Permission.AI_VIEW_OPERATIONAL_SUGGESTIONS,
+    ):
+        raise AuthorizationError(detail="Operational AI access required")
+    return current_user
+
+
+async def get_population_insight_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """Population AI insight access (Phase 11).
+
+    Requires AI_VIEW_POPULATION_INSIGHTS permission. Granted to
+    RESEARCH_REVIEWER, MEDICAL_DIRECTOR, SUPER_ADMIN. Returns de-identified,
+    aggregated insights only — never individual patient data.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="Population insight access required")
+    if not check_permission(
+        _user_permissions(current_user),
+        Permission.AI_VIEW_POPULATION_INSIGHTS,
+    ):
+        raise AuthorizationError(detail="Population insight access required")
+    return current_user
+
+
+async def get_insight_reviewer_user(
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> User:
+    """AI insight review/publish access (Phase 11).
+
+    Requires AI_REVIEW_INSIGHTS permission. Granted to RESEARCH_REVIEWER,
+    MEDICAL_DIRECTOR, SUPER_ADMIN. Reviewers may approve/reject/edit AI-generated
+    operational or population insights. AI never self-publishes — only a human
+    reviewer can move an insight to PUBLISHED.
+    """
+    if not current_user.roles:
+        raise AuthorizationError(detail="AI review access required")
+    if not check_permission(
+        _user_permissions(current_user),
+        Permission.AI_REVIEW_INSIGHTS,
+    ):
+        raise AuthorizationError(detail="AI review access required")
     return current_user

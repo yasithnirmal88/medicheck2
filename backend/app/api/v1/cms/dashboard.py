@@ -5,16 +5,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_cms_user, get_db
+from app.api.deps import get_db
 from app.application.services.cms.dashboard_service import CMSDashboardService
-from app.domain.entities.user import User
+from app.identity import User, get_cms_user
 
 router = APIRouter(prefix="/cms/dashboard", tags=["CMS Dashboard"])
 
 
 @router.get("/overview")
 async def get_overview(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CMSDashboardService(session)
@@ -23,7 +23,7 @@ async def get_overview(
 
 @router.get("/recent-activity")
 async def get_recent_activity(
-    user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
     limit: int = Query(20, ge=1, le=100),
 ):
@@ -33,7 +33,7 @@ async def get_recent_activity(
 
 @router.get("/workflow-summary")
 async def get_workflow_summary(
-    user: Annotated[User, Depends(get_cms_user)],
+    __user: Annotated[User, Depends(get_cms_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = CMSDashboardService(session)

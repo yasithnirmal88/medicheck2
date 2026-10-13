@@ -133,9 +133,6 @@ export function mapPersonalFromWizard(personal: {
   preferred_language: string
   email: string
   phone: string
-  emergency_contact: string
-  emergency_phone: string
-  relationship: string
 }): Record<string, unknown> {
   const fullName = [personal.first_name, personal.middle_name, personal.last_name].filter(Boolean).join(' ').trim()
   return {
@@ -148,13 +145,6 @@ export function mapPersonalFromWizard(personal: {
     state: personal.state || undefined,
     city: personal.city || undefined,
     preferred_language: personal.preferred_language || undefined,
-    emergency_contact: personal.emergency_contact
-      ? {
-          name: personal.emergency_contact,
-          phone: personal.emergency_phone,
-          relationship: personal.relationship,
-        }
-      : undefined,
     occupation: personal.occupation || undefined,
     industry: personal.industry || undefined,
     education_level: personal.education_level || undefined,

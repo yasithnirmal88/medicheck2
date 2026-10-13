@@ -8,8 +8,8 @@ from sqlalchemy.orm import selectinload
 
 from app.domain.entities.user import User
 from app.domain.repositories.user_repository import UserRepository
-from app.infrastructure.persistence.models.user import UserModel
 from app.infrastructure.persistence.models.role import RoleModel
+from app.infrastructure.persistence.models.user import UserModel
 
 
 class SQLUserRepository(UserRepository):
@@ -34,14 +34,14 @@ class SQLUserRepository(UserRepository):
             updated_at=user.updated_at,
             deleted_at=user.deleted_at,
         )
-        
+
         # Fetch and associate roles if user has any
         if user.roles:
             role_codes = list(user.roles)
             stmt = select(RoleModel).where(RoleModel.code.in_(role_codes))
             result = await self._session.execute(stmt)
             roles = list(result.scalars().all())
-            
+
             # Create missing roles if they don't exist
             existing_codes = {r.code for r in roles}
             for code in role_codes:
@@ -55,12 +55,12 @@ class SQLUserRepository(UserRepository):
                     )
                     self._session.add(new_role)
                     roles.append(new_role)
-            
+
             model.roles = roles
-        
+
         self._session.add(model)
         await self._session.flush()
-        
+
         # When creating a new user, return entity with roles from the User object
         # since model.roles might not be populated yet due to flush timing
         return User(

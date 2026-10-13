@@ -17,47 +17,63 @@ import type {
 
 const FIVE_MIN = 1000 * 60 * 5
 
-export function useDashboardProfile() {
-  return useQuery({ queryKey: ['dashboard', 'profile'], queryFn: fetchProfile, staleTime: FIVE_MIN })
+/**
+ * Dashboard queries are gated on `enabled` so they never fire before an
+ * authenticated Firebase user is available. Without this, un-blocking the
+ * auth gate (P1-2) would let requests fire with no token, producing 401s and
+ * retry storms. Callers pass `enabled = !!user`.
+ */
+export function useDashboardProfile(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['dashboard', 'profile'],
+    queryFn: fetchProfile,
+    staleTime: FIVE_MIN,
+    enabled: options?.enabled ?? true,
+  })
 }
 
-export function useDashboardCompletion() {
+export function useDashboardCompletion(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['dashboard', 'completion'],
     queryFn: fetchCompletion,
     staleTime: 1000 * 30,
+    enabled: options?.enabled ?? true,
   })
 }
 
-export function useDashboardSessions() {
+export function useDashboardSessions(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['dashboard', 'sessions'],
     queryFn: fetchSessions,
     staleTime: 1000 * 30,
+    enabled: options?.enabled ?? true,
   })
 }
 
-export function useDashboardReports() {
+export function useDashboardReports(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['dashboard', 'reports'],
     queryFn: () => fetchReports(8),
     staleTime: 1000 * 60,
+    enabled: options?.enabled ?? true,
   })
 }
 
-export function useDashboardMeasurements() {
+export function useDashboardMeasurements(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['dashboard', 'measurements'],
     queryFn: fetchMeasurements,
     staleTime: FIVE_MIN,
+    enabled: options?.enabled ?? true,
   })
 }
 
-export function useDashboardLabReports() {
+export function useDashboardLabReports(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['dashboard', 'lab-reports'],
     queryFn: fetchLabReports,
     staleTime: FIVE_MIN,
+    enabled: options?.enabled ?? true,
   })
 }
 
@@ -97,11 +113,12 @@ export interface DerivedDashboard {
   aiSummary?: string
 }
 
-export function useDashboardDerived(): DerivedDashboard {
-  const profile = useDashboardProfile()
-  const completion = useDashboardCompletion()
-  const sessions = useDashboardSessions()
-  const reports = useDashboardReports()
+export function useDashboardDerived(options?: { enabled?: boolean }): DerivedDashboard {
+  const enabled = options?.enabled ?? true
+  const profile = useDashboardProfile({ enabled })
+  const completion = useDashboardCompletion({ enabled })
+  const sessions = useDashboardSessions({ enabled })
+  const reports = useDashboardReports({ enabled })
 
   return useMemo(() => {
     const reportsData: HealthReport[] = reports.data ?? []
