@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
 from app.application.services.knowledge_graph_service import KnowledgeGraphService
-from app.identity import get_current_admin
+from app.identity import get_current_active_user, get_current_admin
 
 router = APIRouter(prefix="/graph", tags=["graph"])
 
@@ -119,14 +119,20 @@ async def link_body_system_condition(
 
 
 @router.get("/question/{question_id}")
-async def graph_for_question(question_id: str, session: AsyncSession = Depends(get_db)):
+async def graph_for_question(
+    question_id: str,
+    _current_user=Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_db),
+):
     svc = KnowledgeGraphService(session)
     return await svc.build_graph_from_question(question_id)
 
 
 @router.get("/indicator/{indicator_id}")
 async def graph_for_indicator(
-    indicator_id: str, session: AsyncSession = Depends(get_db)
+    indicator_id: str,
+    _current_user=Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_db),
 ):
     svc = KnowledgeGraphService(session)
     conds = await svc.get_conditions_by_indicator(indicator_id)
@@ -136,7 +142,9 @@ async def graph_for_indicator(
 
 @router.get("/condition/{condition_id}")
 async def graph_for_condition(
-    condition_id: str, session: AsyncSession = Depends(get_db)
+    condition_id: str,
+    _current_user=Depends(get_current_active_user),
+    session: AsyncSession = Depends(get_db),
 ):
     svc = KnowledgeGraphService(session)
     recs = await svc.get_recommendations_by_condition(condition_id)

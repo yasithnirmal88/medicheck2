@@ -201,20 +201,12 @@ export interface MedicalEvidence extends BaseEntity {
 export interface EvidenceReference {
   id: string
   title: string
-  citation: string | null
-  pmid: string | null
-  doi: string | null
-  evidence_level: string | null
-  confidence_score: number | null
-  summary: string | null
+  question_id: string | null
+  source: string | null
   url: string | null
-  authors: string | null
-  published_at: string | null
-  entity_type: string | null
-  entity_id: string | null
-  is_active: boolean
+  evidence_level: string
+  summary: string | null
   created_at: string
-  updated_at: string
 }
 
 export interface Template extends BaseEntity {
