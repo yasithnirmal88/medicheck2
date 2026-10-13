@@ -14,19 +14,14 @@ jobs:
   test-backend:
     runs-on: ubuntu-latest
     services:
-      postgres:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_USER: medicheck
-          POSTGRES_PASSWORD: medicheck_secret
-          POSTGRES_DB: medicheck
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+      # The backend test suite is SQLite-only: tests/conftest.py builds a
+      # per-session SQLite file and never connects to these services. A Postgres
+      # service here previously exported `DATABASE_URL` for the test job, which
+      # made the PostgreSQL-only "audit" schema qualifiers resolve at import
+      # time and emit `CREATE TABLE audit.*` on the SQLite test engine
+      # (sqlite3.OperationalError "unknown database audit"). conftest now forces
+      # a SQLite URL for the test process; Postgres is exercised via the
+      # production Docker image, not the unit suite.
       redis:
         image: redis:7-alpine
         ports:
@@ -69,7 +64,10 @@ jobs:
           cd backend
           python -m pytest --tb=short -q --cov=app --cov-report=term-missing --cov-fail-under=50
         env:
-          DATABASE_URL: postgresql+asyncpg://medicheck:medicheck_secret@localhost:5432/medicheck
+          # SQLite: the suite's conftest always builds a SQLite engine,
+          # regardless of this value (see the services comment above). Set
+          # explicitly so schema qualifiers (audit schema) resolve to None.
+          DATABASE_URL: sqlite+aiosqlite:///./test.db
           REDIS_URL: redis://localhost:6379/0
           ENVIRONMENT: development
           SECRET_KEY: test-secret-key
