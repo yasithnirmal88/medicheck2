@@ -1,5 +1,6 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
+import AccessibleDialog from '@/shared/ui/AccessibleDialog'
 
 interface ContentLayoutProps {
   title: string
@@ -439,26 +440,33 @@ interface ModalProps {
 }
 
 export const Modal: React.FC<ModalProps> = ({ open, onClose, title, children, size = 'md' }) => {
-  if (!open) return null
   const sizes: Record<string, string> = { sm: 'max-w-sm', md: 'max-w-md', lg: 'max-w-lg', xl: 'max-w-xl' }
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className={cn(
-        'relative bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-200 dark:border-slate-800 w-full mx-4 max-h-[90vh] overflow-y-auto',
+    <AccessibleDialog
+      open={open}
+      onClose={onClose}
+      ariaLabel={title}
+      containerClassName="flex items-center justify-center"
+      panelClassName={cn(
+        'mx-4 max-h-[90vh] w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900',
         sizes[size],
-      )}>
+      )}
+    >
         <div className="flex items-center justify-between p-5 border-b border-slate-200 dark:border-slate-800">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{title}</h2>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition">
+          <button
+            type="button"
+            aria-label="Close dialog"
+            onClick={onClose}
+            className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+          >
             <svg className="w-5 h-5 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
         </div>
         <div className="p-5">{children}</div>
-      </div>
-    </div>
+    </AccessibleDialog>
   )
 }
 
