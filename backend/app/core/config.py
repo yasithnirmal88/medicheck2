@@ -247,6 +247,19 @@ class Settings(BaseSettings):
     # Maximum FHIR bundle resource count per export (bounded query protection).
     fhir_max_resources_per_export: int = 500
 
+    # ── Phase 11: Governed AI Care Coordination & Equity Intelligence ──
+    # AI operational-suggestion provider. "stub" = deterministic local
+    # provider (operational factors only, never clinical urgency). No external API.
+    ai_operational_provider: str = "stub"
+    # AI equity-intelligence provider (operates on de-identified aggregates only).
+    ai_equity_provider: str = "stub"
+    # AI SDG/population-narrative provider (operates on de-identified aggregates only).
+    ai_population_narrative_provider: str = "stub"
+    # Maximum operational tasks considered per CHW suggestion batch (bounded).
+    ai_operational_max_tasks: int = 100
+    # Maximum population insight/narrative records returned per request.
+    ai_insight_max_results: int = 50
+
     @field_validator("celery_broker_url", mode="before")
     @classmethod
     def validate_celery_broker_url(cls, v: str | None, info: dict) -> str:
