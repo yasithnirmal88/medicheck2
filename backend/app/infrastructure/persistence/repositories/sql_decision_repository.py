@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import insert, select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.persistence.models.decision import (
@@ -19,13 +19,27 @@ class SQLDecisionRepository:
         self.session = session
 
     async def create_result(self, data: dict) -> AssessmentResultModel:
-        stmt = insert(AssessmentResultModel).values(**data)
-        await self.session.execute(stmt)
-        q = select(AssessmentResultModel).where(
-            AssessmentResultModel.session_id == data.get("session_id")
+        existing = await self.get_result_by_session(data["session_id"])
+        if existing is not None:
+            return existing
+        stmt = insert(AssessmentResultModel).values(**data).returning(
+            AssessmentResultModel
         )
-        r = await self.session.execute(q)
-        return r.scalars().first()
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
+
+    async def clear_result_details(self, result_id: str) -> None:
+        for model in (
+            ActivatedIndicatorModel,
+            ActivatedConditionModel,
+            GeneratedRecommendationModel,
+            GeneratedLaboratoryTestModel,
+            GeneratedScreeningModel,
+            ExplanationRecordModel,
+        ):
+            await self.session.execute(
+                delete(model).where(model.result_id == result_id)
+            )
 
     async def add_activated_indicator(
         self,
@@ -41,15 +55,9 @@ class SQLDecisionRepository:
             score=score,
             evidence_count=evidence_count,
             notes=notes,
-        )
-        await self.session.execute(stmt)
-        q = select(ActivatedIndicatorModel).where(
-            ActivatedIndicatorModel.result_id == result_id
-        )
-        r = await self.session.execute(q)
-        rows = r.scalars().all()
-        # return last added
-        return rows[-1]
+        ).returning(ActivatedIndicatorModel)
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
 
     async def add_activated_condition(
         self,
@@ -65,14 +73,9 @@ class SQLDecisionRepository:
             score=score,
             confidence=confidence,
             notes=notes,
-        )
-        await self.session.execute(stmt)
-        q = select(ActivatedConditionModel).where(
-            ActivatedConditionModel.result_id == result_id
-        )
-        r = await self.session.execute(q)
-        rows = r.scalars().all()
-        return rows[-1]
+        ).returning(ActivatedConditionModel)
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
 
     async def add_recommendation(
         self,
@@ -86,65 +89,51 @@ class SQLDecisionRepository:
             recommendation_id=recommendation_id,
             source=source,
             notes=notes,
-        )
-        await self.session.execute(stmt)
-        q = select(GeneratedRecommendationModel).where(
-            GeneratedRecommendationModel.result_id == result_id
-        )
-        r = await self.session.execute(q)
-        rows = r.scalars().all()
-        return rows[-1]
+        ).returning(GeneratedRecommendationModel)
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
 
     async def add_laboratory_test(
         self, result_id: str, laboratory_test_id: str, reason: str | None
     ) -> GeneratedLaboratoryTestModel:
         stmt = insert(GeneratedLaboratoryTestModel).values(
             result_id=result_id, laboratory_test_id=laboratory_test_id, reason=reason
-        )
-        await self.session.execute(stmt)
-        q = select(GeneratedLaboratoryTestModel).where(
-            GeneratedLaboratoryTestModel.result_id == result_id
-        )
-        r = await self.session.execute(q)
-        rows = r.scalars().all()
-        return rows[-1]
+        ).returning(GeneratedLaboratoryTestModel)
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
 
     async def add_screening(
         self, result_id: str, name: str, reason: str | None
     ) -> GeneratedScreeningModel:
         stmt = insert(GeneratedScreeningModel).values(
             result_id=result_id, name=name, reason=reason
-        )
-        await self.session.execute(stmt)
-        q = select(GeneratedScreeningModel).where(
-            GeneratedScreeningModel.result_id == result_id
-        )
-        r = await self.session.execute(q)
-        rows = r.scalars().all()
-        return rows[-1]
+        ).returning(GeneratedScreeningModel)
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
 
     async def add_explanation(
         self, result_id: str, source_type: str, source_id: str | None, text: str | None
     ) -> ExplanationRecordModel:
         stmt = insert(ExplanationRecordModel).values(
             result_id=result_id, source_type=source_type, source_id=source_id, text=text
-        )
-        await self.session.execute(stmt)
-        q = select(ExplanationRecordModel).where(
-            ExplanationRecordModel.result_id == result_id
-        )
-        r = await self.session.execute(q)
-        rows = r.scalars().all()
-        return rows[-1]
+        ).returning(ExplanationRecordModel)
+        result = await self.session.execute(stmt)
+        return result.scalar_one()
 
     async def get_result_by_session(
         self, session_id: str
     ) -> AssessmentResultModel | None:
-        q = select(AssessmentResultModel).where(
-            AssessmentResultModel.session_id == session_id
+        q = (
+            select(AssessmentResultModel)
+            .where(AssessmentResultModel.session_id == session_id)
+            .order_by(
+                AssessmentResultModel.created_at.desc().nulls_last(),
+                AssessmentResultModel.id.desc(),
+            )
+            .limit(1)
         )
         r = await self.session.execute(q)
-        return r.scalars().first()
+        return r.scalar_one_or_none()
 
     async def get_result(self, result_id: str) -> AssessmentResultModel | None:
         q = select(AssessmentResultModel).where(AssessmentResultModel.id == result_id)

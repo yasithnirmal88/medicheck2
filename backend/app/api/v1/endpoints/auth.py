@@ -42,7 +42,6 @@ async def register(
         firebase_token=request.firebase_token,
         full_name=request.full_name,
         email=str(request.email) if request.email else None,
-        role=request.role,
     )
     return UserResponse.from_entity(user)
 

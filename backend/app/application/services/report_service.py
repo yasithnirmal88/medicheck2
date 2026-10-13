@@ -104,6 +104,7 @@ class ReportService:
                 "created_at": None,
             }
         )
+        await self.report_repo.clear_report_details(assessment.id)
 
         # add body system assessments
         for bs_id, sc in body_scores.items():
@@ -193,6 +194,10 @@ class ReportService:
             HealthAssessmentModel.__table__.update()
             .where(HealthAssessmentModel.id == assessment.id)
             .values(summary=str(summary))
+        )
+        await self.session.refresh(
+            assessment,
+            attribute_names=["body_systems", "conditions", "lifestyle", "advices"],
         )
 
         return {"report_id": assessment.id, "summary": summary}

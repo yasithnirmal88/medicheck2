@@ -59,6 +59,28 @@ const VISIBLE_STEPS = (state: WizardState) => {
   })
 }
 
+interface ProfileInputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
+  label: string
+  value: string
+  onValueChange: (value: string) => void
+}
+
+function ProfileInput({ label, value, onValueChange, ...inputProps }: ProfileInputProps) {
+  return (
+    <label className="block space-y-1">
+      <span className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</span>
+      <input
+        {...inputProps}
+        aria-label={label}
+        value={value}
+        onChange={(event) => onValueChange(event.target.value)}
+        className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200"
+      />
+    </label>
+  )
+}
+
 function renderSection(
   step: { key: SectionKey; label: string },
   state: WizardState,
@@ -102,18 +124,18 @@ function renderSection(
                 />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input placeholder="Diagnosis date" value={entry.diagnosis_date ?? ''} onChange={(e) => onUpdate({ ...entry, diagnosis_date: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Severity" value={entry.severity ?? ''} onChange={(e) => onUpdate({ ...entry, severity: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
+                <ProfileInput label="Diagnosis date" placeholder="Diagnosis date" value={entry.diagnosis_date ?? ''} onValueChange={(value) => onUpdate({ ...entry, diagnosis_date: value })} />
+                <ProfileInput label="Severity" placeholder="Severity" value={entry.severity ?? ''} onValueChange={(value) => onUpdate({ ...entry, severity: value })} />
               </div>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input placeholder="Status" value={entry.status ?? ''} onChange={(e) => onUpdate({ ...entry, status: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Notes" value={entry.notes ?? ''} onChange={(e) => onUpdate({ ...entry, notes: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
+                <ProfileInput label="Status" placeholder="Status" value={entry.status ?? ''} onValueChange={(value) => onUpdate({ ...entry, status: value })} />
+                <ProfileInput label="Notes" placeholder="Notes" value={entry.notes ?? ''} onValueChange={(value) => onUpdate({ ...entry, notes: value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <input placeholder="Surgeries count" value={entry.surgeries_count ?? ''} onChange={(e) => onUpdate({ ...entry, surgeries_count: e.target.value })} type="number" min={0} max={50} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Hospital admissions" value={entry.hospital_admissions ?? ''} onChange={(e) => onUpdate({ ...entry, hospital_admissions: e.target.value })} type="number" min={0} max={50} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Previous fractures" value={entry.previous_fractures ?? ''} onChange={(e) => onUpdate({ ...entry, previous_fractures: e.target.value })} type="number" min={0} max={20} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Organ transplants" value={entry.organ_transplants ?? ''} onChange={(e) => onUpdate({ ...entry, organ_transplants: e.target.value })} type="number" min={0} max={10} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
+                <ProfileInput label="Surgeries count" placeholder="Surgeries count" value={entry.surgeries_count ?? ''} onValueChange={(value) => onUpdate({ ...entry, surgeries_count: value })} type="number" min={0} max={50} />
+                <ProfileInput label="Hospital admissions" placeholder="Hospital admissions" value={entry.hospital_admissions ?? ''} onValueChange={(value) => onUpdate({ ...entry, hospital_admissions: value })} type="number" min={0} max={50} />
+                <ProfileInput label="Previous fractures" placeholder="Previous fractures" value={entry.previous_fractures ?? ''} onValueChange={(value) => onUpdate({ ...entry, previous_fractures: value })} type="number" min={0} max={20} />
+                <ProfileInput label="Organ transplants" placeholder="Organ transplants" value={entry.organ_transplants ?? ''} onValueChange={(value) => onUpdate({ ...entry, organ_transplants: value })} type="number" min={0} max={10} />
               </div>
             </div>
           )
@@ -126,12 +148,12 @@ function renderSection(
           return (
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input placeholder="Procedure" value={entry.procedure} onChange={(e) => onUpdate({ ...entry, procedure: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Date" value={entry.date ?? ''} onChange={(e) => onUpdate({ ...entry, date: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Hospital" value={entry.hospital ?? ''} onChange={(e) => onUpdate({ ...entry, hospital: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Reason" value={entry.reason ?? ''} onChange={(e) => onUpdate({ ...entry, reason: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
+                <ProfileInput label="Procedure" placeholder="Procedure" value={entry.procedure} onValueChange={(value) => onUpdate({ ...entry, procedure: value })} />
+                <ProfileInput label="Date" placeholder="Date" value={entry.date ?? ''} onValueChange={(value) => onUpdate({ ...entry, date: value })} />
+                <ProfileInput label="Hospital" placeholder="Hospital" value={entry.hospital ?? ''} onValueChange={(value) => onUpdate({ ...entry, hospital: value })} />
+                <ProfileInput label="Reason" placeholder="Reason" value={entry.reason ?? ''} onValueChange={(value) => onUpdate({ ...entry, reason: value })} />
               </div>
-              <input placeholder="Outcome" value={entry.outcome ?? ''} onChange={(e) => onUpdate({ ...entry, outcome: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
+              <ProfileInput label="Outcome" placeholder="Outcome" value={entry.outcome ?? ''} onValueChange={(value) => onUpdate({ ...entry, outcome: value })} />
             </div>
           )
         },
@@ -198,10 +220,10 @@ function renderSection(
           return (
             <div className="space-y-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <input placeholder="Vaccine" value={entry.vaccine} onChange={(e) => onUpdate({ ...entry, vaccine: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Dose" value={entry.dose ?? ''} onChange={(e) => onUpdate({ ...entry, dose: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Date" value={entry.date ?? ''} onChange={(e) => onUpdate({ ...entry, date: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
-                <input placeholder="Provider" value={entry.provider ?? ''} onChange={(e) => onUpdate({ ...entry, provider: e.target.value })} className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-700 dark:text-slate-200" />
+                <ProfileInput label="Vaccine" placeholder="Vaccine" value={entry.vaccine} onValueChange={(value) => onUpdate({ ...entry, vaccine: value })} />
+                <ProfileInput label="Dose" placeholder="Dose" value={entry.dose ?? ''} onValueChange={(value) => onUpdate({ ...entry, dose: value })} />
+                <ProfileInput label="Date" placeholder="Date" value={entry.date ?? ''} onValueChange={(value) => onUpdate({ ...entry, date: value })} />
+                <ProfileInput label="Provider" placeholder="Provider" value={entry.provider ?? ''} onValueChange={(value) => onUpdate({ ...entry, provider: value })} />
               </div>
             </div>
           )

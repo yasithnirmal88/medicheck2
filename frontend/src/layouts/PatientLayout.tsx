@@ -6,11 +6,9 @@
  */
 
 import React, { useState } from 'react'
-import { createPortal } from 'react-dom'
-import { NavLink, useNavigate, useLocation, Outlet } from 'react-router-dom'
+import { NavLink, useNavigate, Outlet } from 'react-router-dom'
 import {
   Activity,
-  BookOpen,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -130,8 +128,6 @@ export const PatientLayout: React.FC<PatientLayoutProps> = ({ children }) => {
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
           onLogout={handleLogout}
           loggingOut={loggingOut}
-          displayName={displayName}
-          initials={initials}
         />
       </aside>
 
@@ -148,8 +144,6 @@ export const PatientLayout: React.FC<PatientLayoutProps> = ({ children }) => {
               onToggle={() => setMobileOpen(false)}
               onLogout={handleLogout}
               loggingOut={loggingOut}
-              displayName={displayName}
-              initials={initials}
               mobile
               onCloseMobile={() => setMobileOpen(false)}
             />
@@ -209,8 +203,6 @@ interface SidebarContentProps {
   onToggle: () => void
   onLogout: () => void
   loggingOut: boolean
-  displayName: string
-  initials: string
   onCloseMobile?: () => void
 }
 
@@ -220,8 +212,6 @@ const SidebarContent: React.FC<SidebarContentProps> = ({
   onToggle,
   onLogout,
   loggingOut,
-  displayName,
-  initials,
   onCloseMobile,
 }) => {
   const navClass = ({ isActive }: { isActive: boolean }) =>
