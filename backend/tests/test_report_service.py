@@ -1,4 +1,5 @@
 import pytest
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.services.clinical_decision_service import ClinicalDecisionService
@@ -16,6 +17,10 @@ from app.infrastructure.persistence.models.clinical_indicator import (
 from app.infrastructure.persistence.models.question import QuestionModel
 from app.infrastructure.persistence.models.question_group import QuestionGroupModel
 from app.infrastructure.persistence.models.question_option import QuestionOptionModel
+from app.infrastructure.persistence.models.report import (
+    BodySystemAssessmentModel,
+    HealthAssessmentModel,
+)
 
 
 @pytest.mark.asyncio
@@ -101,6 +106,19 @@ async def test_report_generation_flow(db_session: AsyncSession):
     assert len(r.body_systems) >= 0
     assert len(r.conditions) >= 0
     assert len(r.advices) >= 0
+
+    second_report = await report_svc.generate_report(s_id, "u1")
+    assert second_report["report_id"] == rpt["report_id"]
+    assert await session.scalar(
+        select(func.count()).select_from(HealthAssessmentModel).where(
+            HealthAssessmentModel.session_id == s_id
+        )
+    ) == 1
+    assert await session.scalar(
+        select(func.count()).select_from(BodySystemAssessmentModel).where(
+            BodySystemAssessmentModel.assessment_id == rpt["report_id"]
+        )
+    ) == len(r.body_systems)
 
 
 @pytest.mark.asyncio

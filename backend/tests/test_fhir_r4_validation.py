@@ -20,13 +20,14 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.application.services.fhir_export_service import FhirExportService
 from app.application.services.fhir_validation import (
     validate_fhir_bundle,
     validate_fhir_resource,
 )
+from app.core.exceptions import InternalError
 from app.core.security.rbac import Role
 from app.domain.entities.user import User
 from app.infrastructure.persistence.models.assessment_answer import (
@@ -39,6 +40,9 @@ from app.infrastructure.persistence.models.consent_record import ConsentRecordMo
 from app.infrastructure.persistence.models.decision import AssessmentResultModel
 from app.infrastructure.persistence.models.facility import FacilityModel
 from app.infrastructure.persistence.models.follow_up_task import FollowUpTaskModel
+from app.infrastructure.persistence.models.interoperability_export import (
+    InteroperabilityExportModel,
+)
 from app.infrastructure.persistence.models.health_profile import HealthProfileModel
 from app.infrastructure.persistence.models.personal_info import PersonalInfoModel
 from app.infrastructure.persistence.models.referral import ReferralModel
@@ -146,6 +150,29 @@ class TestFhirR4StructuralValidation:
 
         errors = validate_fhir_bundle(resp.bundle.model_dump(by_alias=True, exclude_none=True))
         assert errors == [], f"FHIR R4 validation errors: {errors}"
+
+    @pytest.mark.asyncio
+    async def test_invalid_generated_bundle_is_not_audited_or_returned(
+        self, db_session, patient_user, monkeypatch
+    ):
+        await _create_user_model(db_session, patient_user.id)
+        session = await _seed_completed_session(db_session, patient_user.id)
+        await _seed_consent(db_session, patient_user.id)
+        await db_session.commit()
+
+        monkeypatch.setattr(
+            "app.application.services.fhir_export_service.validate_fhir_bundle",
+            lambda _bundle: ["test structural error"],
+        )
+
+        with pytest.raises(InternalError, match="Generated FHIR Bundle failed validation"):
+            await FhirExportService(db_session).export_session_bundle(
+                patient_user, session.id
+            )
+
+        assert await db_session.scalar(
+            select(func.count()).select_from(InteroperabilityExportModel)
+        ) == 0
 
     @pytest.mark.asyncio
     async def test_every_resource_validates_individually(self, db_session, patient_user):

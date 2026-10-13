@@ -81,4 +81,9 @@ class BaseModel(Base, UUIDPrimaryKeyMixin, TimestampMixin, SoftDeleteMixin):
         return cls.__name__.lower() + "s"
 
     def to_dict(self) -> dict:
-        return {c.name: getattr(self, c.name) for c in self.__table__.columns}
+        return {
+            column.name: getattr(
+                self, self.__mapper__.get_property_by_column(column).key
+            )
+            for column in self.__table__.columns
+        }

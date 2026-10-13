@@ -64,6 +64,12 @@ class ClinicalDecisionService:
             )
             opt_models = {o.id: o for o in opt_rows.scalars().all()}
 
+        indicator_confidences = {
+            indicator.id: indicator.confidence
+            for indicators in (*q_indicators_map.values(), *opt_indicators_map.values())
+            for indicator in indicators
+        }
+
         # Generate trace ID for reproducibility
         trace_id = uuid.uuid4().hex[:16]
 
@@ -137,6 +143,7 @@ class ClinicalDecisionService:
                 "created_at": None,
             }
         )
+        await self.dec_repo.clear_result_details(result.id)
 
         # Batch-load evidence for all activated indicators
         activated_ind_ids = [iid for iid, _ in activated_indicators]
@@ -178,18 +185,28 @@ class ClinicalDecisionService:
         recs_map = await self.kg_repo.get_recommendations_by_condition_batch(activated_condition_ids)
         labs_map = await self.kg_repo.get_laboratory_tests_by_condition_batch(activated_condition_ids)
 
-        # persist conditions with normalized confidence scores
-        max_possible_condition_score = max(
-            (sc for _, sc in activated_conditions), default=0.0
-        )
+        # Condition confidence summarizes the configured confidence of its
+        # contributing indicators; it is independent of other conditions.
+        condition_confidences: list[float] = []
         for cid, sc in activated_conditions:
-            contributors = condition_indicator_map.get(cid, [])
-            # Normalize confidence to 0-1: actual_score / max_possible_score
+            contributors = list(dict.fromkeys(condition_indicator_map.get(cid, [])))
+            confidence_weights = [
+                (indicator_scores[ind_id], indicator_confidences[ind_id])
+                for ind_id in contributors
+                if indicator_scores.get(ind_id, 0.0) > 0
+                and ind_id in indicator_confidences
+            ]
+            total_weight = sum(weight for weight, _ in confidence_weights)
             confidence = (
-                sc / max_possible_condition_score if max_possible_condition_score > 0 else 0.0
+                sum(
+                    weight * max(0.0, min(1.0, indicator_confidence))
+                    for weight, indicator_confidence in confidence_weights
+                )
+                / total_weight
+                if total_weight > 0
+                else 0.0
             )
-            # Clamp to [0, 1]
-            confidence = max(0.0, min(1.0, confidence))
+            condition_confidences.append(confidence)
             await self.dec_repo.add_activated_condition(
                 result.id, cid, sc, confidence, None
             )
@@ -224,16 +241,12 @@ class ClinicalDecisionService:
             "activated_conditions": len(activated_conditions),
             "indicator_scores": {k: v for k, v in indicator_scores.items()},
         }
-        # update result summary and confidence
-        # Normalized confidence: mean of per-condition confidences (each is already 0-1)
-        confs = []
-        for cid, sc in activated_conditions:
-            contributors = condition_indicator_map.get(cid, [])
-            c_conf = (
-                sc / max_possible_condition_score if max_possible_condition_score > 0 else 0.0
-            )
-            confs.append(max(0.0, min(1.0, c_conf)))
-        overall_confidence = sum(confs) / len(confs) if confs else 0.0
+        # The overall value averages the independent condition confidences.
+        overall_confidence = (
+            sum(condition_confidences) / len(condition_confidences)
+            if condition_confidences
+            else 0.0
+        )
         await self.session.execute(
             AssessmentSessionModel.__table__.update()
             .where(AssessmentSessionModel.id == session_id)
@@ -245,6 +258,17 @@ class ClinicalDecisionService:
             AssessmentResultModel.__table__.update()
             .where(AssessmentResultModel.id == result.id)
             .values(summary=str(summary), confidence_score=float(overall_confidence))
+        )
+        await self.session.refresh(
+            result,
+            attribute_names=[
+                "activated_indicators",
+                "activated_conditions",
+                "generated_recommendations",
+                "generated_laboratory_tests",
+                "generated_screenings",
+                "explanations",
+            ],
         )
 
         return {
