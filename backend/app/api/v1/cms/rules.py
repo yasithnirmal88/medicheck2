@@ -6,9 +6,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_cms_user, get_db
+from app.api.deps import get_db
 from app.application.services.cms.rule_engine_service import RuleEngineService
-from app.domain.entities.user import User
+from app.identity import User, get_cms_user
 from app.infrastructure.persistence.models.questionnaire_rule_set import (
     QuestionnaireRuleSetModel,
 )

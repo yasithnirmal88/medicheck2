@@ -6,10 +6,11 @@ from a specific LLM vendor and lets a deterministic stub provider be used in
 development/tests (and as the default) without any external API key or network
 dependency.
 
-A real vendor provider can be added later by implementing the Protocol and
-selecting it via ``settings.ai_provider`` — no change to the service layer is
-required. Phase 1 ships only the stub provider; no third-party AI packages are
-installed.
+A real OpenAI-compatible HTTP provider (``http_chat_provider``) implements the
+Protocol and is selected via ``settings.ai_provider`` (``openai`` /
+``openai-compatible`` + ``AI_API_KEY``/``AI_MODEL``) — no change to the
+service layer is required. Unknown provider names raise
+``AIConfigurationError`` (fail fast, never silent stub fallback).
 """
 
 from __future__ import annotations
@@ -210,11 +211,19 @@ def _severity_explanation(severity: str | None) -> str:
 def get_explanation_provider() -> AIExplanationProvider:
     """Return the configured AI explanation provider.
 
-    Defaults to the deterministic stub provider. Phase 7 adds a
-    ``personalized-stub`` provider that supports multilingual + health-literacy
-    levels; select it by setting ``AI_PROVIDER=personalized-stub``.
+    - ``stub`` → deterministic local provider (default, no credentials).
+    - ``personalized-stub`` → multilingual + literacy-level stub (Phase 7).
+    - ``openai`` / ``openai-compatible`` → HTTP provider (requires
+      ``AI_API_KEY`` + ``AI_MODEL``; raises ``AIConfigurationError`` when
+      missing — never silently falls back to the stub).
+    - Anything else → ``AIConfigurationError`` (fail fast, never silent).
     """
-    name = (settings.ai_provider or "stub").strip().lower()
+    from app.application.ai.provider_selection import (
+        normalize_provider_name,
+        resolve_llm_config,
+    )
+
+    name = normalize_provider_name(settings.ai_provider)
     if name == "personalized-stub":
         from app.application.ai.personalized_provider import (
             PersonalizedExplanationProvider,
@@ -223,9 +232,8 @@ def get_explanation_provider() -> AIExplanationProvider:
         return PersonalizedExplanationProvider()
     if name == "stub":
         return StubExplanationProvider()
-    # Unknown / unconfigured vendor → fall back to the stub so the report is
-    # never broken. A future phase wires a real provider here.
-    logger.info(
-        "AI provider '%s' not implemented in Phase 1; using stub provider", name
-    )
-    return StubExplanationProvider()
+    # A real provider name: resolve validates credentials and raises
+    # AIConfigurationError for unknown names or missing keys.
+    from app.application.ai.http_chat_provider import OpenAICompatibleChatProvider
+
+    return OpenAICompatibleChatProvider.from_config(resolve_llm_config(name))

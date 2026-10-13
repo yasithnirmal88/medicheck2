@@ -13,14 +13,19 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db, get_interop_user, get_referral_user
+from app.api.deps import get_db
 from app.application.dtos.referral_dtos import (
     FacilityCreateRequest,
     FacilityListResponse,
     FacilityResponse,
 )
 from app.application.services.facility_service import FacilityService
-from app.domain.entities.user import User
+from app.identity import (
+    User,
+    get_current_user,
+    get_interop_user,
+    get_referral_user,
+)
 
 logger = logging.getLogger(__name__)
 

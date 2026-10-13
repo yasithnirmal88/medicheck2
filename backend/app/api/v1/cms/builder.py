@@ -5,21 +5,17 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_cms_user, get_db
+from app.api.deps import get_db
 from app.application.services.cms.builder_service import (
     QuestionnaireBuilderService,
 )
-from app.core.security.rbac import (
+from app.identity import (
     Permission,
+    User,
     check_permission,
-    get_role_permissions,
+    get_cms_user,
+    get_user_permissions,
 )
-from app.core.security.rbac import (
-    Role as RBACRole,
-)
-from app.domain.entities.user import User
-from app.infrastructure.persistence.models.role import RoleModel
-from app.infrastructure.persistence.models.user_role import user_role_table
 
 router = APIRouter(prefix="/cms/builder", tags=["CMS Questionnaire Builder"])
 
@@ -27,22 +23,7 @@ router = APIRouter(prefix="/cms/builder", tags=["CMS Questionnaire Builder"])
 async def _check_write_perm(
     session: AsyncSession, user_id: str
 ) -> None:
-    from sqlalchemy import select
-
-    stmt = (
-        select(RoleModel.code)
-        .select_from(user_role_table)
-        .join(RoleModel, RoleModel.id == user_role_table.c.role_id)
-        .where(user_role_table.c.user_id == user_id)
-    )
-    result = await session.execute(stmt)
-    perms: set[Permission] = set()
-    for row in result.all():
-        try:
-            role = RBACRole(row[0])
-            perms.update(get_role_permissions(role))
-        except ValueError:
-            continue
+    perms = await get_user_permissions(session, user_id)
     if not check_permission(perms, Permission.CMS_WRITE_QUESTION):
         raise HTTPException(403, "Insufficient permissions to edit questions")
 

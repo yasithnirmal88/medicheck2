@@ -15,7 +15,6 @@ import {
   Square,
   X,
 } from 'lucide-react'
-import AppLayout from '@/layouts/AppLayout'
 import Card from '@/shared/ui/Card'
 import {
   extractIntake,
@@ -163,146 +162,144 @@ const IntakePage: React.FC = () => {
   const isUnavailable = result && !result.available
 
   return (
-    <AppLayout>
-      <div className="mx-auto max-w-3xl space-y-6 py-2">
-        <header className="space-y-2">
-          <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-300">
-            <Sparkles className="w-5 h-5" aria-hidden />
-            <h1 className="text-xl font-semibold">Tell us what you&apos;re experiencing</h1>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Describe anything you&apos;ve noticed recently in your own words. We&apos;ll help identify
-            information that may be relevant and suggest a few questions to clarify it. This is an
-            optional assisted step — you can always use the standard questionnaire.
-          </p>
-        </header>
+    <div className="mx-auto max-w-3xl space-y-6 py-2">
+      <header className="space-y-2">
+        <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-300">
+          <Sparkles className="w-5 h-5" aria-hidden />
+          <h1 className="text-xl font-semibold">Tell us what you&apos;re experiencing</h1>
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Describe anything you&apos;ve noticed recently in your own words. We&apos;ll help identify
+          information that may be relevant and suggest a few questions to clarify it. This is an
+          optional assisted step — you can always use the standard questionnaire.
+        </p>
+      </header>
 
-        <Card className="space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="flex items-center justify-between gap-3">
-              <label htmlFor="intake-text" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
-                How are you feeling?
-              </label>
-              <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
-                Language:
-                <select
-                  value={language}
-                  onChange={handleLanguageChange}
-                  disabled={isLoading || !!result || transcribing}
-                  aria-label="Select your language"
-                  className="rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-                >
-                  {LANGUAGES.map((l) => (
-                    <option key={l.code} value={l.code}>{l.label}</option>
-                  ))}
-                </select>
-              </label>
+      <Card className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="intake-text" className="block text-sm font-medium text-gray-700 dark:text-gray-200">
+              How are you feeling?
+            </label>
+            <label className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+              Language:
+              <select
+                value={language}
+                onChange={handleLanguageChange}
+                disabled={isLoading || !!result || transcribing}
+                aria-label="Select your language"
+                className="rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>{l.label}</option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <textarea
+            id="intake-text"
+            className="w-full min-h-[120px] rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            placeholder="I have been getting tired when climbing stairs..."
+            value={text}
+            onChange={handleTextChange}
+            disabled={isLoading || !!result || transcribing}
+            aria-describedby="intake-help"
+          />
+          <p id="intake-help" className="text-xs text-gray-500">
+            You can type, speak, edit your description, reject an interpretation, or skip this step at any time.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            {!result && (
+              <button
+                type="submit"
+                className="inline-flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
+                disabled={isLoading || transcribing || !text.trim()}
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <ArrowRight className="w-4 h-4" aria-hidden />}
+                {isLoading ? 'Analyzing...' : 'Continue'}
+              </button>
+            )}
+            {!result && recorder.isSupported && recorder.state !== 'recording' && (
+              <button
+                type="button"
+                onClick={handleStartRecording}
+                disabled={isLoading || transcribing}
+                className="inline-flex items-center gap-2 rounded border border-indigo-300 dark:border-indigo-700 px-4 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 disabled:opacity-50"
+              >
+                {transcribing ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Mic className="w-4 h-4" aria-hidden />}
+                {transcribing ? 'Transcribing...' : 'Speak'}
+              </button>
+            )}
+            {recorder.state === 'recording' && (
+              <button
+                type="button"
+                onClick={handleStopRecording}
+                className="inline-flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
+              >
+                <Square className="w-4 h-4" aria-hidden /> Stop
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={handleSkip}
+              className="inline-flex items-center gap-2 rounded border border-gray-300 dark:border-slate-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700"
+            >
+              Skip AI intake
+            </button>
+          </div>
+          {inputType === 'voice' && text && !result && (
+            <div className="rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+              <p className="font-medium">Please review your transcript</p>
+              <p className="mt-1">This was transcribed from your voice. Edit it above if anything is incorrect, then continue. We won&apos;t interpret it until you confirm.</p>
             </div>
-            <textarea
-              id="intake-text"
-              className="w-full min-h-[120px] rounded border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-900 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              placeholder="I have been getting tired when climbing stairs..."
-              value={text}
-              onChange={handleTextChange}
-              disabled={isLoading || !!result || transcribing}
-              aria-describedby="intake-help"
-            />
-            <p id="intake-help" className="text-xs text-gray-500">
-              You can type, speak, edit your description, reject an interpretation, or skip this step at any time.
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              {!result && (
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50"
-                  disabled={isLoading || transcribing || !text.trim()}
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <ArrowRight className="w-4 h-4" aria-hidden />}
-                  {isLoading ? 'Analyzing...' : 'Continue'}
-                </button>
-              )}
-              {!result && recorder.isSupported && recorder.state !== 'recording' && (
-                <button
-                  type="button"
-                  onClick={handleStartRecording}
-                  disabled={isLoading || transcribing}
-                  className="inline-flex items-center gap-2 rounded border border-indigo-300 dark:border-indigo-700 px-4 py-2 text-sm font-medium text-indigo-700 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 disabled:opacity-50"
-                >
-                  {transcribing ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden /> : <Mic className="w-4 h-4" aria-hidden />}
-                  {transcribing ? 'Transcribing...' : 'Speak'}
-                </button>
-              )}
-              {recorder.state === 'recording' && (
-                <button
-                  type="button"
-                  onClick={handleStopRecording}
-                  className="inline-flex items-center gap-2 rounded bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-                >
-                  <Square className="w-4 h-4" aria-hidden /> Stop
-                </button>
-              )}
+          )}
+        </form>
+
+        {errorMsg && (
+          <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {voiceError && (
+          <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+            <span>{voiceError}</span>
+          </div>
+        )}
+
+        {isUnavailable && (
+          <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
+            <div>
+              <p className="font-medium">AI-assisted intake is currently unavailable.</p>
+              <p className="mt-1">{result?.message ?? 'You can continue with the standard questionnaire.'}</p>
               <button
                 type="button"
                 onClick={handleSkip}
-                className="inline-flex items-center gap-2 rounded border border-gray-300 dark:border-slate-600 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-slate-700"
+                className="mt-2 inline-flex items-center gap-1 text-indigo-600 hover:underline"
               >
-                Skip AI intake
+                Continue with standard questionnaire <ArrowRight className="w-3 h-3" aria-hidden />
               </button>
             </div>
-            {inputType === 'voice' && text && !result && (
-              <div className="rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
-                <p className="font-medium">Please review your transcript</p>
-                <p className="mt-1">This was transcribed from your voice. Edit it above if anything is incorrect, then continue. We won&apos;t interpret it until you confirm.</p>
-              </div>
-            )}
-          </form>
-
-          {errorMsg && (
-            <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {voiceError && (
-            <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
-              <span>{voiceError}</span>
-            </div>
-          )}
-
-          {isUnavailable && (
-            <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-3 text-sm text-amber-800 dark:text-amber-200">
-              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" aria-hidden />
-              <div>
-                <p className="font-medium">AI-assisted intake is currently unavailable.</p>
-                <p className="mt-1">{result?.message ?? 'You can continue with the standard questionnaire.'}</p>
-                <button
-                  type="button"
-                  onClick={handleSkip}
-                  className="mt-2 inline-flex items-center gap-1 text-indigo-600 hover:underline"
-                >
-                  Continue with standard questionnaire <ArrowRight className="w-3 h-3" aria-hidden />
-                </button>
-              </div>
-            </div>
-          )}
-        </Card>
-
-        {result && result.available && (
-          <ResultsSection
-            observations={activeObservations}
-            candidateCount={acceptedCandidateIndicators.length}
-            recommendedGroups={recommendedGroups}
-            clarifications={result.clarifications}
-            onRejectObservation={handleRejectObservation}
-            onEdit={handleEdit}
-            onStartAssessment={handleStartAssessment}
-            starting={startSession.isPending}
-          />
+          </div>
         )}
-      </div>
-    </AppLayout>
+      </Card>
+
+      {result && result.available && (
+        <ResultsSection
+          observations={activeObservations}
+          candidateCount={acceptedCandidateIndicators.length}
+          recommendedGroups={recommendedGroups}
+          clarifications={result.clarifications}
+          onRejectObservation={handleRejectObservation}
+          onEdit={handleEdit}
+          onStartAssessment={handleStartAssessment}
+          starting={startSession.isPending}
+        />
+      )}
+    </div>
   )
 }
 

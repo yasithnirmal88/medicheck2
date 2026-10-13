@@ -3,10 +3,9 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_cms_user, get_db
+from app.api.deps import get_db
 from app.api.schemas.cms import (
     CMSEntityCreate,
     CMSEntityUpdate,
@@ -16,17 +15,13 @@ from app.application.services.cms.content_service import (
     ENTITY_REGISTRY,
     CMSContentService,
 )
-from app.core.security.rbac import (
+from app.identity import (
     Permission,
+    User,
     check_permission,
-    get_role_permissions,
+    get_cms_user,
+    get_user_permissions,
 )
-from app.core.security.rbac import (
-    Role as RBACRole,
-)
-from app.domain.entities.user import User
-from app.infrastructure.persistence.models.role import RoleModel
-from app.infrastructure.persistence.models.user_role import user_role_table
 
 router = APIRouter(prefix="/cms/content", tags=["CMS Content"])
 
@@ -140,26 +135,6 @@ _WRITE_PERM_MAP: dict[str, Permission] = {
 }
 
 
-async def _get_user_permissions(
-    session: AsyncSession, user_id: str
-) -> set[Permission]:
-    stmt = (
-        select(RoleModel.code)
-        .select_from(user_role_table)
-        .join(RoleModel, RoleModel.id == user_role_table.c.role_id)
-        .where(user_role_table.c.user_id == user_id)
-    )
-    result = await session.execute(stmt)
-    perms: set[Permission] = set()
-    for row in result.all():
-        try:
-            role = RBACRole(row[0])
-            perms.update(get_role_permissions(role))
-        except ValueError:
-            continue
-    return perms
-
-
 @router.get("/{entity_type}")
 async def list_content(
     entity_type: str,
@@ -174,7 +149,7 @@ async def list_content(
     canonical = _resolve(entity_type)
     if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
-    perms = await _get_user_permissions(session, user.id)
+    perms = await get_user_permissions(session, user.id)
     req_perm = _READ_PERM_MAP.get(canonical, Permission.CMS_READ_DASHBOARD)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
@@ -198,7 +173,7 @@ async def get_content(
     canonical = _resolve(entity_type)
     if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
-    perms = await _get_user_permissions(session, user.id)
+    perms = await get_user_permissions(session, user.id)
     req_perm = _READ_PERM_MAP.get(canonical, Permission.CMS_READ_DASHBOARD)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
@@ -220,7 +195,7 @@ async def create_content(
     canonical = _resolve(entity_type)
     if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
-    perms = await _get_user_permissions(session, user.id)
+    perms = await get_user_permissions(session, user.id)
     req_perm = _WRITE_PERM_MAP.get(canonical, Permission.CMS_WRITE_PUBLISH)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
@@ -247,7 +222,7 @@ async def update_content(
     canonical = _resolve(entity_type)
     if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
-    perms = await _get_user_permissions(session, user.id)
+    perms = await get_user_permissions(session, user.id)
     req_perm = _WRITE_PERM_MAP.get(canonical, Permission.CMS_WRITE_PUBLISH)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
@@ -271,7 +246,7 @@ async def delete_content(
     canonical = _resolve(entity_type)
     if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
-    perms = await _get_user_permissions(session, user.id)
+    perms = await get_user_permissions(session, user.id)
     req_perm = _WRITE_PERM_MAP.get(canonical, Permission.CMS_WRITE_PUBLISH)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")
@@ -292,7 +267,7 @@ async def update_content_status(
     canonical = _resolve(entity_type)
     if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
-    perms = await _get_user_permissions(session, user.id)
+    perms = await get_user_permissions(session, user.id)
     if not check_permission(perms, Permission.CMS_WRITE_PUBLISH):
         raise HTTPException(403, "Insufficient permissions")
 
@@ -332,7 +307,7 @@ async def bulk_update_content_status(
     canonical = _resolve(entity_type)
     if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
-    perms = await _get_user_permissions(session, user.id)
+    perms = await get_user_permissions(session, user.id)
     if not check_permission(perms, Permission.CMS_WRITE_PUBLISH):
         raise HTTPException(403, "Insufficient permissions")
 
@@ -353,7 +328,7 @@ async def bulk_delete_content(
     canonical = _resolve(entity_type)
     if canonical not in ALL_ENTITY_TYPES:
         raise HTTPException(404, f"Unknown entity type: {entity_type}")
-    perms = await _get_user_permissions(session, user.id)
+    perms = await get_user_permissions(session, user.id)
     req_perm = _WRITE_PERM_MAP.get(canonical, Permission.CMS_WRITE_PUBLISH)
     if not check_permission(perms, req_perm):
         raise HTTPException(403, "Insufficient permissions")

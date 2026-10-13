@@ -1,17 +1,22 @@
 /**
  * Medicheck Router - Role-Based Access Control
- * 
+ *
  * Implements complete separation between Patient and Doctor portals.
  * All routes are protected with appropriate role guards.
+ *
+ * Layout: every authenticated route (patient + doctor/CMS) is a child
+ * of a single RootLayout route, so the chrome (sidebar/header) mounts
+ * once and never unmounts on normal navigation. RootLayout switches
+ * chrome by role internally; the per-route guards below still enforce
+ * RBAC on each page. Public/auth routes stay outside the layout.
  */
 
 import React, { Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import NotFound from '../shared/ui/NotFound'
 import LoadingPage from '../shared/loading/LoadingPage'
 import { RequireAuth, RequirePatient, RequireDoctor, GuestRoute } from '../guards'
-import DoctorLayout from '../layouts/DoctorLayout'
-import { DashboardLayout } from '../layouts/DashboardLayout'
+import { RootLayout } from '../layouts/RootLayout'
 import { WizardProvider } from '../features/profile/state/WizardProvider'
 
 // ============================================================================
@@ -64,15 +69,16 @@ const SdgDashboardPage = React.lazy(() => import('../features/interop/pages/SdgD
 const CareContinuityPage = React.lazy(() => import('../features/interop/pages/CareContinuityPage'))
 const FacilitiesPage = React.lazy(() => import('../features/interop/pages/FacilitiesPage'))
 const ChwQueuePage = React.lazy(() => import('../features/interop/pages/ChwQueuePage'))
+
 // Phase 11 — Governed AI Care Coordination & Equity Intelligence
-const ChwSuggestionsPage = React.lazy(
-  () => import('../features/ai-governance/pages/ChwSuggestionsPage')
+const ChwSuggestionsPage = React.lazy(() =>
+  import('../features/ai-governance/pages/ChwSuggestionsPage')
 )
-const EquityIntelligencePage = React.lazy(
-  () => import('../features/ai-governance/pages/EquityIntelligencePage')
+const EquityIntelligencePage = React.lazy(() =>
+  import('../features/ai-governance/pages/EquityIntelligencePage')
 )
-const SdgNarrativesPage = React.lazy(
-  () => import('../features/ai-governance/pages/SdgNarrativesPage')
+const SdgNarrativesPage = React.lazy(() =>
+  import('../features/ai-governance/pages/SdgNarrativesPage')
 )
 
 // Content list pages - one lazy component per entity type, wired to its
@@ -139,251 +145,262 @@ export default function Router() {
         />
 
         {/* ============================================================ */}
-        {/* PATIENT ROUTES - Patient portal only */}
+        {/* AUTHENTICATED ROUTES - single persistent RootLayout          */}
+        {/* (role-based chrome is chosen inside RootLayout; per-route    */}
+        {/* guards below still enforce RBAC on each page)                */}
         {/* ============================================================ */}
-        
-        {/* Dashboard with nested routes */}
-        {/* Dashboard.tsx renders its own DashboardLayout shell, so no route-level layout wrapper */}
         <Route
-          path="/app"
           element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientDashboard />
-            </RequirePatient>
+            <RequireAuth>
+              <RootLayout />
+            </RequireAuth>
           }
         >
-          <Route path="dashboard" element={<Navigate to="/app" replace />} />
-        </Route>
+          {/* ------------------------------------------------------------ */}
+          {/* PATIENT ROUTES - Patient portal only */}
+          {/* ------------------------------------------------------------ */}
 
-        {/* Patient-specific routes - each wrapped in DashboardLayout */}
-        {/* HealthProfilePage renders its own DashboardLayout shell */}
-        <Route
-          path="/profile"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <WizardProvider>
-                <HealthProfilePage />
-              </WizardProvider>
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/profile/wizard"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<ProfileWizard />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/profile/sections"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<ProfileSections />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/profile/versions"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<ProfileVersions />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/questionnaires"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<QuestionnaireListPage />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/questionnaires/history"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<QuestionnaireHistoryPage />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/questionnaires/:id"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<QuestionnaireSessionPage />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/assessments"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<AssessmentSelectionPage />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/assessments/intake"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<IntakePage />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/assessments/dashboard"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<AssessmentsPage />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/assessments/history"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<AssessmentHistory />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/assessments/:id"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<ReportViewer />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/assessments/:id/results"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<ResultsDashboard />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/report/:id"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<ReportViewer />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/timeline"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<TimelinePage />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/timeline/compare"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<ComparePage />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/timeline/trajectory"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<TrajectoryPage />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/body-systems"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<BodySystemDashboard />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/recommendations"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<RecommendationCenter />} />
-            </RequirePatient>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <RequirePatient fallbackPath="/cms/dashboard">
-              <PatientLayoutWithContent content={<SettingsPage />} />
-            </RequirePatient>
-          }
-        />
+          {/* Dashboard with nested routes */}
+          <Route
+            path="/app"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <PatientDashboard />
+              </RequirePatient>
+            }
+          >
+            <Route path="dashboard" element={<Navigate to="/app" replace />} />
+          </Route>
 
-        {/* ============================================================ */}
-        {/* DOCTOR/CMS ROUTES - Clinical staff only */}
-        {/* ============================================================ */}
-        <Route
-          path="/cms"
-          element={
-            <RequireDoctor fallbackPath="/app">
-              <DoctorLayout />
-            </RequireDoctor>
-          }
-        >
-          <Route index element={<Navigate to="/cms/dashboard" replace />} />
-          <Route path="dashboard" element={<CMSDashboardPage />} />
+          {/* HealthProfilePage renders inside the RootLayout chrome */}
+          <Route
+            path="/profile"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <WizardProvider>
+                  <HealthProfilePage />
+                </WizardProvider>
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/profile/wizard"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <ProfileWizard />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/profile/sections"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <ProfileSections />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/profile/versions"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <ProfileVersions />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/questionnaires"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <QuestionnaireListPage />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/questionnaires/history"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <QuestionnaireHistoryPage />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/questionnaires/:id"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <QuestionnaireSessionPage />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/assessments"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <AssessmentSelectionPage />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/assessments/intake"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <IntakePage />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/assessments/dashboard"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <AssessmentsPage />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/assessments/history"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <AssessmentHistory />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/assessments/:id"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <ReportViewer />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/assessments/:id/results"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <ResultsDashboard />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/report/:id"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <ReportViewer />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/timeline"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <TimelinePage />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/timeline/compare"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <ComparePage />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/timeline/trajectory"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <TrajectoryPage />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/body-systems"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <BodySystemDashboard />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/recommendations"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <RecommendationCenter />
+              </RequirePatient>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <RequirePatient fallbackPath="/cms/dashboard">
+                <SettingsPage />
+              </RequirePatient>
+            }
+          />
 
-          {/* Content Management */}
-          <Route path="questions" element={<QuestionsListPage />} />
-          <Route path="question-groups" element={<Navigate to="/cms/questions" replace />} />
-          <Route path="diseases" element={<DiseasesListPage />} />
-          <Route path="body-systems" element={<BodySystemsListPage />} />
-          <Route path="symptoms" element={<SymptomsListPage />} />
-          <Route path="indicators" element={<IndicatorsListPage />} />
-          <Route path="lab-tests" element={<LabTestsListPage />} />
-          <Route path="imaging" element={<ImagingTestsListPage />} />
-          <Route path="recommendations" element={<RecommendationsListPage />} />
-          <Route path="lifestyle" element={<LifestyleAdviceListPage />} />
-          <Route path="exercise" element={<ExerciseProgramsListPage />} />
-          <Route path="nutrition" element={<NutritionAdviceListPage />} />
-          <Route path="evidence" element={<ClinicalEvidencePage />} />
-          <Route path="templates" element={<TemplatesListPage />} />
-          <Route path="medications" element={<MedicationsListPage />} />
-          <Route path="guidelines" element={<ClinicalGuidelinesListPage />} />
-          <Route path="rules" element={<DecisionRulesListPage />} />
-          <Route path="thresholds" element={<SeverityThresholdsListPage />} />
+          {/* ------------------------------------------------------------ */}
+          {/* DOCTOR/CMS ROUTES - Clinical staff only */}
+          {/* ------------------------------------------------------------ */}
+          <Route
+            path="/cms"
+            element={
+              <RequireDoctor fallbackPath="/app">
+                <Outlet />
+              </RequireDoctor>
+            }
+          >
+            <Route index element={<Navigate to="/cms/dashboard" replace />} />
+            <Route path="dashboard" element={<CMSDashboardPage />} />
 
-          {/* Builders */}
-          <Route path="builder" element={<QuestionnaireBuilderPage />} />
-          <Route path="rules-builder" element={<RuleBuilderPage />} />
-          <Route path="graph" element={<KnowledgeGraphEditorPage />} />
+            {/* Content Management */}
+            <Route path="questions" element={<QuestionsListPage />} />
+            <Route path="question-groups" element={<Navigate to="/cms/questions" replace />} />
+            <Route path="diseases" element={<DiseasesListPage />} />
+            <Route path="body-systems" element={<BodySystemsListPage />} />
+            <Route path="symptoms" element={<SymptomsListPage />} />
+            <Route path="indicators" element={<IndicatorsListPage />} />
+            <Route path="lab-tests" element={<LabTestsListPage />} />
+            <Route path="imaging" element={<ImagingTestsListPage />} />
+            <Route path="recommendations" element={<RecommendationsListPage />} />
+            <Route path="lifestyle" element={<LifestyleAdviceListPage />} />
+            <Route path="exercise" element={<ExerciseProgramsListPage />} />
+            <Route path="nutrition" element={<NutritionAdviceListPage />} />
+            <Route path="evidence" element={<ClinicalEvidencePage />} />
+            <Route path="templates" element={<TemplatesListPage />} />
+            <Route path="medications" element={<MedicationsListPage />} />
+            <Route path="guidelines" element={<ClinicalGuidelinesListPage />} />
+            <Route path="rules" element={<DecisionRulesListPage />} />
+            <Route path="thresholds" element={<SeverityThresholdsListPage />} />
 
-          {/* Workflow */}
-          <Route path="publishing" element={<PublishingWorkflowsPage />} />
-          <Route path="approvals" element={<ApprovalQueuePage />} />
-          <Route path="history" element={<VersionHistoryPage />} />
+            {/* Builders */}
+            <Route path="builder" element={<QuestionnaireBuilderPage />} />
+            <Route path="rules-builder" element={<RuleBuilderPage />} />
+            <Route path="graph" element={<KnowledgeGraphEditorPage />} />
 
-          {/* Operations */}
-          <Route path="audit" element={<AuditViewerPage />} />
-          <Route path="users" element={<UsersRolesPage />} />
-          <Route path="search" element={<SearchPage />} />
-          <Route path="settings" element={<SettingsPage />} />
+            {/* Workflow */}
+            <Route path="publishing" element={<PublishingWorkflowsPage />} />
+            <Route path="approvals" element={<ApprovalQueuePage />} />
+            <Route path="history" element={<VersionHistoryPage />} />
 
-          {/* Phase 6 — Population Health & SDG Analytics */}
-          <Route path="analytics" element={<AnalyticsDashboardPage />} />
+            {/* Operations */}
+            <Route path="audit" element={<AuditViewerPage />} />
+            <Route path="users" element={<UsersRolesPage />} />
+            <Route path="search" element={<SearchPage />} />
+            <Route path="settings" element={<SettingsPage />} />
 
-          {/* Phase 10 — Interoperability, Health-System Integration & Outcome Feedback */}
-          <Route path="interop" element={<InteroperabilityDashboardPage />} />
-          <Route path="interop/sdg" element={<SdgDashboardPage />} />
-          <Route path="interop/care-continuity" element={<CareContinuityPage />} />
-          <Route path="interop/facilities" element={<FacilitiesPage />} />
-          <Route path="interop/chw-queue" element={<ChwQueuePage />} />
+            {/* Phase 6 — Population Health & SDG Analytics */}
+            <Route path="analytics" element={<AnalyticsDashboardPage />} />
 
-          {/* Phase 11 — Governed AI Care Coordination & Equity Intelligence */}
-          <Route path="ai-governance/chw-suggestions" element={<ChwSuggestionsPage />} />
-          <Route path="ai-governance/equity" element={<EquityIntelligencePage />} />
-          <Route path="ai-governance/sdg-narratives" element={<SdgNarrativesPage />} />
+            {/* Phase 10 — Interoperability, Health-System Integration & Outcome Feedback */}
+            <Route path="interop" element={<InteroperabilityDashboardPage />} />
+            <Route path="interop/sdg" element={<SdgDashboardPage />} />
+            <Route path="interop/care-continuity" element={<CareContinuityPage />} />
+            <Route path="interop/facilities" element={<FacilitiesPage />} />
+            <Route path="interop/chw-queue" element={<ChwQueuePage />} />
+
+            {/* Phase 11 — Governed AI Care Coordination & Equity Intelligence */}
+            <Route path="ai-governance/chw-suggestions" element={<ChwSuggestionsPage />} />
+            <Route path="ai-governance/equity" element={<EquityIntelligencePage />} />
+            <Route path="ai-governance/sdg-narratives" element={<SdgNarrativesPage />} />
+          </Route>
         </Route>
 
         {/* ============================================================ */}
@@ -412,14 +429,3 @@ export default function Router() {
     </Suspense>
   )
 }
-
-// ============================================================================
-// Layout Wrapper Components
-// ============================================================================
-
-// Wrapper that provides the DashboardLayout shell (sidebar + topbar) to patient
-// pages that don't render their own layout. Pages like Dashboard and HealthProfile
-// render DashboardLayout themselves and bypass this wrapper to avoid double sidebars.
-const PatientLayoutWithContent: React.FC<{ content: React.ReactNode }> = ({ content }) => (
-  <DashboardLayout>{content}</DashboardLayout>
-)

@@ -5,10 +5,11 @@ Mirrors the Phase 1/2 provider pattern: the application service depends on the
 default development provider is deterministic (no network, no external API
 key) so tests run without credentials.
 
-A real vendor provider can be added later by implementing the Protocol and
-selecting it via ``settings.ai_provider`` — no change to the service layer is
-required. Phase 3 ships only the stub provider; no third-party AI packages are
-installed.
+A real OpenAI-compatible HTTP provider (``http_chat_provider``) implements the
+Protocol and is selected via ``settings.ai_provider`` (``openai`` /
+``openai-compatible`` + ``AI_API_KEY``/``AI_MODEL``) — no change to the
+service layer is required. Unknown provider names raise
+``AIConfigurationError``.
 
 The stub performs deterministic, rule-based extraction:
 - keyword/phrase matching against the supplied indicator catalog,
@@ -369,13 +370,19 @@ def _localized_clarification(language: str) -> str:
 def get_intake_provider() -> AIClinicalIntakeProvider:
     """Return the configured AI intake provider.
 
-    Defaults to the deterministic stub provider. A real vendor provider can be
-    selected by setting ``AI_PROVIDER`` and implementing the Protocol here.
+    ``stub`` (and ``personalized-stub``, which is explanation-scoped) use the
+    deterministic stub. ``openai`` / ``openai-compatible`` use the HTTP
+    provider (requires ``AI_API_KEY`` + ``AI_MODEL``). Anything else raises
+    ``AIConfigurationError`` — never a silent stub fallback.
     """
-    name = (settings.ai_provider or "stub").strip().lower()
-    if name == "stub":
-        return StubClinicalIntakeProvider()
-    logger.info(
-        "AI provider '%s' not implemented for intake in Phase 3; using stub", name
+    from app.application.ai.provider_selection import (
+        normalize_provider_name,
+        resolve_llm_config,
     )
-    return StubClinicalIntakeProvider()
+
+    name = normalize_provider_name(settings.ai_provider)
+    if name in ("stub", "personalized-stub"):
+        return StubClinicalIntakeProvider()
+    from app.application.ai.http_chat_provider import OpenAICompatibleChatProvider
+
+    return OpenAICompatibleChatProvider.from_config(resolve_llm_config(name))

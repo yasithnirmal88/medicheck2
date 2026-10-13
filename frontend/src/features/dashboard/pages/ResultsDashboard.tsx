@@ -2,7 +2,6 @@ import React, { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Award, BarChart2, FlaskConical, HeartPulse, LifeBuoy, NotebookText, Repeat, TrendingUp } from 'lucide-react'
-import AppLayout from '@/layouts/AppLayout'
 import Card from '@/shared/ui/Card'
 import Button from '@/shared/ui/Button'
 import { fetchReportBySession, generateReport } from '@/features/dashboard/api/patientService'
@@ -217,163 +216,159 @@ const ResultsDashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <AppLayout>
-        <div className="mx-auto max-w-4xl p-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-6 w-48 rounded bg-gray-200 dark:bg-gray-700" />
-            <Card>
-              <div className="p-6 space-y-4">
-                <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
-                <div className="h-4 w-1/2 rounded bg-gray-200 dark:bg-gray-700" />
-              </div>
-            </Card>
-          </div>
+      <div className="mx-auto max-w-4xl p-4">
+        <div className="animate-pulse space-y-4">
+          <div className="h-6 w-48 rounded bg-gray-200 dark:bg-gray-700" />
+          <Card>
+            <div className="p-6 space-y-4">
+              <div className="h-4 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
+              <div className="h-4 w-1/2 rounded bg-gray-200 dark:bg-gray-700" />
+            </div>
+          </Card>
         </div>
-      </AppLayout>
+      </div>
     )
   }
 
   return (
-    <AppLayout>
-      <div className="mx-auto max-w-4xl p-4 space-y-6">
-        <header className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-indigo-600" />
-            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Assessment Results</h1>
-          </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            Generated from session <span className="font-medium">{id}</span>
-          </p>
-        </header>
+    <div className="mx-auto max-w-4xl p-4 space-y-6">
+      <header className="flex flex-col gap-1">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-indigo-600" />
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Assessment Results</h1>
+        </div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          Generated from session <span className="font-medium">{id}</span>
+        </p>
+      </header>
 
-        {/* Overall Health Score */}
-        <Card>
-          <div className="flex items-center justify-between">
-            <ScoreGauge score={overall} />
-            <div className="text-right text-xs text-gray-500 dark:text-gray-400">
-              <p>Overall Health Score</p>
-              <p>Updated just now</p>
+      {/* Overall Health Score */}
+      <Card>
+        <div className="flex items-center justify-between">
+          <ScoreGauge score={overall} />
+          <div className="text-right text-xs text-gray-500 dark:text-gray-400">
+            <p>Overall Health Score</p>
+            <p>Updated just now</p>
+          </div>
+        </div>
+      </Card>
+
+      {/* Body System Scores */}
+      <Card>
+        <div className="flex items-center gap-2 mb-3">
+          <HeartPulse className="h-4 w-4 text-indigo-600" />
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Body System Scores</h2>
+        </div>
+        <div className="space-y-4">
+          {systems.map((s) => (
+            <div key={s.id} className="space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{s.name}</span>
+                <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[s.status]}`}>
+                  {s.score} — {s.status}
+                </span>
+              </div>
+              <BarRow label={s.name} value={s.score} />
             </div>
-          </div>
-        </Card>
+          ))}
+        </div>
+      </Card>
 
-        {/* Body System Scores */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <HeartPulse className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Body System Scores</h2>
-          </div>
-          <div className="space-y-4">
-            {systems.map((s) => (
-              <div key={s.id} className="space-y-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-200">{s.name}</span>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_COLOR[s.status]}`}>
-                    {s.score} — {s.status}
-                  </span>
-                </div>
-                <BarRow label={s.name} value={s.score} />
+      {/* Risk Indicators */}
+      <Card>
+        <div className="flex items-center gap-2 mb-3">
+          <BarChart2 className="h-4 w-4 text-rose-600" />
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Risk Indicators</h2>
+        </div>
+        <div className="space-y-3">
+          {risks.map((r) => (
+            <div key={r.id} className={`rounded-md border border-transparent p-3 ${RISK_LEVEL_BG[r.level]}`}>
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{r.label}</span>
+                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white ${RISK_LEVEL_COLOR[r.level]}`}>
+                  {r.level}
+                </span>
               </div>
-            ))}
-          </div>
-        </Card>
+              <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">{r.value}</p>
+            </div>
+          ))}
+        </div>
+      </Card>
 
-        {/* Risk Indicators */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <BarChart2 className="h-4 w-4 text-rose-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Risk Indicators</h2>
-          </div>
-          <div className="space-y-3">
-            {risks.map((r) => (
-              <div key={r.id} className={`rounded-md border border-transparent p-3 ${RISK_LEVEL_BG[r.level]}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{r.label}</span>
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white ${RISK_LEVEL_COLOR[r.level]}`}>
-                    {r.level}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-600 dark:text-gray-300 mt-0.5">{r.value}</p>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Recommendations */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <LifeBuoy className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recommendations</h2>
-          </div>
-          <div className="space-y-3">
-            {recommendations.map((r) => (
-              <div key={r.id} className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className={`inline-block h-1.5 w-1.5 rounded-full ${r.priority === 'urgent' ? 'bg-rose-500' : r.priority === 'routine' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
-                      <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{r.category}</span>
-                    </div>
-                    <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-1">{r.title}</p>
-                    <p className="text-xs text-gray-600 dark:text-gray-300">{r.description}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        {/* Suggested Laboratory Tests */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <FlaskConical className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Suggested Laboratory Tests</h2>
-          </div>
-          <ul className="list-outside list-disc space-y-1 pl-4 text-sm text-gray-700 dark:text-gray-300">
-            {labTests.map((t) => (
-              <li key={t.id}>
-                <span className="font-medium">{t.name}</span> — <span className="text-gray-500 dark:text-gray-400">{t.rationale}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        {/* Lifestyle Advice */}
-        <Card>
-          <div className="flex items-center gap-2 mb-3">
-            <NotebookText className="h-4 w-4 text-indigo-600" />
-            <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Lifestyle Advice</h2>
-          </div>
-          <div className="space-y-3">
-            {lifestyle.map((l) => (
-              <div key={l.id} className="flex items-start gap-2">
-                <span className="mt-0.5 inline-block h-1 w-1 shrink-0 rounded-full bg-indigo-500" />
+      {/* Recommendations */}
+      <Card>
+        <div className="flex items-center gap-2 mb-3">
+          <LifeBuoy className="h-4 w-4 text-indigo-600" />
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Recommendations</h2>
+        </div>
+        <div className="space-y-3">
+          {recommendations.map((r) => (
+            <div key={r.id} className="rounded-md border border-gray-200 dark:border-gray-700 p-3">
+              <div className="flex items-start justify-between gap-2">
                 <div>
-                  <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{l.category}</span>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">{l.text}</p>
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${r.priority === 'urgent' ? 'bg-rose-500' : r.priority === 'routine' ? 'bg-indigo-500' : 'bg-emerald-500'}`} />
+                    <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{r.category}</span>
+                  </div>
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-200 mt-1">{r.title}</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-300">{r.description}</p>
                 </div>
               </div>
-            ))}
-          </div>
-        </Card>
+            </div>
+          ))}
+        </div>
+      </Card>
 
-        {/* Next Assessment Date */}
-        <Card>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <Repeat className="h-4 w-4 text-indigo-600" />
+      {/* Suggested Laboratory Tests */}
+      <Card>
+        <div className="flex items-center gap-2 mb-3">
+          <FlaskConical className="h-4 w-4 text-indigo-600" />
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Suggested Laboratory Tests</h2>
+        </div>
+        <ul className="list-outside list-disc space-y-1 pl-4 text-sm text-gray-700 dark:text-gray-300">
+          {labTests.map((t) => (
+            <li key={t.id}>
+              <span className="font-medium">{t.name}</span> — <span className="text-gray-500 dark:text-gray-400">{t.rationale}</span>
+            </li>
+          ))}
+        </ul>
+      </Card>
+
+      {/* Lifestyle Advice */}
+      <Card>
+        <div className="flex items-center gap-2 mb-3">
+          <NotebookText className="h-4 w-4 text-indigo-600" />
+          <h2 className="text-lg font-medium text-gray-900 dark:text-gray-100">Lifestyle Advice</h2>
+        </div>
+        <div className="space-y-3">
+          {lifestyle.map((l) => (
+            <div key={l.id} className="flex items-start gap-2">
+              <span className="mt-0.5 inline-block h-1 w-1 shrink-0 rounded-full bg-indigo-500" />
               <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Next recommended assessment</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{nextAssessment}</p>
+                <span className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">{l.category}</span>
+                <p className="text-sm text-gray-700 dark:text-gray-300">{l.text}</p>
               </div>
             </div>
-          <Button variant="primary">
-            Schedule reassessment
-          </Button>
+          ))}
+        </div>
+      </Card>
+
+      {/* Next Assessment Date */}
+      <Card>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Repeat className="h-4 w-4 text-indigo-600" />
+            <div>
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">Next recommended assessment</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">{nextAssessment}</p>
+            </div>
           </div>
-        </Card>
-      </div>
-    </AppLayout>
+        <Button variant="primary">
+          Schedule reassessment
+        </Button>
+        </div>
+      </Card>
+    </div>
   )
 }
 

@@ -364,8 +364,18 @@ class TestFhirExport:
         ]
         # Body-system observation + possible-condition observation.
         assert len(observations) >= 1
-        bs_obs = [o for o in observations if o.get("valueString") == "Needs Attention"]
+        # The categorical risk category is the Observation's single
+        # value[x] (valueCodeableConcept); the numeric score is a
+        # standard component.
+        bs_obs = [
+            o for o in observations
+            if (o.get("valueCodeableConcept") or {}).get("text") == "Needs Attention"
+        ]
         assert len(bs_obs) == 1
+        assert "valueString" not in bs_obs[0], "Observation must carry a single value[x]"
+        components = bs_obs[0].get("component") or []
+        assert len(components) == 1
+        assert components[0]["valueQuantity"]["value"] == 3.0
 
     @pytest.mark.asyncio
     async def test_diagnostic_report_generation(self, db_session, patient_user):

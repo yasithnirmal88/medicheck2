@@ -11,9 +11,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_ai_governance_user, get_db
+from app.api.deps import get_db
 from app.application.services.ai_audit_service import AIAuditService
-from app.domain.entities.user import User
+from app.identity import User, get_ai_governance_user
 
 router = APIRouter(prefix="/ai-governance", tags=["ai-governance"])
 

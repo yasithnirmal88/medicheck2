@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_active_user, get_db
+from app.api.deps import get_db
 from app.application.dtos.questionnaire_dtos import (
     AssessmentSessionResponse,
     QuestionnaireTemplateResponse,
@@ -16,7 +16,7 @@ from app.application.dtos.questionnaire_dtos import (
     SubmitSessionResponse,
 )
 from app.application.services.questionnaire_service import QuestionnaireService
-from app.domain.entities.user import User
+from app.identity import User, get_current_active_user
 
 router = APIRouter(prefix="/questionnaires", tags=["Questionnaires"])
 

@@ -8,8 +8,13 @@
     "preview": "vite preview",
     "lint": "eslint --ext .ts,.tsx src",
     "typecheck": "tsc --noEmit",
+    "generate:api": "orval --config orval.config.ts",
+    "generate:api:schema": "node scripts/export-openapi.mjs",
+    "generate:api:fetch": "node scripts/fetch-openapi.mjs && orval --config orval.config.ts",
+    "generate:api:check": "node scripts/check-generated-api.mjs",
     "test": "vitest",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "verify": "npm run generate:api:check && npm run typecheck && npm run lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
@@ -45,6 +50,7 @@
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-react": "^7.33.0",
     "jsdom": "^29.1.1",
+    "orval": "^7.21.0",
     "prettier": "^3.2.0",
     "terser": "^5.49.1",
     "typescript": "^5.4.2",

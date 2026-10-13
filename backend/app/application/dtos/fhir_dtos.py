@@ -107,7 +107,11 @@ class FhirObservation(FhirResource):
     subject: FhirReference | None = None
     effectiveDateTime: str | None = None
     valueQuantity: dict | None = None
+    valueCodeableConcept: FhirCodeableConcept | None = None
     valueString: str | None = None
+    # Observation.component — standard way to carry supplementary
+    # measured values alongside the single value[x] result.
+    component: list[dict] | None = None
     interpretation: list[FhirCodeableConcept] = []
     note: list[dict] = []
 
@@ -124,6 +128,7 @@ class FhirDiagnosticReport(FhirResource):
     conclusionCode: list[FhirCodeableConcept] = []
     result: list[FhirReference] = []
     presentedForm: list[dict] = []
+    extension: list[FhirExtension] = []
 
 
 class FhirServiceRequest(FhirResource):
@@ -171,6 +176,7 @@ class FhirConsent(FhirResource):
     scope: FhirCodeableConcept
     category: list[FhirCodeableConcept] = []
     patient: FhirReference | None = None
+    # FHIR R4: Consent.provision is 0..1 (single provision object).
     provision: dict | None = None
 
 

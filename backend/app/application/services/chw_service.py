@@ -61,6 +61,7 @@ from app.application.dtos.chw_dtos import (
     QrHandoffResponse,
 )
 from app.core.exceptions import AuthorizationError, NotFoundError, ValidationError
+from app.identity import get_user_summaries
 from app.infrastructure.persistence.models.assessment_session import (
     AssessmentSessionModel,
 )
@@ -89,7 +90,6 @@ from app.infrastructure.persistence.models.question_option import (
 from app.infrastructure.persistence.models.questionnaire_template import (
     QuestionnaireTemplateModel,
 )
-from app.infrastructure.persistence.models.user import UserModel
 
 #: Metadata keys stored on assessment_session.extra_metadata for CHW sessions.
 _META_CHW_USER_ID = "chw_user_id"
@@ -137,20 +137,23 @@ class ChwService:
     async def list_assigned_patients(
         self, chw_user_id: str
     ) -> AssignedPatientsResponse:
-        stmt = (
-            select(ChwAssignmentModel, UserModel)
-            .join(UserModel, UserModel.id == ChwAssignmentModel.patient_user_id)
-            .where(
-                ChwAssignmentModel.chw_user_id == chw_user_id,
-                ChwAssignmentModel.status == "active",
-                ChwAssignmentModel.deleted_at.is_(None),
-                UserModel.deleted_at.is_(None),
-                UserModel.is_active.is_(True),
+        assignments = (
+            await self.session.execute(
+                select(ChwAssignmentModel).where(
+                    ChwAssignmentModel.chw_user_id == chw_user_id,
+                    ChwAssignmentModel.status == "active",
+                    ChwAssignmentModel.deleted_at.is_(None),
+                )
             )
+        ).scalars().all()
+        summaries = await get_user_summaries(
+            self.session, {a.patient_user_id for a in assignments}
         )
-        rows = (await self.session.execute(stmt)).all()
         items: list[AssignedPatient] = []
-        for _assignment, user in rows:
+        for assignment in assignments:
+            user = summaries.get(assignment.patient_user_id)
+            if user is None or user.is_deleted or not user.is_active:
+                continue
             items.append(
                 AssignedPatient(
                     user_id=user.id,
@@ -630,8 +633,7 @@ class ChwService:
         self, chw_user_id: str
     ) -> list[ChwSessionSummary]:
         stmt = (
-            select(AssessmentSessionModel, UserModel)
-            .join(UserModel, UserModel.id == AssessmentSessionModel.user_id)
+            select(AssessmentSessionModel)
             .where(
                 AssessmentSessionModel.extra_metadata[_META_CHW_USER_ID].as_string()
                 == chw_user_id,
@@ -639,9 +641,15 @@ class ChwService:
             )
             .order_by(AssessmentSessionModel.started_at.desc())
         )
-        rows = (await self.session.execute(stmt)).all()
+        sessions = (await self.session.execute(stmt)).scalars().all()
+        users_by_id = await get_user_summaries(
+            self.session, {s.user_id for s in sessions}
+        )
         summaries: list[ChwSessionSummary] = []
-        for sess, user in rows:
+        for sess in sessions:
+            user = users_by_id.get(sess.user_id)
+            if user is None:
+                continue
             meta = sess.extra_metadata or {}
             # Sync status from the ledger if a ledger row exists.
             sync_status = None

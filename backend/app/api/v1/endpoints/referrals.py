@@ -14,7 +14,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db, get_referral_user
+from app.api.deps import get_db
 from app.application.dtos.referral_dtos import (
     AcknowledgeRequest,
     BarrierRequest,
@@ -29,7 +29,7 @@ from app.application.dtos.referral_dtos import (
     StatusUpdateRequest,
 )
 from app.application.services.referral_service import ReferralService
-from app.domain.entities.user import User
+from app.identity import User, get_current_user, get_referral_user
 
 logger = logging.getLogger(__name__)
 

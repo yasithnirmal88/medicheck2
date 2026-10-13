@@ -24,6 +24,14 @@ class Settings(BaseSettings):
 
     environment: Environment = Environment.DEVELOPMENT
     log_level: str = "DEBUG"
+    # Log format: "text" (default, human-readable) or "json" (log aggregation).
+    log_format: str = "text"
+    # API docs (/docs, /redoc, /openapi.json). None = auto: enabled unless
+    # production. Explicit True/False always wins.
+    docs_enabled: bool | None = None
+    # Sentry error tracking. Empty = disabled. When set, sentry_sdk must be
+    # installed (optional dependency); otherwise startup logs a warning.
+    sentry_dsn: str = ""
     secret_key: str = ""  # MUST be set via .env in production
     project_name: str = "MediCheck"
     version: str = "0.1.0"
@@ -168,6 +176,21 @@ class Settings(BaseSettings):
     ai_provider: str = "stub"
     ai_model: str = ""
     ai_api_key: str = ""
+    # Base URL for OpenAI-compatible chat APIs (e.g. https://api.openai.com/v1).
+    # Empty means "use the OpenAI default". Any OpenAI-compatible endpoint that
+    # accepts Bearer auth + POST /chat/completions works (Azure native endpoint
+    # shape is NOT supported — use an OpenAI-compatible gateway instead).
+    ai_base_url: str = ""
+    # Retries after the first attempt for transient vendor failures (HTTP
+    # 429/5xx, network errors). Auth errors (other 4xx) never retry.
+    ai_max_retries: int = 1
+    # ── AI vendor spend / abuse guardrails ──────────────────────────
+    # Per-user + global request budgets for METERED (real-vendor) AI calls.
+    # Stubs bypass budgets entirely (no vendor cost). 0 disables a tier.
+    # Hourly/daily windows are UTC calendar windows.
+    ai_budget_user_hourly_requests: int = 30
+    ai_budget_user_daily_requests: int = 200
+    ai_budget_global_daily_requests: int = 20000
     # Hard timeout (seconds) for an AI explanation request. A timeout is
     # treated as an AI failure, never a clinical-report failure.
     ai_request_timeout_seconds: float = 20.0
@@ -190,6 +213,11 @@ class Settings(BaseSettings):
     # Speech-to-text provider. Default stub works without external credentials.
     stt_provider: str = "stub"
     stt_model: str = ""
+    # API key for the STT vendor. Required for any non-stub STT provider.
+    stt_api_key: str = ""
+    # Base URL for OpenAI-compatible transcription APIs
+    # (POST /audio/transcriptions). Empty means "use the OpenAI default".
+    stt_base_url: str = ""
     # Hard timeout (seconds) for a speech-to-text request. A timeout is treated
     # as a voice failure, never an assessment failure (patient can type instead).
     stt_request_timeout_seconds: float = 20.0
@@ -264,6 +292,14 @@ class Settings(BaseSettings):
         host = values.get("redis_host", "localhost")
         port = values.get("redis_port", 6379)
         return f"redis://{host}:{port}/1"
+
+    @property
+    def docs_enabled_resolved(self) -> bool:
+        """Whether API docs are served. Explicit setting always wins;
+        otherwise docs are on except in production."""
+        if self.docs_enabled is not None:
+            return self.docs_enabled
+        return self.environment != Environment.PRODUCTION
 
     @property
     def is_development(self) -> bool:

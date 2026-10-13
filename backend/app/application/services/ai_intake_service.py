@@ -29,6 +29,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.ai.intake_prompts import INTAKE_PROMPT_VERSION
+from app.application.ai.ai_budget import enforce_ai_budget
 from app.application.ai.intake_provider import (
     AIIntakeProviderError,
     get_intake_provider,
@@ -147,6 +148,7 @@ class AIIntakeService:
         session_ref: str,
         language: str | None = None,
         input_type: str = "text",
+        user_id: str | None = None,
     ) -> IntakeResponse:
         """Extract observations + candidate indicators from patient text.
 
@@ -210,6 +212,13 @@ class AIIntakeService:
         )
 
         # 1. Provider extraction (failure → safe fallback).
+        # Vendor spend guardrail first: stubs bypass; exhaustion raises a
+        # typed 429 that must propagate (never a silent fallback).
+        await enforce_ai_budget(
+            user_id=user_id or f"session:{session_ref}",
+            operation="intake_extract",
+            metered=bool(getattr(self.provider, "metered", False)),
+        )
         try:
             raw = await self.provider.extract_candidates(ctx)
             parsed = parse_provider_json(raw)
@@ -282,6 +291,7 @@ class AIIntakeService:
         *,
         language: str | None = None,
         content_type: str = "audio/webm",
+        user_id: str | None = None,
     ) -> TranscriptResult:
         """Phase 5 — transcribe audio to text via the STT provider.
 
@@ -292,6 +302,11 @@ class AIIntakeService:
         """
         stt = self.stt_provider
         selected = normalize_language(language)
+        await enforce_ai_budget(
+            user_id=user_id or "anonymous",
+            operation="stt_transcribe",
+            metered=bool(getattr(stt, "metered", False)),
+        )
         return await stt.transcribe(
             audio_bytes,
             language=selected,

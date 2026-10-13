@@ -31,7 +31,7 @@ from app.application.ai.queue_ranking_provider import (
 from app.application.services.ai_audit_service import AIAuditService
 from app.core.config import settings
 from app.core.exceptions import AuthorizationError
-from app.domain.entities.user import User
+from app.identity import User
 from app.infrastructure.persistence.models.chw_assignment import ChwAssignmentModel
 from app.infrastructure.persistence.models.referral import ReferralModel
 
@@ -105,7 +105,7 @@ class ChwQueueService:
         return output
 
     def _is_supervisor(self, user: User) -> bool:
-        from app.core.security.rbac import Role
+        from app.identity import Role
 
         return Role.MEDICAL_DIRECTOR in (user.roles or set()) or Role.SUPER_ADMIN in (
             user.roles or set()

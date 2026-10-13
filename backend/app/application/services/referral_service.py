@@ -51,8 +51,7 @@ from app.application.dtos.referral_dtos import (
     StatusUpdateRequest,
 )
 from app.core.exceptions import AuthorizationError, NotFoundError, ValidationError
-from app.core.security.rbac import Permission, Role, check_permission, get_role_permissions
-from app.domain.entities.user import User
+from app.identity import Permission, Role, User, check_permission, get_role_permissions
 from app.infrastructure.persistence.models.audit_log import AuditLogModel
 from app.infrastructure.persistence.models.care_outcome import CareOutcomeModel
 from app.infrastructure.persistence.models.decision import (

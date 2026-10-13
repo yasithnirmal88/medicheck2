@@ -15,7 +15,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db, get_sdg_export_user
+from app.api.deps import get_db
 from app.application.dtos.analytics_dtos import AnalyticsFilters
 from app.application.dtos.fhir_dtos import FhirExportResponse
 from app.application.dtos.interoperability_dtos import (
@@ -26,7 +26,7 @@ from app.application.services.care_continuity_service import CareContinuityServi
 from app.application.services.fhir_export_service import FhirExportService
 from app.application.services.sdg_export_service import SdgExportService
 from app.core.exceptions import AuthorizationError
-from app.domain.entities.user import User
+from app.identity import User, get_current_user, get_sdg_export_user
 
 logger = logging.getLogger(__name__)
 

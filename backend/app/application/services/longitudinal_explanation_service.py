@@ -25,6 +25,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.ai.longitudinal_prompts import LONGITUDINAL_PROMPT_VERSION
+from app.application.ai.ai_budget import enforce_ai_budget
 from app.application.ai.longitudinal_provider import (
     AIProviderError,
     LongitudinalExplanationProvider,
@@ -90,6 +91,14 @@ class LongitudinalExplanationService:
             comparison = trajectory.comparisons[-1]
 
         context = await self._build_context(comparison)
+        # Vendor spend guardrail: stubs bypass; exhaustion raises a typed
+        # 429 that propagates (placed before try: so broad fallbacks below
+        # cannot convert it into a silent fallback).
+        await enforce_ai_budget(
+            user_id=user_id,
+            operation="trajectory_explanation",
+            metered=bool(getattr(self.provider, "metered", False)),
+        )
         try:
             raw = await self.provider.explain_trajectory(context)
             response = self._parse_and_validate(raw, context)

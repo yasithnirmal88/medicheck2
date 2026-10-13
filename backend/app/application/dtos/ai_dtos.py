@@ -12,6 +12,7 @@ MEDICHECK_AI_PHASE1_REPORT.md.
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 from typing import Any
 
@@ -47,6 +48,7 @@ class AIQualityStatus(str, Enum):
     VALIDATION_FAILED = "validation_failed"
     PROVIDER_UNAVAILABLE = "provider_unavailable"
     EVIDENCE_UNAVAILABLE = "evidence_unavailable"
+    BUDGET_EXCEEDED = "budget_exceeded"
 
 
 # ---------------------------------------------------------------------------
@@ -341,6 +343,100 @@ class AIExplanationResponse(BaseModel):
             if not isinstance(n, str) or len(n) > 2000:
                 raise ValueError("evidence_note malformed")
         return v
+
+
+#: Explicit diagnostic-claim patterns. Bare words like "diagnosis" are
+#: deliberately NOT matched — legitimate non-diagnostic phrasing ("not a
+#: diagnosis", "AI did not diagnose") must pass.
+_DIAGNOSTIC_CLAIM_RE = re.compile(
+    r"\b(you have|you've got|youve got|diagnosed with|diagnosis of|"
+    r"confirmed condition|confirmed diagnosis|"
+    r"disease (is )?(getting worse|progressing|resolved)|"
+    r"will develop|chance of developing)\b",
+    re.IGNORECASE,
+)
+
+#: Negation cues that neutralize a claim match ("does not mean you have a
+#: disease" is explicitly non-diagnostic and must pass).
+_NEGATION_RE = re.compile(
+    r"\b(not|does not|doesn['\u2019]t|do not|don['\u2019]t|never|"
+    r"no longer|without|isn['\u2019]t|aren['\u2019]t|cannot|"
+    r"can['\u2019]t|neither|nor)\b",
+    re.IGNORECASE,
+)
+
+#: Sinhala diagnostic-claim patterns. Narrow by design: the subject "ඔබට"
+#: ("to you") plus a "have/exists" verb within a short window is the
+#: canonical "you have X" claim form an LLM emits; bare "තියෙනවා"
+#: ("exists") alone is NOT matched (e.g. "questions තියෙනවා නම්" is
+#: innocuous). "තහවුරු" ("confirmed") forms are matched directly.
+_SI_CLAIM_RE = re.compile(
+    r"ඔබට.{0,40}(තියෙනවා|තියෙයි|ඇත|ඇති)|තහවුරු(යි|ව|කර|කළ)",
+)
+
+#: Sinhala negation cues (superset of the Phase 5 intake cues). Sinhala is
+#: SOV: negators usually FOLLOW the claim ("...තියෙනවා නොවේ"), so both
+#: sides of a match are checked (see _SIDE_RULES).
+_SI_NEGATION_RE = re.compile(
+    r"(නෑ|නැහැ|නොමැත|නැති|නැත|නොව|නොහැක|නොකිය)",
+)
+
+#: Tamil diagnostic-claim patterns. Same narrow subject+verb structure:
+#: "உங்களுக்கு" ("to you") plus a "have/exists" verb, or an explicit
+#: "disease confirmed" phrase.
+_TA_CLAIM_RE = re.compile(
+    r"உங்களுக்கு.{0,40}(உள்ளது|இருக்கிறது|உள்ளன|இருக்கின்றன)|"
+    r"நோய்.{0,20}உறுதி|உறுதிப்படுத்தப்பட்ட",
+)
+
+#: Tamil negation cues (superset of the Phase 5 intake cues). Covers the
+#: இல்லை-family ("not have/exist"), அல்ல ("is not"), and -ஆது verb negations
+#: ("சொல்லாது" = "does not say" — the form the "does not say you have a
+#: disease" disclaimer uses).
+_TA_NEGATION_RE = re.compile(
+    r"(இல்லை|இல்ல|கிடையாது|இல்லையென|அல்ல|ாது)",
+)
+
+#: (claim pattern, negation pattern, prefix window, suffix window).
+#: English keeps its exact legacy behaviour (prefix-only). Sinhala/Tamil
+#: also check a suffix window because their negators typically follow the
+#: claim (SOV order), sometimes across a subordinate clause.
+_SIDE_RULES = (
+    (_SI_CLAIM_RE, _SI_NEGATION_RE, 80, 80),
+    (_TA_CLAIM_RE, _TA_NEGATION_RE, 80, 80),
+)
+
+
+def screen_diagnostic_claims(*texts: str | None) -> None:
+    """Reject provider free text that reads as a diagnosis.
+
+    Raises ``ValueError`` when a diagnostic claim appears WITHOUT a nearby
+    negation. Negated statements ("this does not mean you have a disease")
+    pass. Covers English plus Sinhala and Tamil (subject+verb claim forms);
+    other languages and romanized (Latin-script) Sinhala/Tamil rely on prompt
+    binding + allow-list validation (documented limitation).
+    """
+    for text in texts:
+        if not text:
+            continue
+        # English (legacy, prefix-only) — byte-identical behaviour.
+        for match in _DIAGNOSTIC_CLAIM_RE.finditer(text):
+            prefix = text[max(0, match.start() - 60):match.start()]
+            if _NEGATION_RE.search(prefix):
+                continue
+            raise ValueError(
+                "AI explanation reads as a diagnosis, not an explanation"
+            )
+        # Sinhala / Tamil (bidirectional negation window).
+        for claim_re, neg_re, pre, post in _SIDE_RULES:
+            for match in claim_re.finditer(text):
+                start = match.start()
+                window = text[max(0, start - pre):match.end() + post]
+                if neg_re.search(window):
+                    continue
+                raise ValueError(
+                    "AI explanation reads as a diagnosis, not an explanation"
+                )
 
 
 # Standard fallback returned when the AI is unavailable or invalid. The

@@ -130,8 +130,9 @@ class TestPopulateUserRolesP2:
         assert denied.status_code == 403
 
         # Promote the SAME user to admin and re-check. _seed_user_with_roles
-        # clears and replaces role assignments, so no second user is created
-        # (mock auth yields a fixed email, which would otherwise collide).
+        # clears and replaces role assignments, so no second user is created.
+        # (Distinct mock tokens now get distinct emails, but reusing one token
+        # keeps this test focused on role changes rather than user creation.)
         await _seed_user_with_roles(client, db_session, token, ["medical_director"])
         allowed = await client.post(
             "/api/v1/graph/question-indicators",

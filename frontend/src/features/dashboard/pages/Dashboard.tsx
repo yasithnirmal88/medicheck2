@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   Activity as ActivityGlyph,
@@ -10,7 +10,7 @@ import {
   Waves,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { DashboardLayout } from '@/layouts/DashboardLayout'
+import { useLayoutChrome } from '@/layouts/LayoutChromeContext'
 import { useAuth } from '@/hooks/useAuth'
 import {
   useDashboardDerived,
@@ -103,68 +103,72 @@ export default function Dashboard() {
     [derived, reports.data, sessionsState.data, measurements.data, labReports.data, profile.data],
   )
 
+  // Publish TopBar chrome data (notifications, user name) to the
+  // route-level RootLayout via context — the layout no longer mounts
+  // here, so the dashboard pushes this data instead of passing props.
+  const { setChrome } = useLayoutChrome()
+  const userName = profile.data?.personal_info?.full_name ?? 'User'
+  useEffect(() => {
+    setChrome({ notifications: viewModel.notifications, userName })
+    return () => setChrome({ notifications: [], userName: undefined })
+  }, [setChrome, viewModel.notifications, userName])
+
+  if (loading) {
+    return <DashboardSkeleton />
+  }
+
   return (
-    <DashboardLayout
-      notifications={viewModel.notifications}
-      userName={profile.data?.personal_info?.full_name ?? 'User'}
-      userEmail={user?.email ?? undefined}
-    >
-      {loading ? (
-        <DashboardSkeleton />
-      ) : (
-        <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-          <motion.div variants={fadeUp}>
-            <WelcomeSection
-              greeting={derived.greeting}
-              name={derived.name}
-              healthScore={derived.healthScore}
-              nextAssessment={viewModel.primaryAssessment}
-              lastActivity={derived.lastActivity}
-            />
-          </motion.div>
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      <motion.div variants={fadeUp}>
+        <WelcomeSection
+          greeting={derived.greeting}
+          name={derived.name}
+          healthScore={derived.healthScore}
+          nextAssessment={viewModel.primaryAssessment}
+          lastActivity={derived.lastActivity}
+        />
+      </motion.div>
 
-          <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12">
-            <div className="lg:col-span-3">
-              <HealthScoreCard score={derived.healthScore} />
-            </div>
-            <div className="lg:col-span-5">
-              <InsightCard summary={derived.aiSummary} nextAssessment={viewModel.primaryAssessment} />
-            </div>
-            <div className="lg:col-span-4">
-              <ProfileProgress
-                overall={derived.completion}
-                completed={derived.completedSections}
-                total={derived.totalSections}
-              />
-            </div>
-          </motion.div>
+      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-12">
+        <div className="lg:col-span-3">
+          <HealthScoreCard score={derived.healthScore} />
+        </div>
+        <div className="lg:col-span-5">
+          <InsightCard summary={derived.aiSummary} nextAssessment={viewModel.primaryAssessment} />
+        </div>
+        <div className="lg:col-span-4">
+          <ProfileProgress
+            overall={derived.completion}
+            completed={derived.completedSections}
+            total={derived.totalSections}
+          />
+        </div>
+      </motion.div>
 
-          <motion.div variants={fadeUp}>
-            <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">Health Summary</h2>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {viewModel.metricCards.map((card) => (
-                <MetricCard key={card.label} {...card} />
-              ))}
-            </div>
-          </motion.div>
+      <motion.div variants={fadeUp}>
+        <h2 className="mb-3 text-sm font-semibold text-slate-700 dark:text-slate-200">Health Summary</h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {viewModel.metricCards.map((card) => (
+            <MetricCard key={card.label} {...card} />
+          ))}
+        </div>
+      </motion.div>
 
-          <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-            <QuickActions />
-            <UpcomingAssessments items={viewModel.upstreamAssessments} />
-            <RecommendationList items={viewModel.recommendations} />
-          </motion.div>
+      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <QuickActions />
+        <UpcomingAssessments items={viewModel.upstreamAssessments} />
+        <RecommendationList items={viewModel.recommendations} />
+      </motion.div>
 
-          <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            <HealthTimeline items={viewModel.timeline} />
-            <ActivityTable rows={viewModel.activity} />
-          </motion.div>
+      <motion.div variants={fadeUp} className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <HealthTimeline items={viewModel.timeline} />
+        <ActivityTable rows={viewModel.activity} />
+      </motion.div>
 
-          <motion.div variants={fadeUp}>
-            <HealthCharts scoreSeries={viewModel.scoreSeries} weightSeries={viewModel.weightSeries} />
-          </motion.div>
-        </motion.div>
-      )}
-    </DashboardLayout>
+      <motion.div variants={fadeUp}>
+        <HealthCharts scoreSeries={viewModel.scoreSeries} weightSeries={viewModel.weightSeries} />
+      </motion.div>
+    </motion.div>
   )
 }
 

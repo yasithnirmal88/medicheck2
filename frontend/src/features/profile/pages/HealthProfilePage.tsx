@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Info } from 'lucide-react'
 import { useWizard } from '../state/WizardProvider'
-import { DashboardLayout } from '../../../layouts/DashboardLayout'
 import { Stepper } from '../components/wizard/Stepper'
 import { SectionForm } from '../components/wizard/SectionForm'
 import { RepeatableSection } from '../components/wizard/RepeatableSection'
@@ -444,17 +443,14 @@ export default function HealthProfilePage() {
 
   if (!isHydrated) {
     return (
-      <DashboardLayout>
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-        </div>
-      </DashboardLayout>
+      <div className="flex items-center justify-center py-12">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+      </div>
     )
   }
 
   return (
-    <DashboardLayout>
-      <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-4xl">
         <div className="mb-4 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
           <div>
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Health Profile</h1>
@@ -579,6 +575,5 @@ export default function HealthProfilePage() {
           </div>
         )}
       </div>
-    </DashboardLayout>
   )
 }

@@ -5,9 +5,11 @@ intake pipeline. Voice never creates a second clinical interpretation system.
 
 The application depends on the ``SpeechToTextProvider`` Protocol, not on any
 concrete vendor SDK. The default development provider is deterministic (no
-network, no external API key) so tests run without credentials. A real vendor
-provider can be added later by implementing the Protocol and selecting it via
-``settings.stt_provider`` — no service-layer change required.
+network, no external API key) so tests run without credentials. A real
+OpenAI-compatible HTTP provider (``http_stt_provider``) implements the
+Protocol and is selected via ``settings.stt_provider`` (``openai`` /
+``whisper`` / ``openai-compatible`` + ``STT_API_KEY``) — no service-layer
+change required. Unknown names raise ``AIConfigurationError``.
 
 Audio privacy: audio is processed transiently. It is never permanently stored,
 never logged, and never exposed via URLs. The provider receives only the audio
@@ -27,9 +29,6 @@ from app.application.ai.language import (
     resolve_language,
 )
 from app.core.config import settings
-from app.core.logging import get_logger
-
-logger = get_logger(__name__)
 
 #: Maximum audio size accepted for transcription (10 MB). Protects against
 #: oversized uploads; real STT vendors have their own limits.
@@ -127,17 +126,22 @@ class StubSpeechToTextProvider:
 def get_stt_provider() -> SpeechToTextProvider:
     """Return the configured speech-to-text provider.
 
-    Defaults to the deterministic stub. A real vendor provider can be selected
-    by setting ``STT_PROVIDER`` and implementing the Protocol here. Phase 5
-    ships only the stub provider; no third-party STT packages are installed.
+    ``stub`` uses the deterministic local provider (default, no credentials).
+    ``openai`` / ``whisper`` / ``openai-compatible`` use the HTTP provider
+    (requires ``STT_API_KEY``; model defaults to ``whisper-1``). Anything else
+    raises ``AIConfigurationError`` — never a silent stub fallback.
     """
-    name = (getattr(settings, "stt_provider", None) or "stub").strip().lower()
-    if name == "stub":
-        return StubSpeechToTextProvider()
-    logger.info(
-        "STT provider '%s' not implemented for intake in Phase 5; using stub", name
+    from app.application.ai.provider_selection import (
+        normalize_provider_name,
+        resolve_stt_config,
     )
-    return StubSpeechToTextProvider()
+
+    name = normalize_provider_name(getattr(settings, "stt_provider", None))
+    if name in ("stub", "stub-stt"):
+        return StubSpeechToTextProvider()
+    from app.application.ai.http_stt_provider import OpenAICompatibleSTTProvider
+
+    return OpenAICompatibleSTTProvider.from_config(resolve_stt_config(name))
 
 
 def resolve_transcript_language(

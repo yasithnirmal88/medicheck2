@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import sys
 
@@ -31,6 +32,25 @@ def get_request_id_filter() -> RequestIDFilter:
     return _request_id_filter
 
 
+class JsonFormatter(logging.Formatter):
+    """Single-line JSON logs for aggregation (Render/Datadog/ELK).
+
+    Emits timestamp, level, logger, message, and the request id. Only
+    structured fields the application sets explicitly are included — free
+    text stays in ``message`` exactly as today.
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": self.formatTime(record, "%Y-%m-%dT%H:%M:%S%z"),
+            "level": record.levelname,
+            "logger": record.name,
+            "request_id": getattr(record, "request_id", "-"),
+            "message": record.getMessage(),
+        }
+        return json.dumps(payload, default=str)
+
+
 def setup_logging() -> None:
     root_logger = logging.getLogger()
     root_logger.setLevel(settings.log_level.upper())
@@ -38,10 +58,13 @@ def setup_logging() -> None:
     handler = logging.StreamHandler(sys.stdout)
     handler.setLevel(settings.log_level.upper())
 
-    formatter = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(request_id)-36s | %(name)s:%(lineno)d | %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S%z",
-    )
+    if (settings.log_format or "text").strip().lower() == "json":
+        formatter: logging.Formatter = JsonFormatter()
+    else:
+        formatter = logging.Formatter(
+            fmt="%(asctime)s | %(levelname)-8s | %(request_id)-36s | %(name)s:%(lineno)d | %(message)s",
+            datefmt="%Y-%m-%dT%H:%M:%S%z",
+        )
     handler.setFormatter(formatter)
     handler.addFilter(_request_id_filter)
 

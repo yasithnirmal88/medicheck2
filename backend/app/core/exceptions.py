@@ -69,7 +69,34 @@ class RateLimitError(AppException):
     code = "rate_limit_exceeded"
 
 
+class AIBudgetExceededError(RateLimitError):
+    """Raised when an AI vendor spend/abuse budget is exhausted.
+
+    HTTP 429 with a distinct code so clients can tell vendor-budget
+    rejections apart from generic rate limiting. Never triggers a stub
+    fallback — the caller asked for a real provider and must get an
+    explicit rejection instead.
+    """
+
+    detail = "AI request budget exceeded"
+    code = "ai_budget_exceeded"
+
+
 class InternalError(AppException):
     status_code = 500
     detail = "Internal server error"
     code = "internal_error"
+
+
+class AIConfigurationError(AppException):
+    """Raised when an explicitly configured AI/STT provider cannot be built.
+
+    Fail-fast (never silent stub fallback): selecting a real provider name
+    without the required credentials/endpoints, or an unknown provider name,
+    raises here — at factory call time — instead of silently serving stub
+    output that an operator might mistake for the real vendor.
+    """
+
+    status_code = 500
+    detail = "AI provider is misconfigured"
+    code = "ai_provider_misconfigured"

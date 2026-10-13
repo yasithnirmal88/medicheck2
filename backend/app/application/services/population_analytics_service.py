@@ -26,7 +26,7 @@ import datetime
 import logging
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select, and_, case
+from sqlalchemy import func, select, and_, case, false
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dtos.analytics_dtos import (
@@ -50,19 +50,16 @@ from app.application.dtos.analytics_dtos import (
     TrajectoryResponse,
 )
 from app.core.config import settings
+from app.identity import get_user_ids
 from app.infrastructure.persistence.models.assessment_session import (
     AssessmentSessionModel,
 )
 from app.infrastructure.persistence.models.body_system import BodySystemModel
-from app.infrastructure.persistence.models.clinical_indicator import (
-    ClinicalIndicatorModel,
-)
 from app.infrastructure.persistence.models.report import (
     BodySystemAssessmentModel,
     ConditionAssessmentModel,
     HealthAssessmentModel,
 )
-from app.infrastructure.persistence.models.user import UserModel
 
 logger = logging.getLogger(__name__)
 
@@ -157,6 +154,7 @@ class PopulationAnalyticsService:
         self,
         start: datetime.date,
         end: datetime.date,
+        user_ids: set[str],
         *,
         language: str | None = None,
         input_type: str | None = None,
@@ -165,6 +163,8 @@ class PopulationAnalyticsService:
 
         Excludes soft-deleted sessions (deleted_at IS NULL). Applies
         language/input_type filters from session.extra_metadata (Phase 5).
+        Cohort membership (non-deleted + active users) comes from the
+        identity-owned ``get_user_ids`` set, passed in by the caller.
         """
         end_dt = datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC)
         start_dt = datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC)
@@ -172,9 +172,11 @@ class PopulationAnalyticsService:
             AssessmentSessionModel.deleted_at.is_(None),
             AssessmentSessionModel.started_at >= start_dt,
             AssessmentSessionModel.started_at <= end_dt,
-            UserModel.deleted_at.is_(None),
-            UserModel.is_active.is_(True),
-            AssessmentSessionModel.user_id == UserModel.id,
+            (
+                AssessmentSessionModel.user_id.in_(user_ids)
+                if user_ids
+                else false()
+            ),
         ]
         if language:
             # Language stored in session.extra_metadata JSON (Phase 5).
@@ -191,12 +193,12 @@ class PopulationAnalyticsService:
         self, start, end, *, language=None, input_type=None
     ) -> int:
         """Count distinct users after all filters (combination-attack guard)."""
+        user_ids = await get_user_ids(self.session)
         stmt = (
             select(func.count(func.distinct(AssessmentSessionModel.user_id)))
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(
                 self._base_session_filter(
-                    start, end, language=language, input_type=input_type
+                    start, end, user_ids, language=language, input_type=input_type
                 )
             )
         )
@@ -212,9 +214,10 @@ class PopulationAnalyticsService:
     ) -> AnalyticsOverviewResponse:
         start, end = _date_range(filters.start_date, filters.end_date)
         _validate_date_range(start, end)
+        user_ids = await get_user_ids(self.session)
 
         base = self._base_session_filter(
-            start, end,
+            start, end, user_ids,
             language=filters.language,
             input_type=filters.input_type,
         )
@@ -222,17 +225,14 @@ class PopulationAnalyticsService:
         # Total, completed, in-progress counts (SQL-level).
         total_stmt = (
             select(func.count()).select_from(AssessmentSessionModel)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(base)
         )
         completed_stmt = (
             select(func.count()).select_from(AssessmentSessionModel)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(and_(base, AssessmentSessionModel.status == _COMPLETED))
         )
         in_progress_stmt = (
             select(func.count()).select_from(AssessmentSessionModel)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(
                 and_(
                     base,
@@ -242,7 +242,6 @@ class PopulationAnalyticsService:
         )
         participants_stmt = (
             select(func.count(func.distinct(AssessmentSessionModel.user_id)))
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(base)
         )
 
@@ -289,7 +288,6 @@ class PopulationAnalyticsService:
         stmt = (
             select(trunc.label("bucket"), func.count().label("count"))
             .select_from(AssessmentSessionModel)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(base)
             .group_by(trunc)
             .order_by(trunc)
@@ -316,6 +314,9 @@ class PopulationAnalyticsService:
     ) -> SeverityDistributionResponse:
         start, end = _date_range(filters.start_date, filters.end_date)
         _validate_date_range(start, end)
+        # Deleted-only cohort (legacy semantics): non-deleted users,
+        # regardless of active flag.
+        user_ids = await get_user_ids(self.session, active_only=False)
 
         # Join through report → body_system_assessments.
         # Only completed assessments (with reports) contribute.
@@ -325,8 +326,11 @@ class PopulationAnalyticsService:
             AssessmentSessionModel.started_at >= datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC),
             AssessmentSessionModel.started_at <= datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC),
             HealthAssessmentModel.session_id == AssessmentSessionModel.id,
-            UserModel.id == AssessmentSessionModel.user_id,
-            UserModel.deleted_at.is_(None),
+            (
+                AssessmentSessionModel.user_id.in_(user_ids)
+                if user_ids
+                else false()
+            ),
         )
 
         total_reports = (
@@ -334,7 +338,6 @@ class PopulationAnalyticsService:
                 select(func.count())
                 .select_from(HealthAssessmentModel)
                 .join(AssessmentSessionModel, HealthAssessmentModel.session_id == AssessmentSessionModel.id)
-                .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
                 .where(base)
             )
         ).scalar() or 0
@@ -358,7 +361,6 @@ class PopulationAnalyticsService:
             .select_from(BodySystemAssessmentModel)
             .join(HealthAssessmentModel, BodySystemAssessmentModel.assessment_id == HealthAssessmentModel.id)
             .join(AssessmentSessionModel, HealthAssessmentModel.session_id == AssessmentSessionModel.id)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(base)
             .group_by(BodySystemAssessmentModel.category)
         )
@@ -389,6 +391,9 @@ class PopulationAnalyticsService:
     ) -> BodySystemsResponse:
         start, end = _date_range(filters.start_date, filters.end_date)
         _validate_date_range(start, end)
+        # Deleted-only cohort (legacy semantics): non-deleted users,
+        # regardless of active flag.
+        user_ids = await get_user_ids(self.session, active_only=False)
 
         base = and_(
             AssessmentSessionModel.deleted_at.is_(None),
@@ -396,8 +401,11 @@ class PopulationAnalyticsService:
             AssessmentSessionModel.started_at >= datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC),
             AssessmentSessionModel.started_at <= datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC),
             HealthAssessmentModel.session_id == AssessmentSessionModel.id,
-            UserModel.id == AssessmentSessionModel.user_id,
-            UserModel.deleted_at.is_(None),
+            (
+                AssessmentSessionModel.user_id.in_(user_ids)
+                if user_ids
+                else false()
+            ),
             BodySystemAssessmentModel.assessment_id == HealthAssessmentModel.id,
             BodySystemModel.id == BodySystemAssessmentModel.body_system_id,
             BodySystemModel.is_active.is_(True),
@@ -414,7 +422,6 @@ class PopulationAnalyticsService:
             .select_from(BodySystemAssessmentModel)
             .join(HealthAssessmentModel, BodySystemAssessmentModel.assessment_id == HealthAssessmentModel.id)
             .join(AssessmentSessionModel, HealthAssessmentModel.session_id == AssessmentSessionModel.id)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .join(BodySystemModel, BodySystemAssessmentModel.body_system_id == BodySystemModel.id)
             .where(base)
             .group_by(BodySystemModel.id, BodySystemModel.name, BodySystemModel.code)
@@ -445,21 +452,12 @@ class PopulationAnalyticsService:
     ) -> IndicatorsResponse:
         start, end = _date_range(filters.start_date, filters.end_date)
         _validate_date_range(start, end)
+        # Deleted-only cohort (legacy semantics): non-deleted users,
+        # regardless of active flag.
+        user_ids = await get_user_ids(self.session, active_only=False)
 
         # Condition assessments represent CDSE-activated conditions. Each
         # condition links to possible_conditions which links to body_systems.
-        base = and_(
-            AssessmentSessionModel.deleted_at.is_(None),
-            AssessmentSessionModel.status == _COMPLETED,
-            AssessmentSessionModel.started_at >= datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC),
-            AssessmentSessionModel.started_at <= datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC),
-            HealthAssessmentModel.session_id == AssessmentSessionModel.id,
-            UserModel.id == AssessmentSessionModel.user_id,
-            UserModel.deleted_at.is_(None),
-            ConditionAssessmentModel.assessment_id == HealthAssessmentModel.id,
-            ClinicalIndicatorModel.body_system_id == AssessmentSessionModel.user_id,  # placeholder, fixed below
-        )
-
         # Simpler: count condition assessments per condition_id, join to
         # clinical indicators by matching condition_id to indicator related_disease_ids
         # is complex. Instead, use the condition_assessment condition_id as the
@@ -473,14 +471,17 @@ class PopulationAnalyticsService:
             .select_from(ConditionAssessmentModel)
             .join(HealthAssessmentModel, ConditionAssessmentModel.assessment_id == HealthAssessmentModel.id)
             .join(AssessmentSessionModel, HealthAssessmentModel.session_id == AssessmentSessionModel.id)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(
                 and_(
                     AssessmentSessionModel.deleted_at.is_(None),
                     AssessmentSessionModel.status == _COMPLETED,
                     AssessmentSessionModel.started_at >= datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC),
                     AssessmentSessionModel.started_at <= datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC),
-                    UserModel.deleted_at.is_(None),
+                    (
+                        AssessmentSessionModel.user_id.in_(user_ids)
+                        if user_ids
+                        else false()
+                    ),
                 )
             )
             .group_by(ConditionAssessmentModel.condition_id)
@@ -545,6 +546,9 @@ class PopulationAnalyticsService:
         """
         start, end = _date_range(filters.start_date, filters.end_date)
         _validate_date_range(start, end)
+        # Deleted-only cohort (legacy semantics): non-deleted users,
+        # regardless of active flag.
+        user_ids = await get_user_ids(self.session, active_only=False)
 
         # Get all completed assessments with body-system scores, ordered by
         # user + time. We compute per-user trajectory by comparing first vs
@@ -559,14 +563,17 @@ class PopulationAnalyticsService:
             .select_from(BodySystemAssessmentModel)
             .join(HealthAssessmentModel, BodySystemAssessmentModel.assessment_id == HealthAssessmentModel.id)
             .join(AssessmentSessionModel, HealthAssessmentModel.session_id == AssessmentSessionModel.id)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(
                 and_(
                     AssessmentSessionModel.deleted_at.is_(None),
                     AssessmentSessionModel.status == _COMPLETED,
                     AssessmentSessionModel.started_at >= datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC),
                     AssessmentSessionModel.started_at <= datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC),
-                    UserModel.deleted_at.is_(None),
+                    (
+                        AssessmentSessionModel.user_id.in_(user_ids)
+                        if user_ids
+                        else false()
+                    ),
                 )
             )
             .order_by(AssessmentSessionModel.user_id, HealthAssessmentModel.created_at)
@@ -633,8 +640,9 @@ class PopulationAnalyticsService:
     ) -> AccessibilityResponse:
         start, end = _date_range(filters.start_date, filters.end_date)
         _validate_date_range(start, end)
+        user_ids = await get_user_ids(self.session)
 
-        base = self._base_session_filter(start, end)
+        base = self._base_session_filter(start, end, user_ids)
 
         # By language (from session.extra_metadata).
         lang_stmt = (
@@ -649,7 +657,6 @@ class PopulationAnalyticsService:
                 ).label("completed"),
             )
             .select_from(AssessmentSessionModel)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(base)
             .group_by("lang")
         )
@@ -682,7 +689,6 @@ class PopulationAnalyticsService:
                 ).label("completed"),
             )
             .select_from(AssessmentSessionModel)
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(base)
             .group_by("itype")
         )

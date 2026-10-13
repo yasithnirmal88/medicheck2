@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import re
 import time
+import uuid
 from typing import Any
 
 import firebase_admin
@@ -129,11 +131,41 @@ async def verify_firebase_token(id_token: str) -> dict[str, Any]:
         raise AuthenticationError(detail="Failed to verify authentication token") from exc
 
 
-def _mock_verify(id_token: str) -> dict[str, Any]:
+_MOCK_EMAIL_DOMAIN = "example.com"
+_MOCK_UID_SLUG_MAX_LEN = 32
+_MOCK_EMAIL_UID_SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def mock_email_for_uid(uid: str) -> str:
+    """Build a unique mock email address for a mock Firebase uid.
+
+    ``users.email`` is UNIQUE, so a single fixed mock address made the second
+    (and every subsequent) auto-created mock user collide. Each mock identity
+    therefore needs its own address.
+
+    The uuid suffix guarantees uniqueness even when two distinct uids collapse
+    to the same sanitized/truncated slug. This is safe because every consumer
+    resolves an existing user by ``firebase_uid`` *before* the email is ever
+    considered (``get_current_user``, ``AuthService.get_or_create_user``), so a
+    repeat call for the same token never re-inserts a row.
+    """
+    slug = _MOCK_EMAIL_UID_SLUG_RE.sub("-", (uid or "").lower()).strip("-")
+    slug = slug[:_MOCK_UID_SLUG_MAX_LEN].strip("-") or "uid"
+    return f"mock-{slug}-{uuid.uuid4().hex[:12]}@{_MOCK_EMAIL_DOMAIN}"
+
+
+def _mock_verify(id_token: str, *, email: str | None = None) -> dict[str, Any]:
+    """Deterministic mock claims for development/test auth.
+
+    ``email`` defaults to a unique address derived from the uid (see
+    ``mock_email_for_uid``) and may be pinned to an exact value by tests that
+    need a predictable address.
+    """
     logger.debug("Using mock Firebase verification")
+    uid = id_token or "mock-uid"
     return {
-        "uid": id_token or "mock-uid",
-        "email": "mock@example.com",
+        "uid": uid,
+        "email": email or mock_email_for_uid(uid),
         "email_verified": True,
         "name": "Mock User",
         "picture": None,

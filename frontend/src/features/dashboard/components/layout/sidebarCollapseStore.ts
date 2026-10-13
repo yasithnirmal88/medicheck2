@@ -1,58 +1,106 @@
 /**
- * Sidebar collapse state — shared across DashboardLayout instances.
+ * Sidebar collapse state — shared, persisted, role-aware.
  *
- * Why: each patient route mounts a fresh DashboardLayout, so a local useState
- * for the collapse toggle resets on every navigation. Persisting the preference
- * in a tiny external store (plus localStorage) keeps the sidebar collapsed
- * across page transitions, which is the "make the sidebar shrinkable" UX fix.
+ * Why: the single RootLayout hosts both patient and doctor chrome. Each
+ * role's sidebar collapse preference is kept in its own tiny external
+ * store (module state + localStorage) so the preference survives page
+ * transitions AND survives the (rare) role switch, without conflating
+ * the two roles' preferences. Consumers subscribe via
+ * useSyncExternalStore, so every mounted chrome re-renders on toggle.
  *
- * Desktop only. The mobile drawer is independently open/closed per navigation
- * and intentionally NOT persisted.
+ * Desktop only. The mobile drawer is independently open/closed per
+ * navigation and intentionally NOT persisted.
  */
 
-const STORAGE_KEY = 'medicheck_sidebar_collapsed'
+const PATIENT_STORAGE_KEY = 'medicheck_sidebar_collapsed'
+const DOCTOR_STORAGE_KEY = 'medicheck_doctor_sidebar_collapsed'
 
-function readInitial(): boolean {
+function readInitial(key: string): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) === '1'
+    return localStorage.getItem(key) === '1'
   } catch {
     return false
   }
 }
 
-let collapsed = readInitial()
-const listeners = new Set<() => void>()
-
-function emit() {
-  listeners.forEach((l) => l())
+interface CollapseStore {
+  get(): boolean
+  subscribe(listener: () => void): () => void
+  set(next: boolean): void
+  toggle(): void
 }
 
-function persist(next: boolean) {
-  collapsed = next
-  try {
-    localStorage.setItem(STORAGE_KEY, next ? '1' : '0')
-  } catch {
-    // ignore storage errors (private mode, quota)
+function createCollapseStore(key: string): CollapseStore {
+  let collapsed = readInitial(key)
+  const listeners = new Set<() => void>()
+
+  function emit() {
+    listeners.forEach((l) => l())
   }
-  emit()
+
+  function persist(next: boolean) {
+    collapsed = next
+    try {
+      localStorage.setItem(key, next ? '1' : '0')
+    } catch {
+      // ignore storage errors (private mode, quota)
+    }
+    emit()
+  }
+
+  return {
+    get: () => collapsed,
+    subscribe(listener: () => void) {
+      listeners.add(listener)
+      return () => {
+        listeners.delete(listener)
+      }
+    },
+    set(next: boolean) {
+      if (next === collapsed) return
+      persist(next)
+    },
+    toggle() {
+      persist(!collapsed)
+    },
+  }
 }
+
+const patientStore = createCollapseStore(PATIENT_STORAGE_KEY)
+const doctorStore = createCollapseStore(DOCTOR_STORAGE_KEY)
+
+// --- Patient sidebar (existing public API preserved) ---
 
 export function setSidebarCollapsed(next: boolean) {
-  if (next === collapsed) return
-  persist(next)
+  patientStore.set(next)
 }
 
 export function toggleSidebarCollapsed() {
-  persist(!collapsed)
+  patientStore.toggle()
 }
 
 export function getSidebarCollapsed(): boolean {
-  return collapsed
+  return patientStore.get()
 }
 
 export function subscribeSidebarCollapsed(listener: () => void): () => void {
-  listeners.add(listener)
-  return () => {
-    listeners.delete(listener)
-  }
+  return patientStore.subscribe(listener)
+}
+
+// --- Doctor/CMS sidebar ---
+
+export function setDoctorSidebarCollapsed(next: boolean) {
+  doctorStore.set(next)
+}
+
+export function toggleDoctorSidebarCollapsed() {
+  doctorStore.toggle()
+}
+
+export function getDoctorSidebarCollapsed(): boolean {
+  return doctorStore.get()
+}
+
+export function subscribeDoctorSidebarCollapsed(listener: () => void): () => void {
+  return doctorStore.subscribe(listener)
 }

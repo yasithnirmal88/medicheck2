@@ -168,11 +168,19 @@ class StubQueueRankingProvider:
 
 def get_queue_ranking_provider() -> QueueRankingProvider:
     from app.core.config import settings
+    from app.core.exceptions import AIConfigurationError
 
-    if settings.chw_queue_provider == "stub":
+    name = (settings.chw_queue_provider or "stub").strip().lower()
+    if name == "stub":
         return StubQueueRankingProvider()
-    # Default fallback: stub (never breaks the queue).
-    return StubQueueRankingProvider()
+    # No real queue-ranking vendor exists yet; fail fast instead of silently
+    # serving stub output as if it were a configured provider.
+    raise AIConfigurationError(
+        detail=(
+            f"Unknown CHW_QUEUE_PROVIDER '{name}'. Expected 'stub' "
+            "(no real queue-ranking provider is implemented yet)"
+        )
+    )
 
 
 def compute_input_hash(data: QueueRankingInput) -> str:

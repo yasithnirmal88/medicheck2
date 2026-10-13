@@ -1,4 +1,13 @@
 import api from '@/lib/api'
+import type {
+  AIExplanationResponse,
+  AIQualityStatus,
+  KeyFinding,
+  LiteracyLevel,
+  RecommendationExplanation,
+  RetrievedEvidenceContext,
+  SourceBreakdownItem,
+} from '@/api'
 
 export const fetchProfile = async () => {
   const res = await api.get('/profiles/me')
@@ -30,73 +39,19 @@ export const generateReport = async (sessionId: string) => {
   return res.data
 }
 
-export interface AIKeyFinding {
-  title: string
-  explanation: string
-  source_indicator_ids: string[]
-  evidence_ids?: string[]
-}
-
-export interface AIRecommendationExplanation {
-  recommendation_id: string
-  explanation: string
-  evidence_ids?: string[]
-}
-
-export interface AIRetrievedEvidence {
-  id: string
-  title: string
-  source?: string | null
-  url?: string | null
-  evidence_level?: string | null
-  summary?: string | null
-  excerpt?: string
-  relevance?: number
-  retrieval_tier?: number
-  linked_entity_type?: string
-  linked_entity_id?: string
-}
-
-export interface AISourceBreakdownItem {
-  clinical_finding: string
-  contributing_answer_refs: string[]
-  knowledge_graph_relationship: string
-  evidence_ids: string[]
-  deterministic_score?: number | null
-  trace_id?: string | null
-}
-
-export type AIQualityStatus =
-  | 'valid'
-  | 'fallback'
-  | 'validation_failed'
-  | 'provider_unavailable'
-  | 'evidence_unavailable'
-
-export type LiteracyLevel = 'simple' | 'standard' | 'detailed'
-
-export interface AIExplanation {
-  summary: string
-  key_findings: AIKeyFinding[]
-  severity_explanation: string
-  recommendation_explanations: AIRecommendationExplanation[]
-  evidence_notes: string[]
-  limitations: string
-  disclaimer: string
-  available: boolean
-  prompt_version?: string
-  trace_id?: string | null
-  retrieved_evidence?: AIRetrievedEvidence[]
-  evidence_available?: boolean
-  // Phase 7 — personalized communication + transparency + governance.
-  language?: string
-  literacy_level?: LiteracyLevel
-  source_breakdown?: AISourceBreakdownItem[]
-  transparency_notice?: string
-  quality_status?: AIQualityStatus
-  provider?: string
-  model?: string
-}
+// ---- AI explanation types (Phase 1/2/7) ----
+//
+// These now alias the generated models from the backend OpenAPI schema rather
+// than duplicating them by hand, which is what let the hand-written copies drift
+// (e.g. the old `AIRetrievedEvidence` was missing `publication_year`).
+//
+// The local names are kept so existing components keep importing unchanged.
+export type AIKeyFinding = KeyFinding
+export type AIRecommendationExplanation = RecommendationExplanation
+export type AIRetrievedEvidence = RetrievedEvidenceContext
+export type AISourceBreakdownItem = SourceBreakdownItem
+export type AIExplanation = AIExplanationResponse
+export type { AIQualityStatus, LiteracyLevel }
 
 export interface ReportExplanationParams {
   language?: string

@@ -1,7 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClipboardList, History, PauseCircle, Play, Search, TrendingUp } from 'lucide-react'
-import AppLayout from '@/layouts/AppLayout'
 import ProgressBar from '../components/ProgressBar'
 import AssessmentCard from '../components/AssessmentCard'
 import StatTile from '../components/StatTile'
@@ -120,196 +119,194 @@ const QuestionnaireListPage: React.FC = () => {
   }, [availableTemplates, filter, sessions])
 
   return (
-    <AppLayout>
-      <div className="mx-auto max-w-7xl space-y-8 py-2">
-        {/* Hero */}
-        <HeroSection templates={templates} sessions={sessions} />
+    <div className="mx-auto max-w-7xl space-y-8 py-2">
+      {/* Hero */}
+      <HeroSection templates={templates} sessions={sessions} />
 
-        {/* Quick actions */}
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="primary"
-            className="min-h-[44px]"
-            onClick={() => {
-              if (filteredTemplates.length > 0) {
-                handleStart(filteredTemplates[0].id)
-              }
-            }}
-            disabled={isLoading || filteredTemplates.length === 0}
-          >
-            New Assessment
-          </Button>
-          <Button variant="ghost" className="min-h-[44px]" onClick={() => navigate('/questionnaires/history')}>
-            <History className="h-4 w-4" />
-            View History
-          </Button>
-        </div>
-
-        {/* Assessment statistics */}
-        <section aria-labelledby="stats-heading">
-          <h2 id="stats-heading" className="sr-only">
-            Assessment statistics
-          </h2>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {isLoading ? (
-              <>
-                {Array.from({ length: 4 }).map((_, i) => (
-                  <Skeleton key={i} className="h-20 w-full rounded-xl" />
-                ))}
-              </>
-            ) : (
-              <>
-                <StatTile icon={TrendingUp} label="Avg. Completion" value={`${avgCompletion}%`} trend="up" />
-                <StatTile icon={Play} label="In Progress" value={statusStats[1].value} trend="flat" />
-                <StatTile icon={PauseCircle} label="Paused" value={statusStats[2].value} trend="flat" />
-                <StatTile icon={ClipboardList} label="Completed" value={statusStats[0].value} trend="up" />
-              </>
-            )}
-          </div>
-        </section>
-
-        {/* Continue Assessment card */}
-        <section aria-labelledby="continue-heading">
-          {inProgressSession ? (
-            <div className="rounded-xl border border-yellow-200 bg-gradient-to-r from-yellow-50 via-amber-50 to-yellow-50 p-5 shadow-sm dark:border-yellow-900/50 dark:from-yellow-900/30 dark:to-amber-900/30">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 id="continue-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                  Continue your assessment
-                </h2>
-                <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
-                  {inProgressSession.status === 'in_progress' ? 'In progress' : 'Paused'}
-                </span>
-              </div>
-              <div className="mb-4">
-                <p className="font-medium text-gray-800 dark:text-gray-200">
-                  {sessions?.find((s) => s.id === inProgressSession.id)?.questionnaire_template_id ??
-                    inProgressSession.questionnaire_template_id}
-                </p>
-                <ProgressBar
-                  current={inProgressSession.progress?.completed_questions ?? 0}
-                  total={inProgressSession.progress?.total_questions ?? 0}
-                  percentage={inProgressSession.progress?.completion_percentage ?? 0}
-                />
-                <div className="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">
-                  {inProgressSession.progress?.skipped_questions ?? 0} questions skipped
-                </div>
-              </div>
-              <Button
-                variant="ghost"
-                className="min-h-[44px] bg-white dark:bg-slate-800"
-                onClick={() => handleContinue(inProgressSession.id)}
-              >
-                <Play className="h-4 w-4" />
-                Resume Assessment
-              </Button>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-slate-800">
-              <h2 id="continue-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-                You have no assessments in progress
-              </h2>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Start a new assessment below or pick up a previous one from your history.
-              </p>
-            </div>
-          )}
-        </section>
-
-        {/* Search + Filters */}
-        <section aria-labelledby="available-heading">
-          <div className="flex items-center justify-between">
-            <h2 id="available-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Available Assessments
-            </h2>
-            <span className="text-sm text-gray-500 dark:text-gray-400">{filteredTemplates.length} shown</span>
-          </div>
-          <SearchFilters value={filter} onChange={setFilter} className="mt-3" />
-
-          {isLoading ? (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-48 w-full rounded-xl" />
-              ))}
-            </div>
-          ) : filteredTemplates.length > 0 ? (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredTemplates.map((template) => {
-                const latest = sessions?.find((s) => s.questionnaire_template_id === template.id)
-                return (
-                  <AssessmentCard
-                    key={template.id}
-                    template={template}
-                    status={latest ? (['submitted'].includes(latest.status) ? 'completed' : latest.status) as 'available' | 'in_progress' | 'paused' | 'completed' : 'available'}
-                    progress={
-                      latest && latest.status !== 'completed'
-                        ? {
-                            current: latest.progress?.current_section ? 1 : 0,
-                            total: latest.progress?.total_questions ?? 1,
-                            percentage: latest.progress?.completion_percentage ?? 0,
-                          }
-                        : undefined
-                    }
-                    lastTaken={latest ? formatDate(latest.updated_at) : undefined}
-                    onStart={handleStart}
-                  />
-                )
-              })}
-            </div>
-          ) : (
-            <EmptyState
-              icon={Search}
-              title="No assessments found"
-              description={filter.query ? 'Try a different search term or reset your filters.' : 'No assessments are currently available.'}
-              action={
-                filter.query || filter.status !== 'all' ? (
-                  <Button variant="ghost" onClick={() => setFilter({ query: '', status: 'all' })}>
-                    Reset filters
-                  </Button>
-                ) : undefined
-              }
-            />
-          )}
-        </section>
-
-        {/* Recent assessments */}
-        <section aria-labelledby="recent-heading">
-          <div className="flex items-center justify-between">
-            <h2 id="recent-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              Recent Assessments
-            </h2>
-            {recentSessions.length > 0 && (
-              <Button variant="ghost" className="min-h-[44px]" onClick={() => navigate('/questionnaires/history')}>
-                See all
-              </Button>
-            )}
-          </div>
-          {isLoading ? (
-            <div className="mt-3 space-y-2">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <Skeleton key={i} className="h-16 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : recentSessions.length > 0 ? (
-            <ul className="mt-3 space-y-2">
-              {recentSessions.map((s) => (
-                <RecentAssessmentRow
-                  key={s.id}
-                  session={s}
-                  template={templates?.find((t) => t.id === s.questionnaire_template_id)}
-                  onOpen={handleContinue}
-                />
-              ))}
-            </ul>
-          ) : (
-            <EmptyState
-              icon={History}
-              title="No recent assessments"
-              description="Once you start an assessment, it will appear here for quick access."
-            />
-          )}
-        </section>
+      {/* Quick actions */}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="primary"
+          className="min-h-[44px]"
+          onClick={() => {
+            if (filteredTemplates.length > 0) {
+              handleStart(filteredTemplates[0].id)
+            }
+          }}
+          disabled={isLoading || filteredTemplates.length === 0}
+        >
+          New Assessment
+        </Button>
+        <Button variant="ghost" className="min-h-[44px]" onClick={() => navigate('/questionnaires/history')}>
+          <History className="h-4 w-4" />
+          View History
+        </Button>
       </div>
-    </AppLayout>
+
+      {/* Assessment statistics */}
+      <section aria-labelledby="stats-heading">
+        <h2 id="stats-heading" className="sr-only">
+          Assessment statistics
+        </h2>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {isLoading ? (
+            <>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <Skeleton key={i} className="h-20 w-full rounded-xl" />
+              ))}
+            </>
+          ) : (
+            <>
+              <StatTile icon={TrendingUp} label="Avg. Completion" value={`${avgCompletion}%`} trend="up" />
+              <StatTile icon={Play} label="In Progress" value={statusStats[1].value} trend="flat" />
+              <StatTile icon={PauseCircle} label="Paused" value={statusStats[2].value} trend="flat" />
+              <StatTile icon={ClipboardList} label="Completed" value={statusStats[0].value} trend="up" />
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* Continue Assessment card */}
+      <section aria-labelledby="continue-heading">
+        {inProgressSession ? (
+          <div className="rounded-xl border border-yellow-200 bg-gradient-to-r from-yellow-50 via-amber-50 to-yellow-50 p-5 shadow-sm dark:border-yellow-900/50 dark:from-yellow-900/30 dark:to-amber-900/30">
+            <div className="mb-3 flex items-center justify-between">
+              <h2 id="continue-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Continue your assessment
+              </h2>
+              <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">
+                {inProgressSession.status === 'in_progress' ? 'In progress' : 'Paused'}
+              </span>
+            </div>
+            <div className="mb-4">
+              <p className="font-medium text-gray-800 dark:text-gray-200">
+                {sessions?.find((s) => s.id === inProgressSession.id)?.questionnaire_template_id ??
+                  inProgressSession.questionnaire_template_id}
+              </p>
+              <ProgressBar
+                current={inProgressSession.progress?.completed_questions ?? 0}
+                total={inProgressSession.progress?.total_questions ?? 0}
+                percentage={inProgressSession.progress?.completion_percentage ?? 0}
+              />
+              <div className="mt-1 text-right text-xs text-gray-500 dark:text-gray-400">
+                {inProgressSession.progress?.skipped_questions ?? 0} questions skipped
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              className="min-h-[44px] bg-white dark:bg-slate-800"
+              onClick={() => handleContinue(inProgressSession.id)}
+            >
+              <Play className="h-4 w-4" />
+              Resume Assessment
+            </Button>
+          </div>
+        ) : (
+          <div className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm dark:border-gray-700 dark:bg-slate-800">
+            <h2 id="continue-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+              You have no assessments in progress
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              Start a new assessment below or pick up a previous one from your history.
+            </p>
+          </div>
+        )}
+      </section>
+
+      {/* Search + Filters */}
+      <section aria-labelledby="available-heading">
+        <div className="flex items-center justify-between">
+          <h2 id="available-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Available Assessments
+          </h2>
+          <span className="text-sm text-gray-500 dark:text-gray-400">{filteredTemplates.length} shown</span>
+        </div>
+        <SearchFilters value={filter} onChange={setFilter} className="mt-3" />
+
+        {isLoading ? (
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-48 w-full rounded-xl" />
+            ))}
+          </div>
+        ) : filteredTemplates.length > 0 ? (
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {filteredTemplates.map((template) => {
+              const latest = sessions?.find((s) => s.questionnaire_template_id === template.id)
+              return (
+                <AssessmentCard
+                  key={template.id}
+                  template={template}
+                  status={latest ? (['submitted'].includes(latest.status) ? 'completed' : latest.status) as 'available' | 'in_progress' | 'paused' | 'completed' : 'available'}
+                  progress={
+                    latest && latest.status !== 'completed'
+                      ? {
+                          current: latest.progress?.current_section ? 1 : 0,
+                          total: latest.progress?.total_questions ?? 1,
+                          percentage: latest.progress?.completion_percentage ?? 0,
+                        }
+                      : undefined
+                  }
+                  lastTaken={latest ? formatDate(latest.updated_at) : undefined}
+                  onStart={handleStart}
+                />
+              )
+            })}
+          </div>
+        ) : (
+          <EmptyState
+            icon={Search}
+            title="No assessments found"
+            description={filter.query ? 'Try a different search term or reset your filters.' : 'No assessments are currently available.'}
+            action={
+              filter.query || filter.status !== 'all' ? (
+                <Button variant="ghost" onClick={() => setFilter({ query: '', status: 'all' })}>
+                  Reset filters
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+      </section>
+
+      {/* Recent assessments */}
+      <section aria-labelledby="recent-heading">
+        <div className="flex items-center justify-between">
+          <h2 id="recent-heading" className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+            Recent Assessments
+          </h2>
+          {recentSessions.length > 0 && (
+            <Button variant="ghost" className="min-h-[44px]" onClick={() => navigate('/questionnaires/history')}>
+              See all
+            </Button>
+          )}
+        </div>
+        {isLoading ? (
+          <div className="mt-3 space-y-2">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-16 w-full rounded-lg" />
+            ))}
+          </div>
+        ) : recentSessions.length > 0 ? (
+          <ul className="mt-3 space-y-2">
+            {recentSessions.map((s) => (
+              <RecentAssessmentRow
+                key={s.id}
+                session={s}
+                template={templates?.find((t) => t.id === s.questionnaire_template_id)}
+                onOpen={handleContinue}
+              />
+            ))}
+          </ul>
+        ) : (
+          <EmptyState
+            icon={History}
+            title="No recent assessments"
+            description="Once you start an assessment, it will appear here for quick access."
+          />
+        )}
+      </section>
+    </div>
   )
 }
 

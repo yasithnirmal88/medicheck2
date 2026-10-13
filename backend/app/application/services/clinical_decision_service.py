@@ -240,7 +240,7 @@ class ClinicalDecisionService:
         result = await self.dec_repo.get_result_by_session(session_id)
         if result and user_id and result.user_id != user_id:
             # Check if user has elevated permissions (doctors can view patient results)
-            from app.core.security.rbac import Role, has_role
+            from app.identity import Role, has_role
             # For now, we only allow access if the user owns the result
             # In a real application, you'd check for elevated roles here
             return None

@@ -55,8 +55,7 @@ from app.application.dtos.fhir_dtos import (
 )
 from app.core.config import settings
 from app.core.exceptions import AuthorizationError, NotFoundError, ValidationError
-from app.core.security.rbac import Permission, Role, check_permission, get_role_permissions
-from app.domain.entities.user import User
+from app.identity import Permission, Role, User, UserSummary, check_permission, get_role_permissions, get_user_summary
 from app.infrastructure.persistence.models.assessment_answer import AssessmentAnswerModel
 from app.infrastructure.persistence.models.assessment_session import (
     AssessmentSessionModel,
@@ -82,7 +81,6 @@ from app.infrastructure.persistence.models.report import (
     ConditionAssessmentModel,
     HealthAssessmentModel,
 )
-from app.infrastructure.persistence.models.user import UserModel
 from app.infrastructure.persistence.repositories.sql_profile_repository import (
     SQLProfileRepository,
 )
@@ -97,6 +95,8 @@ _CATEGORY_SYSTEM = "https://medicheck.org/fhir/CodeSystem/body-system-category"
 _REPORT_TYPE_SYSTEM = "https://medicheck.org/fhir/CodeSystem/report-type"
 #: Coding system for referral types.
 _REFERRAL_TYPE_SYSTEM = "https://medicheck.org/fhir/CodeSystem/referral-type"
+
+_TASK_TYPE_SYSTEM = "https://medicheck.org/fhir/CodeSystem/task-type"
 
 # Body-system category -> FHIR Observation interpretation mapping.
 _CATEGORY_INTERPRETATION = {
@@ -191,8 +191,8 @@ class FhirExportService:
         consent = await self._verify_consent(patient_user_id)
 
         # Load patient + profile (eager, no N+1).
-        patient_model = await self.session.get(UserModel, patient_user_id)
-        if patient_model is None or patient_model.is_deleted:
+        patient = await get_user_summary(self.session, patient_user_id)
+        if patient is None or patient.is_deleted:
             raise NotFoundError(detail="Patient not found")
         profile = await self.profile_repo.get_by_user_id(patient_user_id)
 
@@ -200,7 +200,7 @@ class FhirExportService:
         trace_ids: set[str] = set()
 
         # Patient resource
-        patient_res = self._build_patient(patient_model, profile)
+        patient_res = self._build_patient(patient, profile)
         entries.append(self._entry(patient_res))
         # Consent resource (provenance that export was consented)
         if consent is not None:
@@ -290,20 +290,32 @@ class FhirExportService:
         self, user: User, session_id: str
     ) -> FhirExportResponse:
         """Export a FHIR Bundle scoped to one assessment session."""
-        sess = await self.session.get(AssessmentSessionModel, session_id)
-        if sess is None or sess.is_deleted:
+        # Load via SELECT (not session.get) so selectin relationships
+        # (answers, roles) are always populated — session.get() can
+        # return an identity-map object whose relationships were never
+        # loaded, which would trigger a sync lazy load (MissingGreenlet
+        # in async context).
+        sess_stmt = (
+            select(AssessmentSessionModel)
+            .where(
+                AssessmentSessionModel.id == session_id,
+                AssessmentSessionModel.deleted_at.is_(None),
+            )
+        )
+        sess = (await self.session.execute(sess_stmt)).scalar_one_or_none()
+        if sess is None:
             raise NotFoundError(detail="Assessment session not found")
         await self._authorize_export(user, sess.user_id)
         consent = await self._verify_consent(sess.user_id)
 
-        patient_model = await self.session.get(UserModel, sess.user_id)
-        profile = await self.profile_repo.get_by_user_id(sess.user_id) if patient_model else None
+        patient = await get_user_summary(self.session, sess.user_id)
+        profile = await self.profile_repo.get_by_user_id(sess.user_id) if patient else None
 
         entries: list[FhirBundleEntry] = []
         trace_ids: set[str] = set()
 
-        if patient_model:
-            entries.append(self._entry(self._build_patient(patient_model, profile)))
+        if patient:
+            entries.append(self._entry(self._build_patient(patient, profile)))
         if consent is not None:
             entries.append(self._entry(self._build_consent(consent, sess.user_id)))
 
@@ -392,7 +404,7 @@ class FhirExportService:
     # ── Resource builders (deterministic, PHI-minimised) ─────────────
 
     def _build_patient(
-        self, user: UserModel, profile
+        self, user: UserSummary, profile
     ) -> FhirPatient:
         personal = getattr(profile, "personal_info", None) if profile else None
         name_parts = []
@@ -469,6 +481,8 @@ class FhirExportService:
                 )
             ],
             patient=FhirReference(reference=f"Patient/{patient_user_id}"),
+            # FHIR R4: Consent.provision is 0..1 (a single provision
+            # object; nested exceptions live in provision.provision).
             provision={"type": "permit" if consent.granted else "deny"},
         )
 
@@ -514,6 +528,12 @@ class FhirExportService:
             if bs.is_deleted:
                 continue
             score = _safe_float(bs.score)
+            category = bs.category
+            # FHIR R4: an Observation carries exactly ONE value[x]. The
+            # body-system assessment's primary result is the categorical
+            # risk category, so it is exported as valueCodeableConcept;
+            # the numeric score is exported as a standard component
+            # (Observation.component) rather than a second value[x].
             obs = FhirObservation(
                 id=bs.id,
                 status="final",
@@ -523,18 +543,35 @@ class FhirExportService:
                     )
                 ],
                 code=FhirCodeableConcept(
-                    coding=[FhirCoding(system=_CATEGORY_SYSTEM, code=bs.body_system_id or "unknown", display=bs.category or "body-system score")],
+                    coding=[FhirCoding(system=_CATEGORY_SYSTEM, code=bs.body_system_id or "unknown", display=category or "body-system score")],
                     text="MediCheck body-system risk category",
                 ),
                 subject=FhirReference(reference=f"Patient/{patient_user_id}"),
                 effectiveDateTime=_iso(report.created_at),
-                valueQuantity=(
-                    {"value": score, "unit": "score"} if score is not None else None
+                valueCodeableConcept=(
+                    FhirCodeableConcept(
+                        coding=[FhirCoding(system=_CATEGORY_SYSTEM, code=(category or "unknown").replace(" ", "-").lower(), display=category)],
+                        text=category,
+                    )
+                    if category
+                    else None
                 ),
-                valueString=bs.category,
+                component=(
+                    [
+                        {
+                            "code": FhirCodeableConcept(
+                                coding=[FhirCoding(system=_CATEGORY_SYSTEM, code="risk-score", display="Body-system risk score")],
+                                text="Body-system risk score",
+                            ).model_dump(by_alias=True, exclude_none=True),
+                            "valueQuantity": {"value": score, "unit": "score"},
+                        }
+                    ]
+                    if score is not None
+                    else None
+                ),
                 interpretation=(
-                    [FhirCodeableConcept(coding=[FhirCoding(system="http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation", code=_CATEGORY_INTERPRETATION.get(bs.category or "", "N"))])]
-                    if bs.category
+                    [FhirCodeableConcept(coding=[FhirCoding(system="http://terminology.hl7.org/CodeSystem/v3-ObservationInterpretation", code=_CATEGORY_INTERPRETATION.get(category or "", "N"), display=category)])]
+                    if category
                     else []
                 ),
             )
@@ -561,7 +598,7 @@ class FhirExportService:
                 )
             ],
             code=FhirCodeableConcept(
-                coding=[FhirCoding(system="http://loinc.org", code="testing", display="Health screening report")],
+                coding=[FhirCoding(system=_REPORT_TYPE_SYSTEM, code="clinical-report", display="MediCheck Clinical Report")],
                 text="MediCheck Clinical Report",
             ),
             subject=FhirReference(reference=f"Patient/{patient_user_id}"),
@@ -574,6 +611,7 @@ class FhirExportService:
                 )
             ],
             result=obs_refs,
+            extension=extensions,
         )
         return diag, observations
 
@@ -636,7 +674,15 @@ class FhirExportService:
                     coding=[FhirCoding(system=_REFERRAL_TYPE_SYSTEM, code=referral.referral_type)]
                 )
             ],
-            code=FhirCodeableConcept(text=f"Referral ({referral.referral_type})"),
+            code=FhirCodeableConcept(
+                coding=[
+                    FhirCoding(
+                        system=_REFERRAL_TYPE_SYSTEM,
+                        code=referral.referral_type,
+                    )
+                ],
+                text=f"Referral ({referral.referral_type})",
+            ),
             subject=FhirReference(reference=f"Patient/{patient_user_id}"),
             occurrenceDateTime=_iso(referral.scheduled_for or referral.due_at),
             priority=priority,
@@ -657,7 +703,14 @@ class FhirExportService:
             id=task.id,
             status=status_map.get(task.status, "requested"),
             intent="plan",
-            code=FhirCodeableConcept(text=task.task_type),
+            code=FhirCodeableConcept(
+                coding=[
+                    FhirCoding(
+                        system=_TASK_TYPE_SYSTEM, code=task.task_type
+                    )
+                ],
+                text=task.task_type,
+            ),
             focus=FhirReference(reference=f"ServiceRequest/{task.referral_id}"),
             for_fhir=FhirReference(reference=f"Patient/{patient_user_id}"),
             description=task.title,

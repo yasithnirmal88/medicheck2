@@ -5,9 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_active_user, get_db
+from app.api.deps import get_db
 from app.application.services.questionnaire_service import QuestionnaireService
-from app.domain.entities.user import User
+from app.identity import User, get_current_active_user
 
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 

@@ -20,7 +20,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_chw_user, get_current_admin, get_db
+from app.api.deps import get_db
 from app.application.dtos.chw_dtos import (
     ChwDashboardResponse,
     ConsentRequest,
@@ -35,7 +35,7 @@ from app.application.dtos.chw_dtos import (
     SyncResultResponse,
 )
 from app.application.services.chw_service import ChwService
-from app.domain.entities.user import User
+from app.identity import User, get_chw_user, get_current_admin
 
 router = APIRouter(prefix="/chw", tags=["Community Health Worker (Phase 8)"])
 

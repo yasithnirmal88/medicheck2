@@ -19,6 +19,7 @@ from app.api.v1.endpoints.ai_equity_intelligence import (
     router as ai_equity_intelligence_router,
 )
 from app.api.v1.endpoints.ai_governance import router as ai_governance_router
+from app.api.v1.endpoints.ai_health import router as ai_health_router
 from app.api.v1.endpoints.ai_intake import router as ai_intake_router
 from app.api.v1.endpoints.analytics import router as analytics_router
 from app.api.v1.endpoints.assessments import router as assessments_router
@@ -28,6 +29,7 @@ from app.api.v1.endpoints.chw import router as chw_router
 from app.api.v1.endpoints.facilities import router as facilities_router
 from app.api.v1.endpoints.graph import router as graph_router
 from app.api.v1.endpoints.health import router as health_router
+from app.api.v1.endpoints.identity_admin import router as identity_admin_router
 from app.api.v1.endpoints.interoperability import router as interoperability_router
 from app.api.v1.endpoints.profile import router as profile_router
 from app.api.v1.endpoints.questionnaires import router as questionnaires_router
@@ -45,6 +47,7 @@ router.include_router(users_router)
 router.include_router(profile_router)
 router.include_router(questionnaires_router)
 router.include_router(admin_router)
+router.include_router(identity_admin_router)
 router.include_router(graph_router)
 router.include_router(cdse_router)
 router.include_router(report_router)
@@ -54,6 +57,7 @@ router.include_router(assessments_router)
 router.include_router(ai_intake_router)
 router.include_router(analytics_router)
 router.include_router(ai_governance_router)
+router.include_router(ai_health_router)
 router.include_router(chw_router)
 router.include_router(cms_router)
 router.include_router(cms_content_router)

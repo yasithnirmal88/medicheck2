@@ -4,7 +4,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db, get_redis
+from app.api.deps import get_db, get_redis
+from app.identity import get_current_user
 from app.application.dtos.ai_dtos import AIExplanationResponse
 from app.application.services.ai_explanation_service import AIExplanationService
 from app.application.services.report_service import ReportService

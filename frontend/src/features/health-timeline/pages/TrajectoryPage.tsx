@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react'
-import AppLayout from '@/layouts/AppLayout'
 import Card from '@/shared/ui/Card'
 import { Link } from 'react-router-dom'
 import { useTrajectory, useTrajectoryExplanation } from '../hooks/useTrajectory'
@@ -64,61 +63,55 @@ const TrajectoryPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <AppLayout>
-        <div className="max-w-5xl mx-auto p-4">
-          <h1 className="text-2xl font-semibold mb-4">Health Trajectory</h1>
-          <Card><div className="text-sm text-gray-500">Loading trajectory…</div></Card>
-        </div>
-      </AppLayout>
+      <div className="max-w-5xl mx-auto p-4">
+        <h1 className="text-2xl font-semibold mb-4">Health Trajectory</h1>
+        <Card><div className="text-sm text-gray-500">Loading trajectory…</div></Card>
+      </div>
     )
   }
 
   const empty = !trajectory || trajectory.assessments.length === 0
   if (empty) {
     return (
-      <AppLayout>
-        <div className="max-w-5xl mx-auto p-4">
-          <h1 className="text-2xl font-semibold mb-4">Health Trajectory</h1>
-          <Card>
-            <div className="text-sm text-gray-500 py-6 text-center">
-              Complete an assessment to begin your health timeline.
-            </div>
-          </Card>
-        </div>
-      </AppLayout>
+      <div className="max-w-5xl mx-auto p-4">
+        <h1 className="text-2xl font-semibold mb-4">Health Trajectory</h1>
+        <Card>
+          <div className="text-sm text-gray-500 py-6 text-center">
+            Complete an assessment to begin your health timeline.
+          </div>
+        </Card>
+      </div>
     )
   }
 
   return (
-    <AppLayout>
-      <div className="max-w-5xl mx-auto p-4 space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Health Trajectory</h1>
-          <Link to="/timeline" className="text-sm text-indigo-600">View timeline list</Link>
-        </div>
-
-        <Card>
-          <p className="text-sm text-gray-700" data-testid="trajectory-summary">
-            {trajectory?.summary}
-          </p>
-          {!hasData && (
-            <p className="text-xs text-gray-500 mt-2">
-              Your first assessment is recorded. Complete another assessment to compare changes over time.
-            </p>
-          )}
-        </Card>
-
-        {hasData && trajectory && (
-          <>
-            <TimelineSection trajectory={trajectory} />
-            <TrendChart trajectory={trajectory} />
-            <BodySystemCards trajectory={trajectory} />
-            <FindingChanges trajectory={trajectory} />
-            <AIExplanationSection explanation={explanation} />
-          </>
-        )}
+    <div className="max-w-5xl mx-auto p-4 space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Health Trajectory</h1>
+        <Link to="/timeline" className="text-sm text-indigo-600">View timeline list</Link>
       </div>
-    </AppLayout>
+
+      <Card>
+        <p className="text-sm text-gray-700" data-testid="trajectory-summary">
+          {trajectory?.summary}
+        </p>
+        {!hasData && (
+          <p className="text-xs text-gray-500 mt-2">
+            Your first assessment is recorded. Complete another assessment to compare changes over time.
+          </p>
+        )}
+      </Card>
+
+      {hasData && trajectory && (
+        <>
+          <TimelineSection trajectory={trajectory} />
+          <TrendChart trajectory={trajectory} />
+          <BodySystemCards trajectory={trajectory} />
+          <FindingChanges trajectory={trajectory} />
+          <AIExplanationSection explanation={explanation} />
+        </>
+      )}
+    </div>
   )
 }
 

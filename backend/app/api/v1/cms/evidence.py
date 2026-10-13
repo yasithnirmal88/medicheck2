@@ -5,9 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_cms_user, get_db
+from app.api.deps import get_db
 from app.application.services.cms.clinical_evidence_service import ClinicalEvidenceService
-from app.domain.entities.user import User
+from app.identity import User, get_cms_user
 
 router = APIRouter(prefix="/cms/evidence", tags=["CMS Clinical Evidence"])
 

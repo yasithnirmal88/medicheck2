@@ -14,11 +14,15 @@ from __future__ import annotations
 from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.infrastructure.persistence.models.base import BaseModel
+from app.infrastructure.persistence.models.base import AUDIT_SCHEMA, BaseModel
 
 
 class AIInteractionAuditModel(BaseModel):
     __tablename__ = "ai_interaction_audits"
+    # Physical separation: lives in the ``audit`` PostgreSQL schema so
+    # high-volume AI audit writes never share hot clinical-table storage.
+    # (``None`` on SQLite — tests/dev behave exactly as before.)
+    __table_args__ = {"schema": AUDIT_SCHEMA}
 
     trace_id: Mapped[str | None] = mapped_column(
         String(64), nullable=True, index=True

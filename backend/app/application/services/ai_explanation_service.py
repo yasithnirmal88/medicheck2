@@ -47,6 +47,8 @@ from app.application.ai.provider import (
     get_explanation_provider,
 )
 from app.application.ai.language import normalize_language
+from app.application.ai.ai_budget import enforce_ai_budget
+from app.core.exceptions import AIBudgetExceededError
 from app.application.dtos.ai_dtos import (
     AIExplanationResponse,
     AIQualityStatus,
@@ -59,6 +61,7 @@ from app.application.dtos.ai_dtos import (
     ReportExplanationContext,
     SourceBreakdownItem,
     UNAVAILABLE_FALLBACK,
+    screen_diagnostic_claims,
 )
 from app.application.services.ai_audit_service import AIAuditService
 from app.application.services.evidence_retrieval_service import (
@@ -214,6 +217,32 @@ class AIExplanationService:
 
         # Build the input-context hash source (ids only, no PHI).
         input_context = self._context_hash_source(context)
+
+        # Vendor spend guardrail: after ownership + cache, before any vendor
+        # call. Stubs bypass. Rejection is audited, then propagates as a
+        # typed 429 — never converted into a stub fallback.
+        try:
+            await enforce_ai_budget(
+                user_id=user_id,
+                operation="report_explanation",
+                metered=bool(getattr(self.provider, "metered", False)),
+            )
+        except AIBudgetExceededError as exc:
+            logger.warning("AI budget exceeded for session %s: %s", session_id, exc)
+            await self.audit.record(
+                trace_id=trace_id,
+                session_id=session_id,
+                request_type="report_explanation",
+                provider=provider_name,
+                model=provider_model,
+                prompt_version=prompt_ver,
+                language=lang,
+                literacy_level=lit.value,
+                input_context=input_context,
+                status=AIQualityStatus.BUDGET_EXCEEDED.value,
+                status_reason=str(exc)[:200],
+            )
+            raise
 
         try:
             raw = await self.provider.explain(context)
@@ -539,6 +568,19 @@ class AIExplanationService:
             allowed_recommendation_ids=context.allowed_recommendation_ids,
             allowed_evidence_ids=context.allowed_evidence_ids,
         )
+        # Output-side diagnostic screen: the LLM must explain, never diagnose.
+        # Negated non-diagnostic phrasing ("does not mean you have ...")
+        # passes; explicit claims ("you have diabetes") fail validation and
+        # the service falls back safely.
+        try:
+            screen_diagnostic_claims(
+                response.summary,
+                response.severity_explanation,
+                *(f.explanation for f in response.key_findings),
+                *(r.explanation for r in response.recommendation_explanations),
+            )
+        except ValueError as exc:
+            raise AIValidationFailure(str(exc)) from exc
         return response
 
     # --- read-only knowledge graph loaders (names only) ---

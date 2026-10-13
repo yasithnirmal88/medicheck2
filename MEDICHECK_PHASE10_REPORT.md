@@ -136,6 +136,65 @@ See `MEDICHECK_FHIR_MAPPING.md` for the full mapping. Summary:
 | Task | follow-up task | CHW owner |
 | CarePlan | operational care plan | operational only |
 
+### FHIR R4 Validation
+
+The export is validated two ways:
+
+1. **In-app deterministic structural validator** —
+   `app/application/services/fhir_validation.py`
+   (`validate_fhir_resource` / `validate_fhir_bundle` /
+   `validate_fhir_payload`). Dependency-free, no network /
+   terminology-server calls. Enforces: exported-resource whitelist,
+   forbidden `Condition` (possible conditions are NEVER confirmed
+   diagnoses), R4 required elements per resource, enum value sets,
+   Observation single `value[x]` (exactly one of
+   valueQuantity/valueCodeableConcept/valueString/…), Reference
+   format (`ResourceType/id`), CodeableConcept/Identifier/HumanName
+   structure, id/date/dateTime/instant/uri formats, namespaced
+   extensions only (`https://medicheck.org/fhir/StructureDefinition/`),
+   and `Consent.provision` as a 0..1 single object
+   (`type`: permit|deny).
+2. **Official FHIR R4 model library** (offline, dev-time) —
+   `fhir.resources==6.5.0` (pydantic v1) in an isolated venv.
+   Generated patient bundle (9 entries) and session bundle
+   (6 entries) both validate with **0 errors**.
+
+Conformance issues found and fixed during validation:
+
+- Body-system Observation previously emitted **both**
+  `valueQuantity` and `valueString` — violates R4's exactly-one
+  `value[x]` constraint. Now: category → `valueCodeableConcept`
+  (MediCheck body-system-category code system), numeric score →
+  standard `Observation.component` (`valueQuantity`, code
+  `risk-score`).
+- `DiagnosticReport.code` used a fake LOINC code (`testing` under
+  `http://loinc.org`). Now uses MediCheck's own report-type code
+  system (`code: clinical-report`).
+- `ServiceRequest.code` / `Task.code` were text-only (no
+  `coding`). Now carry MediCheck-namespaced codings
+  (referral-type / task-type code systems).
+- `DiagnosticReport` trace-id extension was built but never
+  attached (DTO lacked the field) — the source trace id is now
+  actually present on the resource, matching the manifest's
+  `source_trace_ids`.
+- `export_session_bundle` loaded the session via `session.get()`,
+  which can return an identity-map object whose `selectin`
+  relationships (`answers`) were never loaded → synchronous lazy
+  load (`MissingGreenlet`) in async context. Now loads via
+  `select(...)` (consistent with `_load_sessions`), which always
+  triggers selectin loading.
+
+Validation tests: `tests/test_fhir_r4_validation.py` — **19 pass**
+(structural validation, clinical mapping, safety invariants:
+no PHI leakage, no confirmed-diagnosis claim, extension
+namespacing, references resolve within the bundle).
+
+Note: the main environment's `fhir.resources` (8.3.0) models
+**FHIR R5** (e.g. `Consent.scope`/`patient` renamed/removed,
+`provision` as a list). R5-validator complaints about R4-shaped
+fields are version differences, not R4 bugs — always validate R4
+payloads against `fhir.resources==6.5.0`.
+
 ## SDG Mappings
 
 See `MEDICHECK_SDG_INDICATOR_MAPPING.md` for the full mapping. All metrics
@@ -244,6 +303,11 @@ Dedicated Phase 10 security tests cover:
   CSV/JSON export, referral lifecycle, facility feedback, care outcomes,
   care-continuity calculations, AI queue ranking boundaries, audit logging,
   security).
+- FHIR R4 validation suite: `tests/test_fhir_r4_validation.py` —
+  **19 pass** (structural R4 validation via the in-app validator,
+  clinical mapping, safety invariants).
+- Combined run: `tests/test_interoperability_phase10.py
+  tests/test_fhir_r4_validation.py` — **69 pass**.
 - Full regression suite (run in batches): auth/RBAC, profile, emergency
   contact, CHW Phase 8, population analytics Phase 6, AI Phase 7, AI RAG
   Phase 2, longitudinal Phase 4, intake Phase 5, AI intake Phase 3, CMS
@@ -271,7 +335,20 @@ cd frontend && npm run typecheck && CI=true npx vitest run && npm run build
 
 - FHIR export is a controlled subset of FHIR R4 (Patient, Consent,
   QuestionnaireResponse, Observation, DiagnosticReport, ServiceRequest,
-  Task, CarePlan). Not every FHIR resource is implemented.
+  Task, CarePlan). Not every FHIR resource is implemented; the
+  `FhirQuestionnaire` DTO exists but no Questionnaire resource is
+  currently emitted (questionnaires are referenced by canonical
+  URL `Questionnaire/{template_id}`).
+- FHIR validation is structural (in-app validator) plus official-R4-
+  model validation of generated bundles; it does not perform
+  terminology-server validation (codes come from MediCheck's own
+  namespaced code systems, not LOINC/SNOMED).
+- Care-continuity median time-to-care clamps sub-second negative
+  deltas to zero: SQLite's second-granular `CURRENT_TIMESTAMP`
+  (server_default) can otherwise make an outcome appear to
+  predate its referral by a fraction of a second (precision skew,
+  not a real impossible timeline). Materially negative deltas are
+  still discarded.
 - Facility registry uses seeded/demo facilities; no real hospital
   integrations (real integrations require real APIs/specs — documented as
   integration points, not built).

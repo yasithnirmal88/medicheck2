@@ -5,7 +5,7 @@ typed as ``dict | None`` (ORM ``Mapped[dict | None]`` + DTO ``dict | None``). Wr
 dict to a Text column raised on SQLite (``type 'dict' is not supported``) and stored an
 invalid Python repr elsewhere, so the field could never be persisted and could not
 round-trip through /profiles/me. The column is now ``JSON`` (matching other dict-typed
-columns: workflow.steps, questionnaire_template.extra_metadata, profile_version.snapshot).
+columns: workflow.steps, questionnaire_template.template_metadata, profile_version.snapshot).
 
 Investigation found NO legacy non-NULL data: no fixtures/migrations/seed reference
 emergency_contact and the Text-column write never succeeded, so every historical value
@@ -38,6 +38,7 @@ from sqlalchemy.orm import selectinload
 
 from app.application.dtos.profile_dtos import HealthProfileDTO, PersonalInfoDTO
 from app.core.config import Settings
+from app.core.security.firebase import mock_email_for_uid
 from app.domain.entities.user import User
 from app.infrastructure.persistence.models.health_profile import HealthProfileModel
 from app.infrastructure.persistence.models.personal_info import PersonalInfoModel
@@ -165,7 +166,7 @@ async def test_profiles_me_serializes_emergency_contact_as_object(
     user_repo = SQLUserRepository(db_session)
     user = User.create(
         firebase_uid=_MOCK_UID,
-        email="mock@example.com",
+        email=mock_email_for_uid(_MOCK_UID),
         full_name="Mock User",
     )
     user.email_verified = True

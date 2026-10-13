@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dtos.profile_dtos import HealthProfileDTO, PersonalInfoDTO
-from app.domain.entities.user import User
+from app.identity import User
 from app.infrastructure.persistence.repositories.sql_profile_repository import (
     SQLProfileRepository,
 )

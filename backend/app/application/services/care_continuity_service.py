@@ -16,7 +16,7 @@ import logging
 import statistics
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import false, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dtos.interoperability_dtos import (
@@ -26,6 +26,7 @@ from app.application.dtos.interoperability_dtos import (
 )
 from app.application.dtos.analytics_dtos import AnalyticsFilters
 from app.core.config import settings
+from app.identity import get_user_ids
 from app.infrastructure.persistence.models.assessment_session import (
     AssessmentSessionModel,
 )
@@ -35,7 +36,6 @@ from app.infrastructure.persistence.models.decision import (
     GeneratedRecommendationModel,
 )
 from app.infrastructure.persistence.models.referral import ReferralModel
-from app.infrastructure.persistence.models.user import UserModel
 
 logger = logging.getLogger(__name__)
 _UTC = ZoneInfo("UTC")
@@ -73,15 +73,18 @@ class CareContinuityService:
         start, end = _date_range(filters.start_date, filters.end_date)
         start_dt = datetime.datetime.combine(start, datetime.time.min, tzinfo=_UTC)
         end_dt = datetime.datetime.combine(end, datetime.time.max, tzinfo=_UTC)
+        active_user_ids = await get_user_ids(self.session)
 
         # Screened: completed assessment sessions in period.
         screened_stmt = (
             select(func.count(func.distinct(AssessmentSessionModel.user_id)))
-            .join(UserModel, AssessmentSessionModel.user_id == UserModel.id)
             .where(
                 AssessmentSessionModel.deleted_at.is_(None),
-                UserModel.deleted_at.is_(None),
-                UserModel.is_active.is_(True),
+                (
+                    AssessmentSessionModel.user_id.in_(active_user_ids)
+                    if active_user_ids
+                    else false()
+                ),
                 AssessmentSessionModel.status == "completed",
                 AssessmentSessionModel.completed_at.between(start_dt, end_dt),
             )
@@ -255,7 +258,16 @@ class CareContinuityService:
                 care_at = care_at.replace(tzinfo=_UTC)
             delta_days = (care_at - ref_created).total_seconds() / 86400.0
             if delta_days < 0:
-                continue
+                # Sub-second negative deltas are timestamp-precision
+                # skew (server_default CURRENT_TIMESTAMP is
+                # second-granular on SQLite, while recorded_at keeps
+                # microseconds), not genuinely impossible timelines.
+                # Treat as same-instant; discard only materially
+                # negative deltas (outcome clearly predates referral).
+                if delta_days > -1.0 / 86400.0:
+                    delta_days = 0.0
+                else:
+                    continue
             prev = per_patient.get(r.patient_user_id)
             if prev is None or care_at < prev[1]:
                 per_patient[r.patient_user_id] = (ref_created, care_at)

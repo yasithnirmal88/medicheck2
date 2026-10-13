@@ -2,10 +2,10 @@
 
 Mirrors the Phase 1 ``AIExplanationProvider`` pattern: the service depends on a
 Protocol, not a vendor SDK. The deterministic stub provider builds a valid
-explanation strictly from the supplied deterministic longitudinal context — it
-never invents entities, ids, or evidence, and never calls a network service.
-A real vendor provider can implement the Protocol later with no service-layer
-change.
+explanation strictly from the supplied deterministic longitudinal context. A
+real OpenAI-compatible HTTP provider (``http_chat_provider``) implements the
+Protocol and is selected via ``settings.ai_provider`` — no service-layer
+change. Unknown names raise ``AIConfigurationError``.
 """
 
 from __future__ import annotations
@@ -216,11 +216,21 @@ def _summary(overall, ind, cond, rec) -> str:
 
 
 def get_longitudinal_provider() -> LongitudinalExplanationProvider:
-    """Return the configured longitudinal AI provider (default: stub)."""
-    name = (settings.ai_provider or "stub").strip().lower()
-    if name == "stub":
-        return StubLongitudinalProvider()
-    logger.info(
-        "AI provider '%s' not implemented for longitudinal; using stub", name
+    """Return the configured longitudinal AI provider.
+
+    ``stub`` (and ``personalized-stub``, which is explanation-scoped) use the
+    deterministic stub. ``openai`` / ``openai-compatible`` use the HTTP
+    provider (requires ``AI_API_KEY`` + ``AI_MODEL``). Anything else raises
+    ``AIConfigurationError`` — never a silent stub fallback.
+    """
+    from app.application.ai.provider_selection import (
+        normalize_provider_name,
+        resolve_llm_config,
     )
-    return StubLongitudinalProvider()
+
+    name = normalize_provider_name(settings.ai_provider)
+    if name in ("stub", "personalized-stub"):
+        return StubLongitudinalProvider()
+    from app.application.ai.http_chat_provider import OpenAICompatibleChatProvider
+
+    return OpenAICompatibleChatProvider.from_config(resolve_llm_config(name))

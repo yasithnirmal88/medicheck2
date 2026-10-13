@@ -190,13 +190,13 @@ const ReportExplanation: React.FC<ReportExplanationProps> = ({ sessionId }) => {
           </section>
         ) : null}
 
-        {data.key_findings.length > 0 ? (
+        {(data.key_findings ?? []).length > 0 ? (
           <section>
             <h3 className="text-sm font-semibold text-gray-900">
               Why these findings matter
             </h3>
             <ul className="mt-2 space-y-3">
-              {data.key_findings.map((f, i) => {
+              {(data.key_findings ?? []).map((f, i) => {
                 const cited = (f.evidence_ids ?? [])
                   .map((id) => evidenceById.get(id))
                   .filter((e): e is AIRetrievedEvidence => Boolean(e))
@@ -239,13 +239,13 @@ const ReportExplanation: React.FC<ReportExplanationProps> = ({ sessionId }) => {
           </section>
         ) : null}
 
-        {data.recommendation_explanations.length > 0 ? (
+        {(data.recommendation_explanations ?? []).length > 0 ? (
           <section>
             <h3 className="text-sm font-semibold text-gray-900">
               Understanding your recommendations
             </h3>
             <ul className="mt-2 space-y-2">
-              {data.recommendation_explanations.map((r, i) => (
+              {(data.recommendation_explanations ?? []).map((r, i) => (
                 <li key={i} className="text-sm text-gray-700">
                   <span className="font-medium">•</span> {r.explanation}
                 </li>
@@ -346,13 +346,13 @@ const ReportExplanation: React.FC<ReportExplanationProps> = ({ sessionId }) => {
           </section>
         )}
 
-        {data.evidence_notes.length > 0 ? (
+        {(data.evidence_notes ?? []).length > 0 ? (
           <section>
             <h3 className="text-sm font-semibold text-gray-900">
               Supporting evidence notes
             </h3>
             <ul className="mt-2 space-y-1">
-              {data.evidence_notes.map((n, i) => (
+              {(data.evidence_notes ?? []).map((n, i) => (
                 <li key={i} className="text-xs text-gray-500 flex gap-1">
                   <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" aria-hidden />
                   <span>{n}</span>
@@ -450,7 +450,7 @@ const SourceBreakdownRow: React.FC<{
   item: AISourceBreakdownItem
   evidenceById: Map<string, AIRetrievedEvidence>
 }> = ({ item, evidenceById }) => {
-  const cited = item.evidence_ids
+  const cited = (item.evidence_ids ?? [])
     .map((id) => evidenceById.get(id))
     .filter((e): e is AIRetrievedEvidence => Boolean(e))
   return (

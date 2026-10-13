@@ -72,29 +72,51 @@ Full design: `MEDICHECK_AI_PHASE2_RAG_REPORT.md`. Key facts to preserve:
   datetimes -- normalise both sides to naive UTC; never use datetime.utcnow()
   -- it trips `-W error::DeprecationWarning`).
 
-## Layout system (key P3-6/P3-4 findings -- read before touching layouts)
-THREE sidebar layouts existed; after P3-4 only two remain and both are routed:
-- `layouts/DashboardLayout.tsx` -- ROUTED. Used by router's `PatientLayoutWithContent`
-  wrapper for nearly all patient pages AND by `features/dashboard/pages/Dashboard.tsx`
-  (/app) directly. Sidebar is a flex sibling (sticky, shrink-0, w-64--Üîw-[76px]), NOT an
-  overlay -- so it never truly "blocks" content. Collapse state is shared + persisted
-  across navigation via `features/dashboard/components/layout/sidebarCollapseStore.ts`
-  (useSyncExternalStore + localStorage), because each patient route remounts
-  DashboardLayout (so local useState would reset on every navigation).
-- `layouts/DoctorLayout.tsx` -- ROUTED for /cms/* (layout route with <Outlet/>). Does NOT
-  remount on /cms sub-navigation, so its local useState collapse persists. Independent
-  collapse preference from patient sidebar (intentional -- different roles). KEPT (not
-  symmetric with patient) because CMS routing relies on a persistent <Outlet/>.
-- `layouts/AppLayout.tsx` -- NOT dead: imported by ~18 page components, but is now a
-  passthrough (`<>{children}</>`, no chrome) since P3-6. Keeping it is low-risk;
-  removing it would be a large mechanical edit of 18 importers for no functional gain.
-  The `AppLayout passthrough` test pins its no-chrome behavior.
-- `layouts/PatientLayout.tsx` -- REMOVED in P3-4. Was NOT routed (only its own test
-  imported it); the router uses `PatientLayoutWithContent` --Üí `DashboardLayout`, NOT
-  PatientLayout. Had a duplicate dead SidebarContent + inline nav. Removed file + its
-  2 tests; fixed the stale `navConfig.ts` comment (patient nav lives in navConfig.ts,
-  consumed by Sidebar/DashboardLayout).
-- `shared/ui/TopNav.tsx` is dead code (no importers) after AppLayout became a passthrough.
+## Layout system (consolidated -- single RootLayout; read before touching layouts)
+ONE root layout for all authenticated routes (layout consolidation pass):
+- `layouts/RootLayout.tsx` -- the single route-level layout for EVERY
+  authenticated route (patient + /cms). Mounted once, never unmounts on
+  normal navigation. Reads `canAccessCMS` from `useAuthContext()` and
+  renders the role-appropriate chrome with `<Outlet/>`:
+  - Patient chrome (ex-DashboardLayout): patient `Sidebar` + persisted
+    collapse toggle + mobile drawer portal + `TopBar` + max-w-[1400px]
+    content container + footer + `MobileBottomNav`.
+  - Doctor/CMS chrome (ex-DoctorLayout): `DoctorSidebar` + mobile drawer +
+    CMS header (hamburger + "Doctor CMS · name" + initials avatar) +
+    `main.p-4 lg:p-6` + footer.
+- Role-specific nav components: patient nav lives in
+  `features/dashboard/components/layout/navConfig.ts` (consumed by
+  `Sidebar.tsx`); CMS nav lives in
+  `features/cms/components/layout/doctorNavConfig.ts` (consumed by
+  `DoctorSidebar.tsx`, extracted from the old DoctorLayout).
+- Sidebar collapse state: `features/dashboard/components/layout/
+  sidebarCollapseStore.ts` is now a `createCollapseStore(key)` factory
+  with TWO persisted localStorage keys -- `medicheck_sidebar_collapsed`
+  (patient, unchanged key) and `medicheck_doctor_sidebar_collapsed`
+  (doctor, new). Both consumed via `useSyncExternalStore`; doctor
+  collapse is now persisted (previously local useState).
+- `layouts/LayoutChromeContext.tsx` -- pages publish TopBar data
+  (`notifications`, `userName`, `userEmail`) to the route-level
+  TopBar via `useLayoutChrome().setChrome(...)`. `Dashboard.tsx`
+  publishes its notifications/userName (previously DashboardLayout
+  props) in an effect with cleanup on unmount.
+- Router (`routes/router.tsx`): all patient + /cms routes are children
+  of one `<Route element={<RequireAuth><RootLayout/></RequireAuth>}>`.
+  Per-route guards (RequirePatient/RequireDoctor) still wrap each page
+  element (RBAC unchanged); `/cms` uses
+  `<RequireDoctor><Outlet/></RequireDoctor>` as its layout element.
+  Public/auth routes (/, /login, /register) stay outside RootLayout.
+  `PatientLayoutWithContent` wrapper REMOVED.
+- REMOVED in the consolidation: `layouts/DashboardLayout.tsx`,
+  `layouts/DoctorLayout.tsx`, `layouts/AppLayout.tsx` (passthrough
+  stripped from 18 page components), and `PatientLayout.tsx` (P3-4).
+  `features/dashboard/pages/Dashboard.tsx` and
+  `features/profile/pages/HealthProfilePage.tsx` no longer render
+  their own layout -- they render content directly inside RootLayout.
+- `shared/ui/TopNav.tsx` is dead code (no importers).
+- Tests: `layouts/__tests__/layout-outlet.test.tsx` rewritten for
+  RootLayout (outlet rendering, role-based chrome switching, single
+  aside, patient + doctor collapse persistence across remounts).
 
 ## Pydantic v2 (P3-1)
 - `HealthProfileDTO` has `model_config = ConfigDict(from_attributes=True)` + a
@@ -122,7 +144,6 @@ THREE sidebar layouts existed; after P3-4 only two remain and both are routed:
 ## Known pre-existing issues (not yet addressed -- deferred)
 - `UserResponse` DTO role literal only allows `patient|doctor|researcher|administrator`
   but `Role` enum has more -- schema mismatch.
-- Mock auth uses fixed `mock@example.com` -> email collision on second user creation in tests.
 - Frontend wizard sends `emergency_contact` as a STRING vs backend dict (profileService.ts/
   profileApi.ts/defaults.ts/fieldSpecs.ts) -- would 422 on submit. Backend now stores dict
   correctly; frontend type alignment is a separate frontend-schema item (not touched in P3-2).
@@ -587,6 +608,40 @@ mappings: `MEDICHECK_SDG_INDICATOR_MAPPING.md`.
 - Backend Phase 10: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/test_interoperability_phase10.py -q -W error::DeprecationWarning` -> 50 pass.
 - Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run src/features/interop` -> 16 pass; full suite 100 pass, typecheck clean, build OK.
 - Regression (run in batches — full suite times out at 300s): auth/RBAC/profile/emergency, CHW Phase 8, population Phase 6, AI Phase 7, AI RAG Phase 2, longitudinal Phase 4, intake Phase 5, AI intake Phase 3, CMS recovery, report service — ALL pass.
+- Combined Phase 10 + FHIR validation: `python -m pytest tests/test_interoperability_phase10.py tests/test_fhir_r4_validation.py -q -W error::DeprecationWarning` -> 69 pass (50 + 19).
+
+### FHIR R4 validation (COMPLETE — read before touching FHIR export)
+- Targets FHIR R4 (`settings.fhir_version="4.0.1"`). Exported bundle resources:
+  Patient, Consent, QuestionnaireResponse, Observation, DiagnosticReport,
+  ServiceRequest, Task, CarePlan (Bundle type=collection). `FhirQuestionnaire`
+  DTO exists but no Questionnaire resource is emitted (canonical
+  `Questionnaire/{template_id}` reference only).
+- New `app/application/services/fhir_validation.py` — deterministic,
+  dependency-free R4 structural validator (`validate_fhir_resource` /
+  `validate_fhir_bundle` / `validate_fhir_payload`): whitelist, forbidden
+  `Condition`, per-resource required elements, enum value sets, Observation
+  single value[x], Reference/CodeableConcept/Identifier formats,
+  id/date/dateTime/uri formats, namespaced extensions only
+  (`https://medicheck.org/fhir/StructureDefinition/`), Consent.provision 0..1
+  single object (permit|deny).
+- New `backend/tests/test_fhir_r4_validation.py` (19: structural, clinical
+  mapping, safety invariants). Reuses Phase 10 seeders; seeds a real
+  AssessmentAnswerModel row to exercise QuestionnaireResponse.item mapping.
+- Official R4 check: isolated venv with `fhir.resources==6.5.0` (+pydantic v1);
+  generated patient (9 entries) + session (6 entries) bundles = 0 errors.
+  Main-env `fhir.resources` 8.x models **R5** — its Consent complaints
+  (scope/patient removed, provision-as-list) are R4/R5 differences, NOT R4 bugs.
+- Fixes made: Observation dual value[x] -> valueCodeableConcept + component;
+  fake LOINC `testing` -> MediCheck report-type coding; text-only
+  ServiceRequest.code/Task.code -> MediCheck-namespaced codings
+  (referral-type/task-type systems); DiagnosticReport trace extension now
+  actually attached (was dead code — DTO lacked `extension`); 
+  `export_session_bundle` loads via `select(...)` not `session.get()` (avoids
+  MissingGreenlet on unloaded selectin `answers`).
+- Care-continuity robustness fix (found via flaky `test_median_time_to_care`):
+  sub-second negative time-to-care deltas (SQLite CURRENT_TIMESTAMP
+  second-granularity vs caller-provided microsecond recorded_at) are clamped
+  to 0; materially negative deltas still discarded.
 
 ### Phase 10 safety invariants (do NOT regress)
 - No Phase 10 feature can alter a previously generated deterministic clinical result.
@@ -685,6 +740,8 @@ ONLY clinical authority. Every AI insight follows:
 - Routes (CMS/DoctorLayout): `/cms/ai-governance/chw-suggestions`,
   `/cms/ai-governance/equity`, `/cms/ai-governance/sdg-narratives`.
 - Nav: "AI Governance" group in DoctorLayout (Sparkles/Scale/Globe2 icons).
+  (After the RootLayout consolidation this group lives in
+  `doctorNavConfig.ts`, see the Layout system section.)
 - Review queue UI: approve/reject/edit actions; publish only after
   approved/edited; no actions for published/rejected. edit requires text.
 
@@ -711,3 +768,147 @@ ONLY clinical authority. Every AI insight follows:
   511 total pass, 0 fail (126 P6-P10+roles + 147 AI P1-P5+longitudinal +
   38 clinical/CMS/profile + 149 unit/integration + 51 P11).
 - Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run src/features/ai-governance` -> 18 pass; full suite 118 pass, typecheck clean, build OK.
+
+## Real AI providers (OpenAI-compatible HTTP -- read before touching ai/ providers)
+Stubs are the default, but REAL vendors are now implemented (not just planned).
+Full doc: `MEDICHECK_AI_PROVIDERS.md`.
+- `app/application/ai/http_chat_provider.py` -- `OpenAICompatibleChatProvider`
+  implements ALL THREE LLM Protocols (`explain` / `extract_candidates` /
+  `explain_trajectory`). `POST {base}/chat/completions`, temperature=0,
+  `response_format: json_object`, reuses versioned system prompts verbatim.
+  Returns raw JSON (services parse+validate). Failures raise the CALLER's own
+  error type (provider.AIProviderError / AIIntakeProviderError /
+  longitudinal.AIProviderError). `http_client` ctor arg takes
+  `httpx.MockTransport` in tests (no new test deps).
+- `app/application/ai/http_stt_provider.py` -- `OpenAICompatibleSTTProvider`
+  (`POST {base}/audio/transcriptions` multipart). Audio transient, never
+  logged. Failures -> `SpeechToTextError`.
+- `app/application/ai/provider_selection.py` -- single source of truth for
+  names + fail-fast: stub names / `LLM_HTTP_NAMES={"openai","openai-compatible"}`
+  / `STT_HTTP_NAMES={"openai","whisper","openai-compatible"}`.
+  `resolve_llm_config`/`resolve_stt_config` raise `AIConfigurationError`
+  (new in `app/core/exceptions.py`, code `ai_provider_misconfigured`) on
+  unknown names or missing creds. NEVER silently falls back to stub.
+- Factories read `settings.ai_provider` (drives explanation+intake+
+  longitudinal), `settings.stt_provider`, `settings.chw_queue_provider`
+  (stub-only; non-stub raises). `personalized-stub` maps to Personalized
+  explanation + stub intake/longitudinal. New settings: `ai_base_url`
+  (default `https://api.openai.com/v1`), `ai_max_retries=1` (429/5xx/network
+  only, never auth), `stt_api_key`, `stt_base_url`. `ai_model` REQUIRED for
+  real LLM (no silent default); `stt_model` defaults to `whisper-1`.
+  Timeouts (`ai/stt_request_timeout_seconds`) are now ENFORCED via
+  `httpx.Timeout` (previously dead config).
+- `screen_diagnostic_claims()` (`ai_dtos.py`, negation-aware, English-only)
+  runs in `AIExplanationService._parse_and_validate` on summary + finding +
+  severity text -> `AIValidationFailure` -> safe fallback. Negations pass
+  ("does not mean you have...") -- do NOT "simplify" to a bare substring
+  match or the personalized stub breaks. Longitudinal keeps its OWN guard
+  (`assert_non_diagnostic` in longitudinal_dtos); intake keeps its DTO
+  diagnostic validator.
+- `GET /api/v1/ai/health` (`ai_health.py`, `get_ai_governance_user`
+  RESEARCH_REVIEWER+): per-consumer impl + credential presence (NEVER
+  values) + `?probe=true` live `GET /models` check (5s, no PHI/tokens).
+  Misconfig reported in body (200), never raised. Registered in router.py;
+  regenerate `frontend/openapi.json` via `backend/scripts/export_openapi.py`
+  when routes change.
+- Tests: `tests/test_ai_providers_http.py` (53: selection 14 + chat 10 + STT 6
+  + screen 2 + multilingual screen 7 + e2e 8 + health 6). Reuses `_seed_assessment`
+  (test_ai_rag_phase2) + `_seed_graph` (test_ai_intake_phase3). Audit no-PHI
+  enforced structurally (no free-text PHI columns on AIInteractionAuditModel).
+- Multilingual screen (`ai_dtos.py`): EN (legacy prefix-only) + SI/TA
+  subject+verb claim patterns with 80+80 bidirectional negation windows
+  (SOV negators follow the claim). Narrow by design; corpus sweep test runs
+  every patient-facing AI string. Romanized SI/TA NOT covered (documented).
+- Spend guardrails (`app/application/ai/ai_budget.py`): per-user hourly
+  (30) + daily (200) + global daily (20000) request budgets, Redis
+  (`medicheck:ai:budget:v1:*`) with process-local fallback when Redis is
+  down. Metered (real) providers only (`metered=True` on HTTP classes);
+  stubs bypass. Exceed -> `AIBudgetExceededError` (429 `ai_budget_exceeded`,
+  never stub fallback; transcribe/extract endpoints re-raise past defensive
+  handlers). Rejections audited as `BUDGET_EXCEEDED` (hashes only).
+  Settings: `ai_budget_{user_hourly,user_daily,global_daily}_requests`
+  (`0` = tier off).
+- `.env.example` documents all AI/STT vars. Azure NATIVE endpoint shape NOT
+  supported (needs api-key header + different paths) -- use a compatible
+  gateway.
+
+## Identity boundary (app/identity -- read before importing auth code)
+First enforced bounded-context boundary (microservices extraction path).
+- `app/identity/__init__.py` is the ONLY public entry point other modules may
+  use: `User`, `Role`, `Permission`, `has_role`/`check_permission`/
+  `get_role_permissions`, `AuthService`, `UserRepository`, `verify_firebase_token`,
+  `mock_email_for_uid`, all `get_*_user` FastAPI deps, auth DTOs, plus
+  `get_user_permissions(session, user_id)` (`app/identity/permissions.py` --
+  canonical role->permission resolution; replaced the duplicated private SQL in
+  cms/content.py + cms/builder.py, which are now deleted).
+- `app/identity/queries.py` -- identity-owned read API (plain-Python
+  signatures, extraction-ready): `UserSummary` (id/full_name/email/is_active/
+  is_deleted, frozen Pydantic), `get_user_summary(session, id)`,
+  `get_user_summaries(session, ids)` (one batched SELECT, session.get parity:
+  deleted/inactive INCLUDED, callers filter via flags), `get_user_ids(session,
+  *, active_only=True)` (non-deleted ids; `active_only=False` preserves the
+  legacy deleted-only semantics of severity/body/indicator/trajectory
+  analytics -- canonical cohort filter uses both flags). Replaced ALL
+  SQL-level `UserModel` joins outside Identity (population ~15 joins/9 methods
+  via `_base_session_filter(start, end, user_ids, ...)` + `false()` on empty
+  sets; care_continuity screened; FHIR 2x session.get + `_build_patient`
+  retargeted to `UserSummary`; CHW assignment/session listings restructured to
+  batch lookups). Boundary test has ZERO exemptions now.
+- `app/api/v1/endpoints/identity_admin.py` -- user/role admin split OUT of
+  `admin.py` (same `/admin` prefix + tags + function names -> identical paths
+  + operation IDs; registered right after admin_router). `admin.py` is now
+  clinical-only and OFF the identity-owned list (passes the boundary clean).
+- DELETED (were 0-importer dead code): `app/infrastructure/auth/
+  firebase_provider.py` (+ removed the now-empty `auth/` dir),
+  `app/domain/entities/role.py` catalog dataclass.
+- RULE: app code outside the identity-owned files (listed in
+  `app/identity/__init__.py` docstring) must NEVER import
+  `app.core.security.{firebase,rbac}`, `app.domain.entities.user`,
+  `app.application.services.auth_service`, identity ORM/repos, or identity dep
+  names from `app.api.deps` directly. `get_db`/`get_redis` stay in
+  `app.api.deps` (not identity). Enforced by `tests/test_identity_boundary.py`
+  (AST scan -- fails on violations). Tests are EXEMPT (may probe internals).
+  No grandfathered exemptions remain.
+
+## Audit schema separation (PG `audit` schema -- read before touching audit tables)
+- `ai_interaction_audits` + `audit_logs` live in the dedicated PostgreSQL
+  `audit` schema (migration `20260812_audit_schema`, down_revision
+  `5037a1e583da`). Models carry `__table_args__ = {"schema": AUDIT_SCHEMA}`.
+- `AUDIT_SCHEMA` / `resolve_audit_schema(url)` in
+  `models/base.py`: `"audit"` on PostgreSQL, `None` on SQLite (no schemas --
+  tests/`create_all` behave exactly as before). Pure function -- unit-tested.
+- BOTH tables are FK-free with only soft id refs (verified structurally by
+  `tests/test_audit_schema_separation.py`, which also asserts nothing else
+  holds an FK into them). All reads are aggregate/admin-only through the
+  models (SQLAlchemy qualifies the schema automatically) -- zero service
+  changes were needed. Raw SQL must qualify `audit.<table>`.
+- Migration is PG-guarded + idempotent (SQLite no-op verified both
+  directions); downgrade moves tables back to `public` (schema kept).
+  `alembic heads` == single head `20260812_audit_schema`.
+- Deliberately NOT moved (FK-bound or workflow-read): referral_status_events
+  (hard FK to referrals), explanation/sync/version records, interop exports,
+  notifications, publishing jobs.
+- Follow-ups: native range partitioning on `created_at` + retention job
+  (drop/detach old partitions); per-schema autovacuum/backup tuning.
+
+## Production readiness (runbook: MEDICHECK_PRODUCTION_RUNBOOK.md)
+- `validate_production_boot()` (`app/main.py`, called in lifespan) RAISES in
+  production on: `ALLOW_MOCK_AUTH=true`, missing Firebase creds, default
+  `POSTGRES_PASSWORD`. Tests use development env -- unaffected. CORS
+  localhost check fixed (old comparison string could never match; now warns
+  when `CORS_ORIGINS` unset in prod).
+- Docs gating: `docs_enabled` setting (`None` = auto: on except production);
+  `create_app` sets docs/redoc/openapi urls to None when off. `export_openapi`
+  script calls `app.openapi()` directly -- unaffected.
+- `/api/v1/ready` (health.py, 200 only when DB+Redis healthy else 503) is the
+  readiness gate; `/api/v1/health` stays 200-always for liveness compat
+  (docker/render healthchecks hit it). Shared `_db_status`/`_redis_status`.
+- `LOG_FORMAT=json|text` (default text) via `JsonFormatter` (timestamp, level,
+  logger, request_id, message). Sentry: `SENTRY_DSN` + import-guarded init
+  (sentry-sdk NOT a hard dep; missing package -> warning, no crash).
+- Rate limiting is in-memory PER WORKER (4 workers ~= 4x effective limit;
+  resets on recycle) -- documented, Redis-backed global is a follow-up.
+  CSRF middleware stays OFF (stateless Bearer API). `SECRET_KEY` is currently
+  UNUSED by app code (Firebase owns auth). `VITE_API_URL` is build-time baked.
+- Tests: `tests/test_production_readiness.py` (14: boot validation, docs
+  gating, ready/health codes, JSON logs, Sentry path).

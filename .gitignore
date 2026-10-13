@@ -20,6 +20,13 @@ dist/
 coverage/
 frontend/coverage/
 
+# Orval codegen scratch space (scripts/check-generated-api.mjs temp output).
+# NOTE: frontend/openapi.json and frontend/src/api/generated/ ARE committed on
+# purpose - they are the source of truth for generated types and the CI drift
+# check. Do not ignore them.
+.orval-check/
+frontend/orval.config.check.ts
+
 # IDE
 .vs/
 .vscode/

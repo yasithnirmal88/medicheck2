@@ -28,7 +28,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.identity import get_current_user
 from app.application.ai.language import (
     LANGUAGE_LABELS,
     SUPPORTED_INTAKE_LANGUAGES,
@@ -42,6 +42,7 @@ from app.application.ai.stt_provider import (
 )
 from app.application.dtos.intake_dtos import IntakeResponse
 from app.application.services.ai_intake_service import AIIntakeService
+from app.core.exceptions import AIBudgetExceededError
 from app.core.logging import get_logger
 from app.infrastructure.database import get_db
 from app.infrastructure.persistence.models.assessment_session import (
@@ -125,7 +126,12 @@ async def extract_intake(
             session_ref=session_ref,
             language=payload.language,
             input_type=input_type,
+            user_id=user_id,
         )
+    except AIBudgetExceededError:
+        # Vendor budget exhausted: typed 429 to the caller, never a silent
+        # stub fallback.
+        raise
     except Exception as exc:  # pragma: no cover - defensive
         # Any unexpected service error → safe fallback, never a 500 that breaks
         # the intake UX. The standard questionnaire remains available.
@@ -200,7 +206,12 @@ async def transcribe_audio(
             audio_bytes,
             language=selected,
             content_type=ct or "audio/webm",
+            user_id=current_user.id,
         )
+    except AIBudgetExceededError:
+        # Vendor budget exhausted: typed 429 to the caller, never a silent
+        # fallback to typing masquerading as success.
+        raise
     except SpeechToTextError as exc:
         logger.warning("transcribe failure (safe): language=%s error=%s", selected, exc)
         raise HTTPException(

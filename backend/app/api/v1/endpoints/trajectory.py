@@ -20,7 +20,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_db
+from app.identity import get_current_user
 from app.application.dtos.longitudinal_dtos import (
     HealthTrajectory,
     LongitudinalExplanationResponse,

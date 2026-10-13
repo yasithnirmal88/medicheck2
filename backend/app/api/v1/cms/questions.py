@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Body, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_admin, get_cms_user, get_db
+from app.api.deps import get_db
 from app.application.dtos.questionnaire_dtos import QuestionResponse
 from app.domain.entities.question import (
     Question,
@@ -17,7 +17,7 @@ from app.domain.entities.question_dependency import QuestionDependency
 from app.domain.entities.question_group import QuestionGroup
 from app.domain.entities.question_option import QuestionOption
 from app.domain.entities.questionnaire_template import QuestionnaireTemplate
-from app.domain.entities.user import User
+from app.identity import User, get_cms_user, get_current_admin
 from app.infrastructure.persistence.repositories.sql_body_system_repository import (
     SQLBodySystemRepository,
 )

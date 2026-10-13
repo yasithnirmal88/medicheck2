@@ -15,7 +15,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_analytics_user, get_db
+from app.api.deps import get_db
 from app.application.dtos.analytics_dtos import (
     AccessibilityResponse,
     AnalyticsFilters,
@@ -32,7 +32,7 @@ from app.application.services.population_analytics_service import (
 )
 from app.core.config import settings
 from app.core.exceptions import AuthorizationError
-from app.domain.entities.user import User
+from app.identity import User, get_analytics_user
 
 logger = logging.getLogger(__name__)
 
