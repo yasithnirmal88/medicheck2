@@ -19,7 +19,6 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.dtos.ai_governance_dtos import (
@@ -222,7 +221,7 @@ class AiInsightReviewService:
 
     async def _audit_review(
         self,
-        reviewer: User,
+        _reviewer: User,
         insight_id: str,
         insight_kind: str,
         target_status: str,

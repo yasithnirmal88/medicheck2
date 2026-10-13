@@ -208,7 +208,7 @@ class EquityIntelligenceService:
 
     async def _persist(
         self,
-        user: User,
+        _user: User,
         context: EquityInsightContext,
         output: EquityInsightOutput,
         in_hash: str,
@@ -300,7 +300,7 @@ class EquityIntelligenceService:
 
     async def _audit(
         self,
-        user: User,
+        _user: User,
         context: EquityInsightContext,
         output: EquityInsightOutput | None,
         status: str,

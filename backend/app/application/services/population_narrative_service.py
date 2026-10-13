@@ -310,7 +310,7 @@ class PopulationNarrativeService:
 
     async def _audit(
         self,
-        user: User,
+        _user: User,
         contexts: list[SdgNarrativeContext],
         outputs: list[SdgNarrativeOutput] | None,
         status: str,

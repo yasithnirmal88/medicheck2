@@ -20,7 +20,7 @@ approve/reject/edit/publish).
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
@@ -181,7 +181,7 @@ class AiOperationalSuggestionService:
     # ── internal helpers ─────────────────────────────────────────────
 
     def _assert_chw_access(self, user: User) -> None:
-        from app.core.security.rbac import Permission, Role, get_role_permissions, check_permission
+        from app.core.security.rbac import Permission, Role, check_permission, get_role_permissions
 
         if not user.roles:
             raise AuthorizationError(detail="Operational AI access required")
@@ -199,7 +199,6 @@ class AiOperationalSuggestionService:
     async def _load_chw_referrals(
         self, chw_user: User
     ) -> list[ReferralModel]:
-        now = datetime.now(_UTC)
         stmt = (
             select(ReferralModel)
             .where(
