@@ -25,7 +25,7 @@ class AuthService:
         # must be granted by an administrator through the identity admin API.
         claims = await verify_firebase_token(firebase_token)
         firebase_uid = claims["uid"]
-        user_email = email or claims.get("email", "")
+        user_email = email or claims.get("email") or None
         user_name = full_name or claims.get("name", "User")
         avatar_url = claims.get("picture")
 
@@ -69,7 +69,7 @@ class AuthService:
             await self._user_repo.update(existing)
             return existing
 
-        user_email = claims.get("email", "")
+        user_email = claims.get("email") or None
         user_name = claims.get("name", "User")
         avatar_url = claims.get("picture")
 

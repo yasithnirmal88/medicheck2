@@ -138,7 +138,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     if not settings.secret_key or settings.secret_key == "change-me-to-a-random-secret-key":
         logger.warning(
             "SECURITY: SECRET_KEY is not set or is the default value. "
-            "Set a strong random key in .env for production."
+            "(Reserved for future symmetric signing; not used for Firebase tokens.)"
         )
     if settings.environment == Environment.PRODUCTION:
         if not settings.cors_origins:
@@ -234,7 +234,6 @@ def _setup_middleware(app: FastAPI) -> None:
         max_requests=settings.rate_limit_max_requests,
         window_seconds=settings.rate_limit_window_seconds,
     )
-    # app.add_middleware(CSRFProtectMiddleware)
 
 
 def _setup_exception_handlers(app: FastAPI) -> None:

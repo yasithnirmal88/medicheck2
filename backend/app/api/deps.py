@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncGenerator
 from typing import Annotated
 
-from fastapi import Depends, Header
+from fastapi import Depends, Header, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,6 +59,7 @@ async def _populate_user_roles(
 
 
 async def get_current_user(
+    request: Request,
     credentials: Annotated[
         HTTPAuthorizationCredentials | None, Depends(security_scheme)
     ],
@@ -87,7 +88,7 @@ async def get_current_user(
     user = await repo.find_by_firebase_uid(firebase_uid)
 
     if user is None:
-        user_email = claims.get("email", "")
+        user_email = claims.get("email") or None
         user_name = claims.get("name", "User")
         avatar_url = claims.get("picture")
 
@@ -111,6 +112,9 @@ async def get_current_user(
     # ever produces a User whose roles were not loaded.
     if getattr(user, "roles", None) is None:
         await _populate_user_roles(user, session)
+    # Expose the resolved identity for the audit middleware (replaces trusting
+    # the spoofable client-supplied x-user-id header).
+    request.state.user_id = user.id
     return user
 
 
@@ -125,7 +129,15 @@ async def get_current_active_user(
 async def get_current_doctor(
     current_user: Annotated[User, Depends(get_current_active_user)],
 ) -> User:
-    if not has_role(current_user.roles, Role.DOCTOR):
+    clinician_roles = {
+        Role.DOCTOR,
+        Role.GENERAL_PHYSICIAN,
+        Role.SPECIALIST_DOCTOR,
+        Role.MEDICAL_DIRECTOR,
+        Role.SUPER_ADMIN,
+    }
+    user_roles = set(current_user.roles)
+    if not (user_roles & {r.value for r in clinician_roles}):
         raise AuthorizationError(detail="Doctor access required")
     return current_user
 

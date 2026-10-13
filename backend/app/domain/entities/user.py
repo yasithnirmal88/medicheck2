@@ -10,7 +10,7 @@ from typing import Any
 class User:
     id: str
     firebase_uid: str
-    email: str
+    email: str | None
     full_name: str
     avatar_url: str | None
     email_verified: bool
@@ -25,7 +25,7 @@ class User:
     def create(
         cls,
         firebase_uid: str,
-        email: str,
+        email: str | None,
         full_name: str,
         avatar_url: str | None = None,
         role: str = "patient",
@@ -34,7 +34,7 @@ class User:
         return cls(
             id=uuid.uuid4().hex,
             firebase_uid=firebase_uid,
-            email=email.lower().strip(),
+            email=(email or "").strip().lower() or None,
             full_name=full_name.strip(),
             avatar_url=avatar_url,
             email_verified=False,

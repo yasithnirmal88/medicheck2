@@ -38,7 +38,7 @@ class AuditLogMiddleware(BaseHTTPMiddleware):
                     "client_ip": request.client.host if request.client else None,
                     "user_agent": request.headers.get("user-agent"),
                     "elapsed_ms": round(elapsed * 1000),
-                    "user_id": request.headers.get("x-user-id", "anonymous"),
+                    "user_id": getattr(request.state, "user_id", None) or "anonymous",
                 },
             )
             return response

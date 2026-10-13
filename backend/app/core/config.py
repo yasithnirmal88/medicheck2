@@ -144,7 +144,7 @@ class Settings(BaseSettings):
         ]
 
     # Security
-    csrf_protection_enabled: bool = True
+    csrf_protection_enabled: bool = False  # Stateless Bearer API does not require CSRF middleware in normal operation
     rate_limit_max_requests: int = 100
     rate_limit_window_seconds: int = 60
     enable_security_headers: bool = True
@@ -306,7 +306,10 @@ class Settings(BaseSettings):
                     "Set a strong password via POSTGRES_PASSWORD env var."
                 )
             if self.secret_key in ("", "change-me-to-a-random-secret-key"):
-                warnings.append("SECURITY: secret_key is not set. Authentication tokens are not secure!")
+                warnings.append(
+                    "SECURITY: secret_key is not set. "
+                    "(Reserved for future symmetric signing; not used for Firebase tokens.)"
+                )
             if self.redis_password == "":
                 warnings.append("SECURITY: redis_password is empty. Set a password via REDIS_PASSWORD env var.")
         return warnings

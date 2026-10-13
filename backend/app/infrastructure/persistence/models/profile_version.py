@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.infrastructure.persistence.models.base import BaseModel
@@ -17,10 +17,12 @@ class ProfileVersionModel(BaseModel):
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     snapshot: Mapped[dict] = mapped_column(JSON, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     created_by: Mapped[str | None] = mapped_column(
         ForeignKey("users.id"), nullable=True, index=True
     )
 
-    # Note: rely on BaseModel timestamps for created/updated, but we add created_at for clarity
+    # Note: created_at is redeclared here (ordering), so it must repeat the
+    # BaseModel server_default; the profile-version write path uses Core
+    # ``insert()`` and would otherwise violate the NOT NULL constraint.
