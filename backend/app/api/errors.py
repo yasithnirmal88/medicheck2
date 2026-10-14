@@ -103,6 +103,20 @@ async def http_exception_handler(
     request: Request,
     exc: StarletteHTTPException,
 ) -> JSONResponse:
+    if exc.status_code >= 500:
+        logger.exception(
+            "Unhandled HTTP exception for %s %s: %d %s",
+            request.method,
+            request.url.path,
+            exc.status_code,
+            exc.detail,
+        )
+        body = ErrorResponse(
+            success=False,
+            error=ErrorBody(code="internal_error", message="An unexpected error occurred", details=[]),
+        ).model_dump()
+        return JSONResponse(status_code=500, content=body)
+
     logger.warning(
         "HTTP exception for %s %s: %d %s",
         request.method,

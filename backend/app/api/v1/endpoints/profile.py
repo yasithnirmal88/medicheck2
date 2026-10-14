@@ -6,7 +6,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db
 from app.application.dtos.profile_dtos import HealthProfileDTO, PersonalInfoDTO
 from app.application.services.profile_service import ProfileService
+from app.core.exceptions import InternalError
+from app.core.logging import get_logger
 from app.identity import User, get_current_active_user
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -29,10 +33,12 @@ async def update_personal_info(
 ) -> HealthProfileDTO:
     svc = ProfileService(session)
     try:
-        updated = await svc.update_personal_info(current_user, payload)
-        return updated
+        return await svc.update_personal_info(current_user, payload)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Unexpected error updating personal info for user %s", current_user.id)
+        raise InternalError("An unexpected error occurred") from exc
 
 
 @router.get("/me/versions")
@@ -76,12 +82,12 @@ async def restore_version(
 ):
     svc = ProfileService(session)
     try:
-        result = await svc.restore_version(current_user, version)
-        return result
+        return await svc.restore_version(current_user, version)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception("Unexpected error restoring profile version %s for user %s", version, current_user.id)
+        raise InternalError("An unexpected error occurred") from exc
 
 
 # Section endpoints (lifestyle, nutrition)

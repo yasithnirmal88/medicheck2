@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
+import logging
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +14,8 @@ from app.identity import User, get_cms_user
 from app.infrastructure.persistence.models.questionnaire_rule_set import (
     QuestionnaireRuleSetModel,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/cms/rules", tags=["CMS Rule Engine"])
 
@@ -178,8 +182,12 @@ async def validate_expression(
     try:
         result = svc.evaluate_expression(expression, context)
         return {"valid": True, "result": result}
-    except Exception as e:
-        return {"valid": False, "error": str(e)}
+    except (KeyError, TypeError, ValueError) as exc:
+        logger.warning("Rule expression validation failed for cms user: %s", exc)
+        return {"valid": False, "error": str(exc) or "Expression validation failed"}
+    except Exception:
+        logger.exception("Unexpected rule expression validation failure")
+        return {"valid": False, "error": "Expression validation failed"}
 
 
 @router.post("/compute")
