@@ -9,10 +9,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db
 from app.api.v1.cms.authz import require_cms_permission
 from app.application.services.cms.rule_engine_service import RuleEngineService
+from app.core.logging import get_logger
 from app.identity import Permission, User, get_cms_user
 from app.infrastructure.persistence.models.questionnaire_rule_set import (
     QuestionnaireRuleSetModel,
 )
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/cms/rules", tags=["CMS Rule Engine"])
 
@@ -183,8 +186,11 @@ async def validate_expression(
     try:
         result = svc.evaluate_expression(expression, context)
         return {"valid": True, "result": result}
-    except Exception as e:
-        return {"valid": False, "error": str(e)}
+    except Exception:
+        # Do not echo raw evaluation errors (internal engine details) back to
+        # the caller; log the traceback server-side and return a generic flag.
+        logger.exception("Rule expression evaluation failed")
+        return {"valid": False, "error": "Invalid or unsupported expression"}
 
 
 @router.post("/compute")

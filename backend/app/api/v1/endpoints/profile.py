@@ -6,9 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_db
 from app.application.dtos.profile_dtos import HealthProfileDTO, PersonalInfoDTO
 from app.application.services.profile_service import ProfileService
+from app.core.logging import get_logger
 from app.identity import User, get_current_active_user
 
+logger = get_logger(__name__)
+
 router = APIRouter(prefix="/profiles", tags=["profiles"])
+
+_INTERNAL_ERROR_MESSAGE = "An unexpected error occurred"
 
 
 @router.get("/me", response_model=HealthProfileDTO)
@@ -31,8 +36,14 @@ async def update_personal_info(
     try:
         updated = await svc.update_personal_info(current_user, payload)
         return updated
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception(
+            "Unexpected error updating personal info for user %s",
+            current_user.id,
+        )
+        raise HTTPException(status_code=500, detail=_INTERNAL_ERROR_MESSAGE) from exc
 
 
 @router.get("/me/versions")
@@ -80,8 +91,15 @@ async def restore_version(
         return result
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.exception(
+            "Unexpected error restoring version %s for user %s",
+            version,
+            current_user.id,
+        )
+        raise HTTPException(status_code=500, detail=_INTERNAL_ERROR_MESSAGE) from exc
 
 
 # Section endpoints (lifestyle, nutrition)
