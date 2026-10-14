@@ -14,6 +14,7 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
+import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_admin, get_cms_user, get_db
@@ -44,14 +45,39 @@ def _cms_admin() -> User:
     )
 
 
-@pytest.fixture
-def cms_overrides(client):
+@pytest_asyncio.fixture
+async def cms_overrides(client, db_session: AsyncSession):
+    """Authenticate the request as a CMS MEDICAL_DIRECTOR.
+
+    The write endpoints now resolve the caller's effective permissions from the
+    database (``app.identity.get_user_permissions``), so the injected user must
+    exist in the DB with its MEDICAL_DIRECTOR role linked — exactly as in
+    production. The override only short-circuits token authentication.
+    """
     admin = _cms_admin()
-    app = client.app if hasattr(client, "app") else None
-    # The conftest client fixture creates the app internally; access it via
-    # the transport's raw_app.
-    if app is None:
-        app = client._transport.app  # type: ignore[attr-defined]
+    app = client._transport.app  # type: ignore[attr-defined]
+    role = RoleModel(
+        code=Role.MEDICAL_DIRECTOR.value,
+        name={"en": "Medical Director"},
+        description="test role",
+        is_system=True,
+        priority=30,
+    )
+    user_row = UserModel(
+        id=admin.id,
+        firebase_uid=admin.firebase_uid,
+        email=admin.email,
+        full_name=admin.full_name,
+        email_verified=True,
+        is_active=True,
+    )
+    db_session.add_all([role, user_row])
+    await db_session.flush()
+    await db_session.execute(
+        user_role_table.insert().values(user_id=admin.id, role_id=role.id)
+    )
+    await db_session.commit()
+
     app.dependency_overrides[get_cms_user] = lambda: admin
     app.dependency_overrides[get_current_admin] = lambda: admin
     yield app

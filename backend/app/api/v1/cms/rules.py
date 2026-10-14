@@ -7,8 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
+from app.api.v1.cms.authz import require_cms_permission
 from app.application.services.cms.rule_engine_service import RuleEngineService
-from app.identity import User, get_cms_user
+from app.identity import Permission, User, get_cms_user
 from app.infrastructure.persistence.models.questionnaire_rule_set import (
     QuestionnaireRuleSetModel,
 )
@@ -74,7 +75,9 @@ async def get_rule_set(
 
 @router.post("")
 async def create_rule_set(
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[
+        User, Depends(require_cms_permission(Permission.CMS_WRITE_RULE))
+    ],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -97,7 +100,9 @@ async def create_rule_set(
 @router.put("/{rule_set_id}")
 async def update_rule_set(
     rule_set_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[
+        User, Depends(require_cms_permission(Permission.CMS_WRITE_RULE))
+    ],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):

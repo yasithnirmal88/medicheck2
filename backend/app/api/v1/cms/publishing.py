@@ -6,12 +6,23 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
+from app.api.v1.cms.authz import require_cms_permission
 from app.application.services.cms.publishing_service import (
     PublishingWorkflowService,
 )
-from app.identity import User, get_cms_user
+from app.identity import Permission, User, get_cms_user
 
 router = APIRouter(prefix="/cms/publishing", tags=["CMS Publishing Workflow"])
+
+# Mutating endpoints require the operation-specific CMS permission. Read
+# endpoints keep the generic get_cms_user gate (any CMS role).
+_require_workflow = require_cms_permission(Permission.CMS_WRITE_WORKFLOW)
+_require_publish = require_cms_permission(Permission.CMS_WRITE_PUBLISH)
+_require_approval = require_cms_permission(Permission.CMS_WRITE_APPROVAL)
+_require_change_request = require_cms_permission(
+    Permission.CMS_WRITE_CHANGE_REQUEST
+)
+_require_approve = require_cms_permission(Permission.CMS_APPROVE_CONTENT)
 
 
 # --- Workflows ---
@@ -28,7 +39,7 @@ async def list_workflows(
 
 @router.post("/workflows")
 async def create_workflow(
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_workflow)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -58,7 +69,7 @@ async def get_workflow(
 @router.put("/workflows/{workflow_id}")
 async def update_workflow(
     workflow_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_workflow)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -84,7 +95,7 @@ async def list_jobs(
 
 @router.post("/jobs")
 async def create_job(
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_publish)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -115,7 +126,7 @@ async def get_job(
 @router.post("/jobs/{job_id}/approve")
 async def approve_job(
     job_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_approve)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = PublishingWorkflowService(session)
@@ -128,7 +139,7 @@ async def approve_job(
 @router.post("/jobs/{job_id}/publish")
 async def execute_publish(
     job_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_publish)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = PublishingWorkflowService(session)
@@ -141,7 +152,7 @@ async def execute_publish(
 @router.post("/jobs/{job_id}/fail")
 async def fail_job(
     job_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_publish)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -155,7 +166,7 @@ async def fail_job(
 @router.post("/jobs/{job_id}/rollback")
 async def rollback_job(
     job_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_publish)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -168,7 +179,7 @@ async def rollback_job(
 
 @router.post("/jobs/process-scheduled")
 async def process_scheduled(
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_publish)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = PublishingWorkflowService(session)
@@ -190,7 +201,7 @@ async def list_approvals(
 
 @router.post("/approvals")
 async def create_approval(
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_approval)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -207,7 +218,7 @@ async def create_approval(
 @router.post("/approvals/{approval_id}/approve")
 async def approve_entity(
     approval_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_approve)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body({}),
 ):
@@ -223,7 +234,7 @@ async def approve_entity(
 @router.post("/approvals/{approval_id}/reject")
 async def reject_approval(
     approval_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_approve)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -239,7 +250,7 @@ async def reject_approval(
 @router.post("/approvals/{approval_id}/comment")
 async def add_approval_comment(
     approval_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_approval)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -267,7 +278,7 @@ async def list_reviews(
 
 @router.post("/reviews")
 async def create_review(
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_approval)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -283,7 +294,7 @@ async def create_review(
 @router.post("/reviews/{review_id}/complete")
 async def complete_review(
     review_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_approve)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -314,7 +325,7 @@ async def list_change_requests(
 
 @router.post("/change-requests")
 async def create_change_request(
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_change_request)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -333,7 +344,7 @@ async def create_change_request(
 @router.post("/change-requests/{cr_id}/approve")
 async def approve_change_request(
     cr_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_approve)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = PublishingWorkflowService(session)
@@ -346,7 +357,7 @@ async def approve_change_request(
 @router.post("/change-requests/{cr_id}/reject")
 async def reject_change_request(
     cr_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_approve)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -385,7 +396,7 @@ async def list_snapshots(
 
 @router.post("/snapshots")
 async def create_snapshot(
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_publish)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):

@@ -322,6 +322,34 @@ Full findings: `CMS_CONTENT_FORENSIC_REPORT.md`. Key facts to preserve:
   `PUT /admin/users/{id}/roles` (now implemented). This is correct security posture; do
   NOT auto-grant CMS roles on signup.
 
+### CMS write-authorization hardening (branch fix/cms-rbac-write-permissions)
+- GAP: `get_cms_user` only asserts *any* CMS role (READ_ONLY_REVIEWER and above, level
+  >=5). The `rules.py`, `publishing.py`, `knowledge_graph.py` routers declared only
+  `Depends(get_cms_user)` on MUTATING endpoints, so a read-only reviewer (or any CMS
+  role lacking the specific write permission) could create/update/delete. `content.py`,
+  `builder.py`, `evidence.py` already had per-endpoint write checks; these three did not.
+- FIX: new `app/api/v1/cms/authz.py` -> `require_cms_permission(permission)` returns a
+  FastAPI dependency that depends on `get_cms_user` (auth) + resolves
+  `app.identity.get_user_permissions(session, user.id)` and raises 403 unless the
+  permission is held. Each mutating endpoint now uses
+  `Depends(require_cms_permission(Permission.CMS_WRITE_*))` (module-level aliases in
+  `publishing.py`/`knowledge_graph.py`). READ/compute/validate endpoints keep
+  `get_cms_user` (adding CMS_READ_* checks there would newly deny DOCTOR/GENERAL_PHYSICIAN,
+  a regression). Endpoint mapping: rules create/update -> CMS_WRITE_RULE; KG
+  graphs/nodes/edges/bulk-link -> CMS_WRITE_KNOWLEDGE_GRAPH; publishing workflows ->
+  CMS_WRITE_WORKFLOW, jobs/snapshots -> CMS_WRITE_PUBLISH, approvals/reviews/comments ->
+  CMS_WRITE_APPROVAL, change-requests -> CMS_WRITE_CHANGE_REQUEST, approve/reject/complete
+  decisions (jobs/approvals/reviews/change-requests) -> CMS_APPROVE_CONTENT.
+- No route paths/operation IDs/security schemes changed (verified: OpenAPI security
+  identical to unchanged GET; `create_app().openapi()` builds, 206 paths). No migration.
+- Tests: new `tests/test_cms_write_authorization.py` (8: read-only/general-physician/
+  content-editor denied per permission, authorized roles allowed, reads open to
+  read-only reviewer, unauthenticated 401). Existing
+  `tests/test_cms_recovery_endpoints.py` `cms_overrides` fixture now seeds the DB
+  user+role so `get_user_permissions` resolves (the in-memory-only override user had no
+  DB row -> would 403 after the fix). Regression batch (CMS/RBAC/identity/CHW/UAT/roles
+  integration) 74 pass. `ruff check app` clean.
+
 ### Test commands (verified)
 - Backend: `cd backend && ALLOW_MOCK_AUTH=true DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=development python -m pytest tests/ -q -W error::DeprecationWarning` -> 252 pass.
 - Frontend: `cd frontend && npm run typecheck && CI=true npx vitest run` -> 43 pass, typecheck clean.

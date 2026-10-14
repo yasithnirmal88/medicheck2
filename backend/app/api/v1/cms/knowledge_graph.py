@@ -6,12 +6,16 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_db
+from app.api.v1.cms.authz import require_cms_permission
 from app.application.services.cms.knowledge_graph_editor_service import (
     KnowledgeGraphEditorService,
 )
-from app.identity import User, get_cms_user
+from app.identity import Permission, User, get_cms_user
 
 router = APIRouter(prefix="/cms/knowledge-graph", tags=["CMS Knowledge Graph"])
+
+# All graph/node/edge mutations require CMS_WRITE_KNOWLEDGE_GRAPH.
+_require_write = require_cms_permission(Permission.CMS_WRITE_KNOWLEDGE_GRAPH)
 
 
 @router.get("/graphs")
@@ -26,7 +30,7 @@ async def list_graphs(
 
 @router.post("/graphs")
 async def create_graph(
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_write)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -55,7 +59,7 @@ async def get_graph(
 @router.put("/graphs/{graph_id}")
 async def update_graph(
     graph_id: str,
-    user: Annotated[User, Depends(get_cms_user)],
+    user: Annotated[User, Depends(_require_write)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -69,7 +73,7 @@ async def update_graph(
 @router.delete("/graphs/{graph_id}")
 async def delete_graph(
     graph_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_write)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KnowledgeGraphEditorService(session)
@@ -80,7 +84,7 @@ async def delete_graph(
 @router.post("/graphs/{graph_id}/nodes")
 async def add_node(
     graph_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_write)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -100,7 +104,7 @@ async def add_node(
 @router.put("/graphs/nodes/{node_id}")
 async def update_node(
     node_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_write)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -114,7 +118,7 @@ async def update_node(
 @router.delete("/graphs/nodes/{node_id}")
 async def remove_node(
     node_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_write)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KnowledgeGraphEditorService(session)
@@ -125,7 +129,7 @@ async def remove_node(
 @router.post("/graphs/{graph_id}/edges")
 async def add_edge(
     graph_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_write)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
@@ -144,7 +148,7 @@ async def add_edge(
 @router.delete("/graphs/edges/{edge_id}")
 async def remove_edge(
     edge_id: str,
-    _user: Annotated[User, Depends(get_cms_user)],
+    _user: Annotated[User, Depends(_require_write)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ):
     svc = KnowledgeGraphEditorService(session)
@@ -186,7 +190,7 @@ async def search_entities(
 
 @router.post("/bulk-link")
 async def bulk_link(
-    __user: Annotated[User, Depends(get_cms_user)],
+    __user: Annotated[User, Depends(_require_write)],
     session: Annotated[AsyncSession, Depends(get_db)],
     payload: dict = Body(...),
 ):
