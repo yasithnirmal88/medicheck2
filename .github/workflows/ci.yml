@@ -21,7 +21,7 @@ jobs:
       fail-fast: false
       matrix:
         group:
-          - "tests/test_admin_service.py tests/test_cdse_answer_activation.py tests/test_clinical_decision_service.py tests/test_cms_recovery_endpoints.py tests/test_knowledge_graph.py tests/test_report_service.py tests/test_uat.py"
+          - "tests/test_admin_service.py tests/test_cdse_answer_activation.py tests/test_clinical_decision_service.py tests/test_cms_recovery_endpoints.py tests/test_cms_knowledge_graph_metadata.py tests/test_knowledge_graph.py tests/test_report_service.py tests/test_uat.py"
           - "tests/test_interoperability_phase10.py tests/test_fhir_r4_validation.py tests/test_chw_phase8.py"
           - "tests/test_intake_phase5.py tests/test_ai_intake_phase3.py tests/test_longitudinal_phase4.py"
           - "tests/test_ai_budget.py tests/test_ai_explanation_phase1.py tests/test_ai_phase7.py tests/test_ai_providers_http.py tests/test_ai_rag_phase2.py"
