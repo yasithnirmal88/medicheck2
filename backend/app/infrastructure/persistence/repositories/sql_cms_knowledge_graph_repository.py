@@ -126,7 +126,7 @@ class SQLCMSKnowledgeGraphRepository(KnowledgeGraphRepository):
             x_position=node.x_position,
             y_position=node.y_position,
             color=node.color,
-            metadata=node.metadata,
+            extra_metadata=node.metadata,
             created_at=node.created_at,
             updated_at=node.updated_at,
         )
@@ -155,7 +155,7 @@ class SQLCMSKnowledgeGraphRepository(KnowledgeGraphRepository):
         model.x_position = node.x_position
         model.y_position = node.y_position
         model.color = node.color
-        model.metadata = node.metadata
+        model.extra_metadata = node.metadata
         model.updated_at = node.updated_at
 
         await self._session.flush()
@@ -180,7 +180,7 @@ class SQLCMSKnowledgeGraphRepository(KnowledgeGraphRepository):
             relationship_type=edge.relationship_type,
             label=edge.label,
             weight=edge.weight,
-            metadata=edge.metadata,
+            extra_metadata=edge.metadata,
             created_at=edge.created_at,
         )
         self._session.add(model)
@@ -225,7 +225,7 @@ class SQLCMSKnowledgeGraphRepository(KnowledgeGraphRepository):
             x_position=model.x_position,
             y_position=model.y_position,
             color=model.color,
-            metadata=model.metadata or {},
+            metadata=model.extra_metadata or {},
             created_at=model.created_at,
             updated_at=model.updated_at,
         )
@@ -241,6 +241,6 @@ class SQLCMSKnowledgeGraphRepository(KnowledgeGraphRepository):
             relationship_type=model.relationship_type,
             label=model.label,
             weight=model.weight,
-            metadata=model.metadata or {},
+            metadata=model.extra_metadata or {},
             created_at=model.created_at,
         )
